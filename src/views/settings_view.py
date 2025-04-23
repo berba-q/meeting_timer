@@ -163,6 +163,25 @@ class SettingsDialog(QDialog):
         display_mode_layout.addWidget(self.digital_mode_radio)
         display_mode_layout.addWidget(self.analog_mode_radio)
         
+        # Theme selection
+        theme_layout = QHBoxLayout()
+        theme_layout.addWidget(QLabel("Theme:"))
+        
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItem("Light Theme", "light")
+        self.theme_combo.addItem("Dark Theme", "dark")
+        
+        theme_layout.addWidget(self.theme_combo)
+        display_mode_layout.addLayout(theme_layout)
+        
+        # Meeting timing options
+        timing_group = QGroupBox("Meeting Timing")
+        timing_layout = QVBoxLayout(timing_group)
+        
+        self.show_end_time_check = QCheckBox("Show predicted meeting end time")
+        self.show_end_time_check.setToolTip("Display the predicted meeting end time based on current progress")
+        timing_layout.addWidget(self.show_end_time_check)
+        
         # Screen selection
         screen_group = QGroupBox("Screen Selection")
         screen_layout = QFormLayout(screen_group)
@@ -196,6 +215,7 @@ class SettingsDialog(QDialog):
         
         # Add groups to layout
         layout.addWidget(display_mode_group)
+        layout.addWidget(timing_group)
         layout.addWidget(screen_group)
         layout.addStretch()
     
@@ -227,6 +247,14 @@ class SettingsDialog(QDialog):
         is_digital = settings.display.display_mode == TimerDisplayMode.DIGITAL
         self.digital_mode_radio.setChecked(is_digital)
         self.analog_mode_radio.setChecked(not is_digital)
+        
+        # Theme setting
+        theme_index = self.theme_combo.findData(settings.display.theme)
+        if theme_index >= 0:
+            self.theme_combo.setCurrentIndex(theme_index)
+        
+        # Predicted end time
+        self.show_end_time_check.setChecked(settings.display.show_predicted_end_time)
         
         # Screen settings
         primary_index = self.primary_screen_combo.findData(settings.display.primary_screen_index)
@@ -264,6 +292,13 @@ class SettingsDialog(QDialog):
         # Display settings
         display_mode = TimerDisplayMode.DIGITAL if self.digital_mode_radio.isChecked() else TimerDisplayMode.ANALOG
         self.settings_controller.set_display_mode(display_mode)
+        
+        # Theme setting
+        theme = self.theme_combo.currentData()
+        self.settings_controller.set_theme(theme)
+        
+        # Predicted end time
+        self.settings_controller.set_show_predicted_end_time(self.show_end_time_check.isChecked())
         
         # Screen settings
         primary_screen = self.primary_screen_combo.currentData()

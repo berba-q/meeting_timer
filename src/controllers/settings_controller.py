@@ -19,6 +19,7 @@ class SettingsController(QObject):
     settings_changed = pyqtSignal()
     language_changed = pyqtSignal(str)
     display_mode_changed = pyqtSignal(TimerDisplayMode)
+    theme_changed = pyqtSignal(str)
     
     def __init__(self, settings_manager: SettingsManager):
         super().__init__()
@@ -69,6 +70,22 @@ class SettingsController(QObject):
         self.settings_manager.settings.display.display_mode = display_mode
         self.settings_manager.save_settings()
         self.display_mode_changed.emit(display_mode)
+        self.settings_changed.emit()
+    
+    def set_theme(self, theme: str):
+        """Set application theme (light or dark)"""
+        if theme not in ['light', 'dark']:
+            theme = 'light'  # Default to light theme if invalid
+            
+        self.settings_manager.settings.display.theme = theme
+        self.settings_manager.save_settings()
+        self.theme_changed.emit(theme)
+        self.settings_changed.emit()
+    
+    def set_show_predicted_end_time(self, enabled: bool):
+        """Enable/disable predicted meeting end time"""
+        self.settings_manager.settings.display.show_predicted_end_time = enabled
+        self.settings_manager.save_settings()
         self.settings_changed.emit()
     
     def set_primary_screen(self, screen_index: int):
