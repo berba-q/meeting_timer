@@ -52,8 +52,8 @@ class TestMeetingScraper(unittest.TestCase):
         <body>
             <div class="meetingItems">
                 <ul>
-                    <li><a href="/en/wol/dt/r1/lp-e/2023/4/21">Treasures From God's Word</a></li>
-                    <li><a href="/en/wol/dt/r1/lp-e/2023/4/23">Watchtower Study</a></li>
+                    <li><a href="en/wol/meetings/r1">Treasures From God's Word</a></li>
+                    <li><a href="en/wol/meetings/r1">Watchtower Study</a></li>
                 </ul>
             </div>
         </body>
@@ -66,9 +66,9 @@ class TestMeetingScraper(unittest.TestCase):
         <html>
         <body>
             <header>
-                <h1>Midweek Meeting: April 21-27, 2023</h1>
+                <h1>Midweek Meeting: April 21-27, 2025</h1>
             </header>
-            <div class="pubDate">April 21-27, 2023</div>
+            <div class="pubDate">April 21-27, 2025</div>
             
             <div class="section">
                 <h2>Treasures From God's Word</h2>
@@ -115,9 +115,9 @@ class TestMeetingScraper(unittest.TestCase):
         <html>
         <body>
             <header>
-                <h1>Weekend Meeting: April 23, 2023</h1>
+                <h1>Weekend Meeting: April 23, 2025</h1>
             </header>
-            <div class="pubDate">April 23, 2023</div>
+            <div class="pubDate">April 26, 2025</div>
             
             <div class="section">
                 <h2>Public Talk</h2>
@@ -166,11 +166,11 @@ class TestMeetingScraper(unittest.TestCase):
         mock_session.return_value.get.return_value = mock_response
         
         # Call the method
-        meeting = self.scraper.scrape_meeting("http://example.com/midweek", MeetingType.MIDWEEK)
+        meeting = self.scraper.scrape_meeting("https://wol.jw.org/en/wol/meetings/", MeetingType.MIDWEEK)
         
         # Check meeting properties
         self.assertEqual(meeting.meeting_type, MeetingType.MIDWEEK)
-        self.assertEqual(meeting.title, "Midweek Meeting: April 21-27, 2023")
+        self.assertEqual(meeting.title, "Midweek Meeting: April 21-27, 2025")
         self.assertEqual(meeting.language, "en")
         
         # Check sections and parts
