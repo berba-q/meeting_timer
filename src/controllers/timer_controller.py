@@ -8,6 +8,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from src.models.meeting import Meeting, MeetingPart
 from src.models.timer import Timer, TimerState
 
+
 class TimerController(QObject):
     """Controller for managing timer functionality"""
     
@@ -19,6 +20,7 @@ class TimerController(QObject):
     countdown_started = pyqtSignal(datetime)  # target datetime
     transition_started = pyqtSignal(str)  # transition description
     meeting_overtime = pyqtSignal(int)  # total overtime in seconds
+    predicted_end_time_updated = pyqtSignal(datetime, datetime)  # original and predicted end times
     
     def __init__(self):
         super().__init__()
@@ -37,6 +39,10 @@ class TimerController(QObject):
         
         # Meeting progress tracking
         self._total_overtime_seconds = 0
+        self._meeting_start_time = None
+        self._original_end_time = None
+        self._predicted_end_time = None
+        self._remaining_parts_duration = 0
         
         # Connect timer signals
         self.timer.state_changed.connect(self._handle_timer_state_change)
@@ -61,12 +67,74 @@ class TimerController(QObject):
         self.current_part_index = 0
         current_part = self.parts_list[self.current_part_index]
         
+        # Reset overtime tracking
+        self._total_overtime_seconds = 0
+        
+        # Record meeting start time and calculate original end time
+        self._meeting_start_time = datetime.now()
+        self._calculate_original_end_time()
+        self._predicted_end_time = self._original_end_time
+        
         # Start timer for first part
         self.timer.start(current_part.duration_seconds)
         
         # Emit signals
         self.part_changed.emit(current_part, self.current_part_index)
         self.meeting_started.emit()
+        self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time)
+    
+    def _calculate_original_end_time(self):
+        """Calculate the original end time based on scheduled parts"""
+        if not self.current_meeting:
+            return
+        
+        # Calculate total meeting duration in seconds
+        total_seconds = 0
+        for part in self.parts_list:
+            total_seconds += part.duration_seconds
+        
+        # Add transition times between sections (1 minute per transition)
+        section_transitions = len(self.current_meeting.sections) - 1
+        total_seconds += section_transitions * 60
+        
+        # Set the original end time
+        self._original_end_time = self._meeting_start_time + timedelta(seconds=total_seconds)
+    
+    def _update_predicted_end_time(self):
+        """Update the predicted end time based on current progress"""
+        if not self._meeting_start_time or self.current_part_index < 0:
+            return
+        
+        # Calculate remaining parts duration
+        self._remaining_parts_duration = 0
+        for i in range(self.current_part_index + 1, len(self.parts_list)):
+            self._remaining_parts_duration += self.parts_list[i].duration_seconds
+        
+        # Add remaining transition times (1 minute per transition between sections)
+        remaining_transitions = 0
+        if self.current_part_index < len(self.parts_list) - 1:
+            # Count transitions between remaining sections
+            current_section_index = -1
+            for section_index, section in enumerate(self.current_meeting.sections):
+                for part in section.parts:
+                    if current_section_index == -1 and part == self.parts_list[self.current_part_index]:
+                        current_section_index = section_index
+                        break
+                if current_section_index != -1:
+                    break
+            
+            if current_section_index != -1:
+                remaining_transitions = len(self.current_meeting.sections) - current_section_index - 1
+        
+        # Add transition times
+        self._remaining_parts_duration += remaining_transitions * 60
+        
+        # Current time + remaining time + any accumulated overtime
+        now = datetime.now()
+        self._predicted_end_time = now + timedelta(seconds=self._remaining_parts_duration)
+        
+        # Emit signal with updated prediction
+        self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time)
     
     def next_part(self):
         """Move to the next part"""
@@ -82,6 +150,9 @@ class TimerController(QObject):
         # Transitions happen between sections, not between parts within the same section
         if self._should_add_chairman_transition():
             self._start_chairman_transition()
+            
+            # Update predicted end time
+            self._update_predicted_end_time()
             return
         
         # Move to next part
@@ -100,6 +171,9 @@ class TimerController(QObject):
         
         # Emit signal
         self.part_changed.emit(current_part, self.current_part_index)
+        
+        # Update predicted end time
+        self._update_predicted_end_time()
     
     def _should_add_chairman_transition(self):
         """Check if we should add a chairman transition between parts"""
@@ -169,6 +243,9 @@ class TimerController(QObject):
         
         # Emit signal
         self.part_changed.emit(current_part, self.current_part_index)
+        
+        # Update predicted end time
+        self._update_predicted_end_time()
     
     def stop_meeting(self):
         """Stop the current meeting"""
@@ -193,6 +270,9 @@ class TimerController(QObject):
     def adjust_time(self, minutes_delta: int):
         """Adjust the current timer by adding/removing minutes"""
         self.timer.adjust_time(minutes_delta * 60)
+        
+        # Update predicted end time since we've changed the duration
+        self._update_predicted_end_time()
     
     def jump_to_part(self, part_index: int):
         """Jump to a specific part"""
@@ -214,6 +294,9 @@ class TimerController(QObject):
             
             # Emit signal
             self.part_changed.emit(current_part, self.current_part_index)
+            
+            # Update predicted end time
+            self._update_predicted_end_time()
     
     def start_countdown_to_meeting(self, meeting: Meeting):
         """Start countdown to the meeting time"""
@@ -264,6 +347,9 @@ class TimerController(QObject):
             
             # Emit signal about total meeting overtime
             self.meeting_overtime.emit(self._total_overtime_seconds)
+            
+            # Update predicted end time
+            self._update_predicted_end_time()
         
         # Check if transition is complete
         if self._in_transition and seconds == 0:
@@ -285,3 +371,6 @@ class TimerController(QObject):
             
             # Emit signal
             self.part_changed.emit(current_part, self.current_part_index)
+            
+            # Update predicted end time
+            self._update_predicted_end_time()
