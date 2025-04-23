@@ -1,0 +1,223 @@
+/* Light theme for JW Meeting Timer */
+
+/* Main Window */
+QMainWindow, QDialog {
+    background-color: #f5f5f5;
+    color: #333333;
+}
+
+/* Buttons */
+QPushButton {
+    background-color: #4a90e2;
+    color: white;
+    border: 1px solid #3a80d2;
+}
+
+QPushButton:hover {
+    background-color: #5aa0f2;
+    border: 1px solid #4a90e2;
+}
+
+QPushButton:pressed {
+    background-color: #3a80d2;
+}
+
+QPushButton:disabled {
+    background-color: #cccccc;
+    color: #999999;
+    border: 1px solid #bbbbbb;
+}
+
+/* Special buttons */
+QPushButton#startButton {
+    background-color: #4caf50;
+    border: 1px solid #3d9f40;
+}
+
+QPushButton#startButton:hover {
+    background-color: #5cbf60;
+}
+
+QPushButton#pauseButton {
+    background-color: #ff9800;
+    border: 1px solid #e68900;
+}
+
+QPushButton#pauseButton:hover {
+    background-color: #ffab30;
+}
+
+QPushButton#stopButton {
+    background-color: #f44336;
+    border: 1px solid #e53930;
+}
+
+QPushButton#stopButton:hover {
+    background-color: #f55549;
+}
+
+/* Timer view */
+TimerView {
+    background-color: white;
+    border: 1px solid #dddddd;
+}
+
+TimerView QLabel#timerLabel {
+    color: #333333;
+}
+
+/* Digital timer colors */
+QLabel#digitalTimerRunning {
+    color: #4caf50;  /* Green */
+}
+
+QLabel#digitalTimerWarning {
+    color: #ff9800;  /* Orange */
+}
+
+QLabel#digitalTimerDanger {
+    color: #f44336;  /* Red */
+}
+
+QLabel#digitalTimerPaused {
+    color: #2196f3;  /* Blue */
+}
+
+QLabel#digitalTimerTransition {
+    color: #9c27b0;  /* Purple */
+}
+
+/* Tool Bar */
+QToolBar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #dddddd;
+}
+
+/* Status Bar */
+QStatusBar {
+    background-color: #ffffff;
+    color: #666666;
+    border-top: 1px solid #dddddd;
+}
+
+/* Status indicators */
+QLabel#overtimeLabel {
+    color: white;
+    background-color: #f44336;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+QLabel#endTimeLabel {
+    color: #4caf50;
+    font-weight: bold;
+}
+
+QLabel#endTimeWarningLabel {
+    color: #f44336;
+    font-weight: bold;
+}
+
+/* Tabs */
+QTabWidget::pane {
+    border: 1px solid #dddddd;
+    background-color: white;
+}
+
+QTabBar::tab {
+    background-color: #f0f0f0;
+    color: #666666;
+    border: 1px solid #dddddd;
+    border-bottom: none;
+}
+
+QTabBar::tab:selected {
+    background-color: white;
+    color: #4a90e2;
+    border-bottom: 2px solid #4a90e2;
+}
+
+/* Group Box */
+QGroupBox {
+    border: 1px solid #dddddd;
+    background-color: white;
+}
+
+QGroupBox::title {
+    color: #4a90e2;
+    background-color: white;
+}
+
+/* Combo Box */
+QComboBox {
+    background-color: white;
+    border: 1px solid #dddddd;
+    color: #333333;
+}
+
+QComboBox:hover {
+    border: 1px solid #bbbbbb;
+}
+
+QComboBox::drop-down {
+    border-left: 1px solid #dddddd;
+}
+
+QComboBox QAbstractItemView {
+    background-color: white;
+    border: 1px solid #dddddd;
+    selection-background-color: #f0f0f0;
+    selection-color: #333333;
+}
+
+/* Check Box and Radio Button */
+QCheckBox, QRadioButton {
+    color: #333333;
+}
+
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {
+    background-color: #4a90e2;
+    border: 1px solid #3a80d2;
+}
+
+QCheckBox::indicator:unchecked, QRadioButton::indicator:unchecked {
+    background-color: white;
+    border: 1px solid #dddddd;
+}
+
+/* Scroll Bars */
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background-color: #cccccc;
+}
+
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
+    background-color: #bbbbbb;
+}
+
+QScrollBar {
+    background-color: #f5f5f5;
+}
+
+/* Meeting parts tree */
+QTreeWidget {
+    background-color: white;
+    alternate-background-color: #f9f9f9;
+    border: 1px solid #dddddd;
+}
+
+QTreeWidget::item:selected {
+    background-color: #e6f2ff;
+    color: #333333;
+    border-left: 2px solid #4a90e2;
+}
+
+QTreeWidget::item:hover {
+    background-color: #f0f7ff;
+}
+
+QHeaderView::section {
+    background-color: #f5f5f5;
+    color: #666666;
+    border: 1px solid #dddddd;
+    padding: 5px;
+}
