@@ -1,0 +1,240 @@
+"""
+Meeting view component for displaying and managing meeting parts.
+"""
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QScrollArea, QFrame, QTreeWidget, QTreeWidgetItem, QHeaderView,
+    QSizePolicy, QSpacerItem, QMenu
+)
+from PyQt6.QtCore import Qt, pyqtSlot, QSize
+from PyQt6.QtGui import QAction, QColor, QBrush, QIcon, QFont
+
+from src.controllers.meeting_controller import MeetingController
+from src.controllers.timer_controller import TimerController
+from src.models.meeting import Meeting, MeetingSection, MeetingPart
+
+
+class MeetingView(QWidget):
+    """Widget for displaying and managing meeting parts"""
+    
+    def __init__(self, meeting_controller: MeetingController, 
+                 timer_controller: TimerController, parent=None):
+        super().__init__(parent)
+        self.meeting_controller = meeting_controller
+        self.timer_controller = timer_controller
+        
+        # Current meeting
+        self.meeting = None
+        
+        # Setup UI
+        self._setup_ui()
+        
+        # Connect signals
+        self._connect_signals()
+    
+    def _setup_ui(self):
+        """Setup the UI components"""
+        layout = QVBoxLayout(self)
+        
+        # Meeting header
+        header_layout = QHBoxLayout()
+        
+        self.title_label = QLabel("No Meeting Selected")
+        self.title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        header_layout.addWidget(self.title_label)
+        
+        header_layout.addStretch()
+        
+        # Add header layout
+        layout.addLayout(header_layout)
+        
+        # Parts tree
+        self.parts_tree = QTreeWidget()
+        self.parts_tree.setHeaderLabels(["Title", "Duration", "Status"])
+        self.parts_tree.setColumnWidth(0, 400)  # Set width for title column
+        self.parts_tree.setColumnWidth(1, 100)  # Set width for duration column
+        self.parts_tree.setAlternatingRowColors(True)
+        self.parts_tree.setIndentation(20)
+        
+        # Connect double-click to jump to part
+        self.parts_tree.itemDoubleClicked.connect(self._part_double_clicked)
+        
+        # Enable context menu
+        self.parts_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.parts_tree.customContextMenuRequested.connect(self._show_context_menu)
+        
+        # Set header properties
+        header = self.parts_tree.header()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        
+        # Add to layout
+        layout.addWidget(self.parts_tree)
+    
+    def _connect_signals(self):
+        """Connect controller signals"""
+        self.timer_controller.part_changed.connect(self._part_changed)
+        self.timer_controller.part_completed.connect(self._part_completed)
+    
+    def set_meeting(self, meeting: Meeting):
+        """Set the current meeting to display"""
+        self.meeting = meeting
+        self._update_display()
+    
+    def _update_display(self):
+        """Update the display with current meeting data"""
+        if not self.meeting:
+            self.title_label.setText("No Meeting Selected")
+            self.parts_tree.clear()
+            return
+        
+        # Update title
+        date_str = self.meeting.date.strftime("%Y-%m-%d")
+        self.title_label.setText(f"{self.meeting.title} ({date_str})")
+        
+        # Clear existing items
+        self.parts_tree.clear()
+        
+        # Add sections and parts
+        for section_index, section in enumerate(self.meeting.sections):
+            # Create section item
+            section_item = QTreeWidgetItem(self.parts_tree)
+            section_item.setText(0, section.title)
+            section_item.setText(1, f"{section.total_duration_minutes} min")
+            section_item.setData(0, Qt.ItemDataRole.UserRole, ("section", section_index))
+            
+            # Set bold font for section
+            font = section_item.font(0)
+            font.setBold(True)
+            section_item.setFont(0, font)
+            
+            # Set background color
+            section_item.setBackground(0, QBrush(QColor(240, 240, 240)))
+            section_item.setBackground(1, QBrush(QColor(240, 240, 240)))
+            section_item.setBackground(2, QBrush(QColor(240, 240, 240)))
+            
+            # Add parts as children
+            for part_index, part in enumerate(section.parts):
+                part_item = QTreeWidgetItem(section_item)
+                part_item.setText(0, part.title)
+                part_item.setText(1, f"{part.duration_minutes} min")
+                
+                # Store global part index for jumping
+                global_part_index = self._get_global_part_index(section_index, part_index)
+                part_item.setData(0, Qt.ItemDataRole.UserRole, ("part", global_part_index))
+                
+                # Set status
+                if part.is_completed:
+                    part_item.setText(2, "Completed")
+                    part_item.setForeground(2, QBrush(QColor(0, 128, 0)))  # Green
+                else:
+                    part_item.setText(2, "Pending")
+        
+        # Expand all sections
+        self.parts_tree.expandAll()
+    
+    def highlight_part(self, global_part_index: int):
+        """Highlight the current part in the tree"""
+        # Iterate through all top-level items (sections)
+        for section_index in range(self.parts_tree.topLevelItemCount()):
+            section_item = self.parts_tree.topLevelItem(section_index)
+            
+            # Iterate through child items (parts)
+            for part_index in range(section_item.childCount()):
+                part_item = section_item.child(part_index)
+                
+                # Get stored global part index
+                item_type, item_index = part_item.data(0, Qt.ItemDataRole.UserRole)
+                
+                if item_type == "part" and item_index == global_part_index:
+                    # Set background color for current part
+                    part_item.setBackground(0, QBrush(QColor(255, 240, 200)))  # Light yellow
+                    part_item.setBackground(1, QBrush(QColor(255, 240, 200)))
+                    part_item.setBackground(2, QBrush(QColor(255, 240, 200)))
+                    
+                    # Set as current item and make visible
+                    self.parts_tree.setCurrentItem(part_item)
+                    self.parts_tree.scrollToItem(part_item)
+                    
+                    # Update status text
+                    part_item.setText(2, "Current")
+                    part_item.setForeground(2, QBrush(QColor(0, 0, 255)))  # Blue
+                else:
+                    # Reset background if not the current part
+                    if item_type == "part":
+                        part_item.setBackground(0, QBrush())
+                        part_item.setBackground(1, QBrush())
+                        part_item.setBackground(2, QBrush())
+    
+    def _part_changed(self, part, global_part_index):
+        """Handle part change from timer controller"""
+        self.highlight_part(global_part_index)
+    
+    def _part_completed(self, global_part_index):
+        """Handle part completion"""
+        # Find the part item in the tree
+        for section_index in range(self.parts_tree.topLevelItemCount()):
+            section_item = self.parts_tree.topLevelItem(section_index)
+            
+            for part_index in range(section_item.childCount()):
+                part_item = section_item.child(part_index)
+                
+                item_type, item_index = part_item.data(0, Qt.ItemDataRole.UserRole)
+                
+                if item_type == "part" and item_index == global_part_index:
+                    # Update status
+                    part_item.setText(2, "Completed")
+                    part_item.setForeground(2, QBrush(QColor(0, 128, 0)))  # Green
+                    break
+    
+    def _part_double_clicked(self, item, column):
+        """Handle double-click on a part"""
+        item_data = item.data(0, Qt.ItemDataRole.UserRole)
+        
+        if not item_data:
+            return
+        
+        item_type, item_index = item_data
+        
+        if item_type == "part":
+            # Jump to this part
+            self.timer_controller.jump_to_part(item_index)
+    
+    def _show_context_menu(self, position):
+        """Show context menu for parts"""
+        item = self.parts_tree.itemAt(position)
+        
+        if item:
+            item_data = item.data(0, Qt.ItemDataRole.UserRole)
+            
+            if item_data:
+                item_type, item_index = item_data
+                
+                menu = QMenu()
+                
+                if item_type == "part":
+                    # Part context menu
+                    start_action = QAction("Start This Part", self)
+                    start_action.triggered.connect(lambda: self.timer_controller.jump_to_part(item_index))
+                    menu.addAction(start_action)
+                    
+                    # Add more actions here
+                
+                elif item_type == "section":
+                    # Section context menu
+                    # Add section-specific actions here
+                    pass
+                
+                if menu.actions():
+                    menu.exec(self.parts_tree.mapToGlobal(position))
+    
+    def _get_global_part_index(self, section_index, part_index):
+        """Convert section and part indices to global part index"""
+        global_index = 0
+        
+        for i in range(section_index):
+            global_index += len(self.meeting.sections[i].parts)
+        
+        global_index += part_index
+        return global_index
