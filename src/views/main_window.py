@@ -213,6 +213,11 @@ class MainWindow(QMainWindow):
         )
         status_bar.addWidget(spacer)
         
+        # Meeting overtime indicator
+        self.meeting_overtime_label = QLabel()
+        self.meeting_overtime_label.setVisible(False)
+        status_bar.addPermanentWidget(self.meeting_overtime_label)
+        
         # Display mode indicator
         self.display_mode_label = QLabel()
         self._update_display_mode_label()
@@ -234,6 +239,8 @@ class MainWindow(QMainWindow):
         self.timer_controller.part_changed.connect(self._part_changed)
         self.timer_controller.meeting_started.connect(self._meeting_started)
         self.timer_controller.meeting_ended.connect(self._meeting_ended)
+        self.timer_controller.transition_started.connect(self._transition_started)
+        self.timer_controller.meeting_overtime.connect(self._meeting_overtime)
         
         # Settings controller signals
         self.settings_controller.settings_changed.connect(self._settings_changed)
@@ -288,6 +295,31 @@ class MainWindow(QMainWindow):
         self.decrease_button.setEnabled(True)
         self.increase_button.setEnabled(True)
     
+    def _meeting_overtime(self, total_overtime_seconds):
+        """Handle meeting overtime notification"""
+        # Only show if there's actual overtime
+        if total_overtime_seconds > 0:
+            # Format the overtime
+            minutes = total_overtime_seconds // 60
+            seconds = total_overtime_seconds % 60
+            
+            # Update and show the label
+            self.meeting_overtime_label.setText(f"Meeting Overtime: {minutes:02d}:{seconds:02d}")
+            self.meeting_overtime_label.setStyleSheet("color: red; font-weight: bold;")
+            self.meeting_overtime_label.setVisible(True)
+    
+    def _transition_started(self, transition_msg):
+        """Handle chairman transition period"""
+        # Update the current part label
+        self.current_part_label.setText(f"⏳ {transition_msg} (1:00)")
+        
+        # Also update the part_label in the timer view
+        self.timer_view.part_label.setText(transition_msg)
+        
+        # Update secondary display if available
+        if self.secondary_display:
+            self.secondary_display.current_part_label.setText(transition_msg)
+    
     def _meeting_ended(self):
         """Handle meeting end"""
         self.start_button.setText("Start Meeting")
@@ -303,6 +335,9 @@ class MainWindow(QMainWindow):
         
         # Reset pause/resume button
         self.pause_resume_button.setText("Pause")
+        
+        # Reset overtime indicator
+        self.meeting_overtime_label.setVisible(False)
     
     def _settings_changed(self):
         """Handle settings changes"""
