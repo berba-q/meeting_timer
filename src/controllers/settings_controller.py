@@ -1,0 +1,114 @@
+"""
+Controller for managing application settings in the JW Meeting Timer application.
+"""
+from datetime import time
+from typing import List, Dict
+from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtGui import QScreen
+
+from src.models.settings import (
+    SettingsManager, AppSettings, MeetingSettings, 
+    DisplaySettings, DayOfWeek, TimerDisplayMode
+)
+
+
+class SettingsController(QObject):
+    """Controller for managing application settings"""
+    
+    # Signals
+    settings_changed = pyqtSignal()
+    language_changed = pyqtSignal(str)
+    display_mode_changed = pyqtSignal(TimerDisplayMode)
+    
+    def __init__(self, settings_manager: SettingsManager):
+        super().__init__()
+        self.settings_manager = settings_manager
+    
+    def get_settings(self) -> AppSettings:
+        """Get current settings"""
+        return self.settings_manager.settings
+    
+    def save_settings(self):
+        """Save current settings"""
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+    
+    def reset_settings(self):
+        """Reset settings to defaults"""
+        self.settings_manager.reset_settings()
+        self.settings_changed.emit()
+    
+    def set_language(self, language: str):
+        """Set application language"""
+        if language != self.settings_manager.settings.language:
+            self.settings_manager.settings.language = language
+            self.settings_manager.save_settings()
+            self.language_changed.emit(language)
+            self.settings_changed.emit()
+    
+    def set_midweek_meeting(self, day: DayOfWeek, meeting_time: time):
+        """Set midweek meeting day and time"""
+        self.settings_manager.settings.midweek_meeting = MeetingSettings(
+            day=day,
+            time=meeting_time
+        )
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+    
+    def set_weekend_meeting(self, day: DayOfWeek, meeting_time: time):
+        """Set weekend meeting day and time"""
+        self.settings_manager.settings.weekend_meeting = MeetingSettings(
+            day=day,
+            time=meeting_time
+        )
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+    
+    def set_display_mode(self, display_mode: TimerDisplayMode):
+        """Set timer display mode"""
+        self.settings_manager.settings.display.display_mode = display_mode
+        self.settings_manager.save_settings()
+        self.display_mode_changed.emit(display_mode)
+        self.settings_changed.emit()
+    
+    def set_primary_screen(self, screen_index: int):
+        """Set primary screen index"""
+        self.settings_manager.settings.display.primary_screen_index = screen_index
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+    
+    def set_secondary_screen(self, screen_index: int):
+        """Set secondary screen index"""
+        self.settings_manager.settings.display.secondary_screen_index = screen_index
+        self.settings_manager.settings.display.use_secondary_screen = (screen_index is not None)
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+    
+    def toggle_secondary_screen(self, enabled: bool):
+        """Enable/disable secondary screen"""
+        self.settings_manager.settings.display.use_secondary_screen = enabled
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+    
+    def set_auto_update_meetings(self, enabled: bool):
+        """Enable/disable auto-update of meetings"""
+        self.settings_manager.settings.auto_update_meetings = enabled
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+    
+    def get_all_screens(self) -> List[Dict]:
+        """Get information about all available screens"""
+        from PyQt6.QtWidgets import QApplication
+        
+        screens = []
+        for i, screen in enumerate(QApplication.screens()):
+            geometry = screen.geometry()
+            screens.append({
+                'index': i,
+                'name': screen.name(),
+                'width': geometry.width(),
+                'height': geometry.height(),
+                'primary': screen.isPrimary()
+            })
+        
+        return screens
