@@ -5,7 +5,8 @@ import os
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QComboBox, QTabWidget, QAction, QMessageBox,
-    QSplitter, QFrame, QToolBar, QStatusBar, QMenuBar
+    QSplitter, QFrame, QToolBar, QStatusBar, QMenuBar,
+    QApplication, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSlot
 from PyQt6.QtGui import QIcon, QFont, QAction
@@ -15,6 +16,7 @@ from src.controllers.timer_controller import TimerController
 from src.controllers.settings_controller import SettingsController
 from src.models.settings import SettingsManager, TimerDisplayMode
 from src.models.meeting import Meeting, MeetingType
+from src.models.timer import TimerState
 from src.views.timer_view import TimerView
 from src.views.meeting_view import MeetingView
 from src.views.settings_view import SettingsDialog
@@ -39,6 +41,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("JW Meeting Timer")
         self.setMinimumSize(1000, 700)
         
+        # Apply current theme
+        self._apply_current_theme()
+        
         # Create UI components
         self._create_menu_bar()
         self._create_tool_bar()
@@ -53,19 +58,21 @@ class MainWindow(QMainWindow):
     
     def _create_menu_bar(self):
         """Create the application menu bar"""
+        from src.utils.resources import get_icon
+        
         menu_bar = self.menuBar()
         
         # File menu
         file_menu = menu_bar.addMenu("&File")
         
         # Create new meeting
-        new_meeting_action = QAction("&New Meeting", self)
+        new_meeting_action = QAction(get_icon("clock"), "&New Meeting", self)
         new_meeting_action.setShortcut("Ctrl+N")
         new_meeting_action.triggered.connect(self._create_new_meeting)
         file_menu.addAction(new_meeting_action)
         
         # Open meeting
-        open_meeting_action = QAction("&Open Meeting", self)
+        open_meeting_action = QAction(get_icon("clock"), "&Open Meeting", self)
         open_meeting_action.setShortcut("Ctrl+O")
         open_meeting_action.triggered.connect(self._open_meeting)
         file_menu.addAction(open_meeting_action)
@@ -73,7 +80,7 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         
         # Update meetings from web
-        update_meetings_action = QAction("&Update Meetings from Web", self)
+        update_meetings_action = QAction(get_icon("increase"), "&Update Meetings from Web", self)
         update_meetings_action.setShortcut("F5")
         update_meetings_action.triggered.connect(self._update_meetings)
         file_menu.addAction(update_meetings_action)
@@ -81,7 +88,7 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         
         # Settings
-        settings_action = QAction("&Settings", self)
+        settings_action = QAction(get_icon("settings"), "&Settings", self)
         settings_action.setShortcut("Ctrl+,")
         settings_action.triggered.connect(self._open_settings)
         file_menu.addAction(settings_action)
@@ -98,20 +105,42 @@ class MainWindow(QMainWindow):
         view_menu = menu_bar.addMenu("&View")
         
         # Toggle secondary display
-        toggle_secondary_action = QAction("Toggle &Secondary Display", self)
-        toggle_secondary_action.setShortcut("F10")
-        toggle_secondary_action.triggered.connect(self._toggle_secondary_display)
-        toggle_secondary_action.setCheckable(True)
-        toggle_secondary_action.setChecked(
+        self.toggle_secondary_action = QAction("Toggle &Secondary Display", self)
+        self.toggle_secondary_action.setShortcut("F10")
+        self.toggle_secondary_action.triggered.connect(self._toggle_secondary_display)
+        self.toggle_secondary_action.setCheckable(True)
+        self.toggle_secondary_action.setChecked(
             self.settings_controller.get_settings().display.use_secondary_screen
         )
-        view_menu.addAction(toggle_secondary_action)
+        view_menu.addAction(self.toggle_secondary_action)
         
         # Switch display mode
         switch_display_mode_action = QAction("Switch Display &Mode", self)
         switch_display_mode_action.setShortcut("F9")
         switch_display_mode_action.triggered.connect(self._toggle_display_mode)
         view_menu.addAction(switch_display_mode_action)
+        
+        # Switch theme
+        self.theme_menu = view_menu.addMenu("&Theme")
+        
+        # Light theme action
+        self.light_theme_action = QAction("&Light Theme", self)
+        self.light_theme_action.setCheckable(True)
+        self.light_theme_action.triggered.connect(lambda: self._set_theme("light"))
+        self.theme_menu.addAction(self.light_theme_action)
+        
+        # Dark theme action
+        self.dark_theme_action = QAction("&Dark Theme", self)
+        self.dark_theme_action.setCheckable(True)
+        self.dark_theme_action.triggered.connect(lambda: self._set_theme("dark"))
+        self.theme_menu.addAction(self.dark_theme_action)
+        
+        # Set initial theme selection
+        current_theme = self.settings_controller.get_settings().display.theme
+        if current_theme == "dark":
+            self.dark_theme_action.setChecked(True)
+        else:
+            self.light_theme_action.setChecked(True)
         
         # Help menu
         help_menu = menu_bar.addMenu("&Help")
@@ -123,16 +152,25 @@ class MainWindow(QMainWindow):
     
     def _create_tool_bar(self):
         """Create the main toolbar"""
+        from src.utils.resources import get_icon
+        
         tool_bar = QToolBar("Main Toolbar")
         tool_bar.setIconSize(QSize(32, 32))
+        tool_bar.setMovable(False)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
         
         # Timer controls
         self.start_button = QPushButton("Start Meeting")
+        self.start_button.setIcon(get_icon("play"))
+        self.start_button.setIconSize(QSize(24, 24))
+        self.start_button.setObjectName("startButton")
         self.start_button.clicked.connect(self._start_meeting)
         tool_bar.addWidget(self.start_button)
         
         self.pause_resume_button = QPushButton("Pause")
+        self.pause_resume_button.setIcon(get_icon("pause"))
+        self.pause_resume_button.setIconSize(QSize(24, 24))
+        self.pause_resume_button.setObjectName("pauseButton")
         self.pause_resume_button.clicked.connect(self._toggle_pause_resume)
         self.pause_resume_button.setEnabled(False)
         tool_bar.addWidget(self.pause_resume_button)
@@ -141,11 +179,15 @@ class MainWindow(QMainWindow):
         
         # Part navigation
         self.prev_button = QPushButton("Previous")
+        self.prev_button.setIcon(get_icon("previous"))
+        self.prev_button.setIconSize(QSize(24, 24))
         self.prev_button.clicked.connect(self._previous_part)
         self.prev_button.setEnabled(False)
         tool_bar.addWidget(self.prev_button)
         
         self.next_button = QPushButton("Next")
+        self.next_button.setIcon(get_icon("next"))
+        self.next_button.setIconSize(QSize(24, 24))
         self.next_button.clicked.connect(self._next_part)
         self.next_button.setEnabled(False)
         tool_bar.addWidget(self.next_button)
@@ -154,11 +196,15 @@ class MainWindow(QMainWindow):
         
         # Time adjustment
         self.decrease_button = QPushButton("-1 Minute")
+        self.decrease_button.setIcon(get_icon("decrease"))
+        self.decrease_button.setIconSize(QSize(24, 24))
         self.decrease_button.clicked.connect(lambda: self._adjust_time(-1))
         self.decrease_button.setEnabled(False)
         tool_bar.addWidget(self.decrease_button)
         
         self.increase_button = QPushButton("+1 Minute")
+        self.increase_button.setIcon(get_icon("increase"))
+        self.increase_button.setIconSize(QSize(24, 24))
         self.increase_button.clicked.connect(lambda: self._adjust_time(1))
         self.increase_button.setEnabled(False)
         tool_bar.addWidget(self.increase_button)
@@ -213,6 +259,11 @@ class MainWindow(QMainWindow):
         )
         status_bar.addWidget(spacer)
         
+        # Predicted end time label
+        self.predicted_end_time_label = QLabel()
+        self.predicted_end_time_label.setVisible(False)
+        status_bar.addPermanentWidget(self.predicted_end_time_label)
+        
         # Meeting overtime indicator
         self.meeting_overtime_label = QLabel()
         self.meeting_overtime_label.setVisible(False)
@@ -241,10 +292,12 @@ class MainWindow(QMainWindow):
         self.timer_controller.meeting_ended.connect(self._meeting_ended)
         self.timer_controller.transition_started.connect(self._transition_started)
         self.timer_controller.meeting_overtime.connect(self._meeting_overtime)
+        self.timer_controller.predicted_end_time_updated.connect(self._update_predicted_end_time)
         
         # Settings controller signals
         self.settings_controller.settings_changed.connect(self._settings_changed)
         self.settings_controller.display_mode_changed.connect(self._display_mode_changed)
+        self.settings_controller.theme_changed.connect(self._theme_changed)
     
     def _meetings_loaded(self, meetings):
         """Handle loaded meetings"""
@@ -284,7 +337,12 @@ class MainWindow(QMainWindow):
     
     def _meeting_started(self):
         """Handle meeting start"""
+        from src.utils.resources import get_icon
+        
         self.start_button.setText("Stop Meeting")
+        self.start_button.setIcon(get_icon("stop"))
+        self.start_button.setObjectName("stopButton")  # Change style
+        self.start_button.setStyleSheet("")  # Force style refresh
         self.start_button.clicked.disconnect()
         self.start_button.clicked.connect(self._stop_meeting)
         
@@ -295,34 +353,14 @@ class MainWindow(QMainWindow):
         self.decrease_button.setEnabled(True)
         self.increase_button.setEnabled(True)
     
-    def _meeting_overtime(self, total_overtime_seconds):
-        """Handle meeting overtime notification"""
-        # Only show if there's actual overtime
-        if total_overtime_seconds > 0:
-            # Format the overtime
-            minutes = total_overtime_seconds // 60
-            seconds = total_overtime_seconds % 60
-            
-            # Update and show the label
-            self.meeting_overtime_label.setText(f"Meeting Overtime: {minutes:02d}:{seconds:02d}")
-            self.meeting_overtime_label.setStyleSheet("color: red; font-weight: bold;")
-            self.meeting_overtime_label.setVisible(True)
-    
-    def _transition_started(self, transition_msg):
-        """Handle chairman transition period"""
-        # Update the current part label
-        self.current_part_label.setText(f"⏳ {transition_msg} (1:00)")
-        
-        # Also update the part_label in the timer view
-        self.timer_view.part_label.setText(transition_msg)
-        
-        # Update secondary display if available
-        if self.secondary_display:
-            self.secondary_display.current_part_label.setText(transition_msg)
-    
     def _meeting_ended(self):
         """Handle meeting end"""
+        from src.utils.resources import get_icon
+        
         self.start_button.setText("Start Meeting")
+        self.start_button.setIcon(get_icon("play"))
+        self.start_button.setObjectName("startButton")  # Change style
+        self.start_button.setStyleSheet("")  # Force style refresh
         self.start_button.clicked.disconnect()
         self.start_button.clicked.connect(self._start_meeting)
         
@@ -335,9 +373,27 @@ class MainWindow(QMainWindow):
         
         # Reset pause/resume button
         self.pause_resume_button.setText("Pause")
+        self.pause_resume_button.setIcon(get_icon("pause"))
+        self.pause_resume_button.setObjectName("pauseButton")  # Change style
+        self.pause_resume_button.setStyleSheet("")  # Force style refresh
         
         # Reset overtime indicator
         self.meeting_overtime_label.setVisible(False)
+        
+        # Reset predicted end time
+        self.predicted_end_time_label.setVisible(False)
+    
+    def _transition_started(self, transition_msg):
+        """Handle chairman transition period"""
+        # Update the current part label
+        self.current_part_label.setText(f"⏳ {transition_msg} (1:00)")
+        
+        # Also update the part_label in the timer view
+        self.timer_view.part_label.setText(transition_msg)
+        
+        # Update secondary display if available
+        if self.secondary_display:
+            self.secondary_display.current_part_label.setText(transition_msg)
     
     def _settings_changed(self):
         """Handle settings changes"""
@@ -369,6 +425,66 @@ class MainWindow(QMainWindow):
         else:
             self.secondary_display_label.setText("Secondary Display: Inactive")
     
+    def _apply_current_theme(self):
+        """Apply the current theme from settings"""
+        from src.utils.resources import apply_stylesheet
+        
+        theme = self.settings_controller.get_settings().display.theme
+        apply_stylesheet(QApplication.instance(), theme)
+    
+    def _set_theme(self, theme: str):
+        """Set the application theme"""
+        # Update theme in settings
+        self.settings_controller.set_theme(theme)
+        
+        # Update menu checkboxes
+        self.light_theme_action.setChecked(theme == "light")
+        self.dark_theme_action.setChecked(theme == "dark")
+        
+        # Apply the theme
+        self._apply_current_theme()
+    
+    def _theme_changed(self, theme: str):
+        """Handle theme change from settings"""
+        # Update menu checkboxes
+        self.light_theme_action.setChecked(theme == "light")
+        self.dark_theme_action.setChecked(theme == "dark")
+        
+        # Apply the theme
+        self._apply_current_theme()
+        
+        # Update secondary display if open
+        if self.secondary_display:
+            self._apply_secondary_display_theme()
+    
+    def _apply_secondary_display_theme(self):
+        """Apply the current theme to the secondary display"""
+        if not self.secondary_display:
+            return
+            
+        # Apply styling specific to secondary display
+        theme = self.settings_controller.get_settings().display.theme
+        
+        # Custom styling for the secondary display
+        if theme == "dark":
+            self.secondary_display.setStyleSheet("""
+                QMainWindow, QWidget {
+                    background-color: #1a1a1a;
+                    color: #ffffff;
+                }
+                
+                QLabel {
+                    color: #ffffff;
+                }
+                
+                QFrame {
+                    background-color: #2d2d2d;
+                    border: 1px solid #1d1d1d;
+                }
+            """)
+        else:
+            self.secondary_display.setStyleSheet("")
+    
     def _start_meeting(self):
         """Start the current meeting"""
         if not self.meeting_controller.current_meeting:
@@ -384,12 +500,20 @@ class MainWindow(QMainWindow):
     
     def _toggle_pause_resume(self):
         """Toggle between pause and resume"""
+        from src.utils.resources import get_icon
+        
         if self.timer_controller.timer.state == TimerState.RUNNING:
             self.timer_controller.pause_timer()
             self.pause_resume_button.setText("Resume")
+            self.pause_resume_button.setIcon(get_icon("play"))
+            self.pause_resume_button.setObjectName("startButton")  # Change style
+            self.pause_resume_button.setStyleSheet("")  # Force style refresh
         else:
             self.timer_controller.resume_timer()
             self.pause_resume_button.setText("Pause")
+            self.pause_resume_button.setIcon(get_icon("pause"))
+            self.pause_resume_button.setObjectName("pauseButton")  # Change style
+            self.pause_resume_button.setStyleSheet("")  # Force style refresh
     
     def _next_part(self):
         """Move to the next part"""
@@ -439,12 +563,21 @@ class MainWindow(QMainWindow):
             if not self.secondary_display:
                 self.secondary_display = SecondaryDisplay(self.timer_controller)
             
+            # Apply theme
+            self._apply_secondary_display_theme()
+            
             # Show and position on the correct screen
             self.secondary_display.show()
             self._position_secondary_display()
+            
+            # Update toggle action
+            self.toggle_secondary_action.setChecked(True)
         elif self.secondary_display:
             # Hide the secondary display
             self.secondary_display.hide()
+            
+            # Update toggle action
+            self.toggle_secondary_action.setChecked(False)
     
     def _position_secondary_display(self):
         """Position the secondary display on the correct screen"""
@@ -472,6 +605,52 @@ class MainWindow(QMainWindow):
             self.settings_controller.set_display_mode(TimerDisplayMode.ANALOG)
         else:
             self.settings_controller.set_display_mode(TimerDisplayMode.DIGITAL)
+    
+    def _meeting_overtime(self, total_overtime_seconds):
+        """Handle meeting overtime notification"""
+        # Only show if there's actual overtime
+        if total_overtime_seconds > 0:
+            # Format the overtime
+            minutes = total_overtime_seconds // 60
+            seconds = total_overtime_seconds % 60
+            
+            # Update and show the label
+            self.meeting_overtime_label.setText(f"Meeting Overtime: {minutes:02d}:{seconds:02d}")
+            self.meeting_overtime_label.setStyleSheet("color: red; font-weight: bold;")
+            self.meeting_overtime_label.setVisible(True)
+    
+    def _update_predicted_end_time(self, original_end_time, predicted_end_time):
+        """Update the predicted end time display"""
+        # Only show if the setting is enabled
+        settings = self.settings_controller.get_settings()
+        if not settings.display.show_predicted_end_time:
+            self.predicted_end_time_label.setVisible(False)
+            return
+        
+        # Format the times
+        original_time_str = original_end_time.strftime("%H:%M")
+        predicted_time_str = predicted_end_time.strftime("%H:%M")
+        
+        # Calculate the difference
+        time_diff = predicted_end_time - original_end_time
+        diff_minutes = int(time_diff.total_seconds() / 60)
+        
+        # Set the text and color based on whether we're running over or under
+        if diff_minutes > 0:
+            # Running over time
+            self.predicted_end_time_label.setText(f"End: {predicted_time_str} (+{diff_minutes} min)")
+            self.predicted_end_time_label.setStyleSheet("color: red;")
+        elif diff_minutes < 0:
+            # Running under time
+            self.predicted_end_time_label.setText(f"End: {predicted_time_str} ({diff_minutes} min)")
+            self.predicted_end_time_label.setStyleSheet("color: green;")
+        else:
+            # On time
+            self.predicted_end_time_label.setText(f"End: {predicted_time_str} (on time)")
+            self.predicted_end_time_label.setStyleSheet("color: black;")
+        
+        # Make the label visible
+        self.predicted_end_time_label.setVisible(True)
     
     def _show_about(self):
         """Show the about dialog"""
