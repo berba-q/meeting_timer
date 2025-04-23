@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from src.controllers.meeting_controller import MeetingController
 from src.views.main_window import MainWindow
+from src.utils.resources import get_icon, apply_stylesheet
 
 def main():
     """Application entry point"""
@@ -16,8 +17,10 @@ def main():
     app.setOrganizationName("JW Meeting Timer")
     
     # Set application icon
-    if os.path.exists("assets/icons/app_icon.png"):
-        app.setWindowIcon(QIcon("assets/icons/app_icon.png"))
+    app.setWindowIcon(get_icon("app_icon"))
+    
+    # Apply stylesheet (light theme by default)
+    apply_stylesheet(app, "light")
     
     # Initialize controller
     controller = MeetingController()
@@ -28,6 +31,7 @@ def main():
     
     # Start application event loop
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()
