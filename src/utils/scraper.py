@@ -197,136 +197,139 @@ class MeetingScraper:
         return duration, title
     
     def _parse_midweek_meeting(self, soup: BeautifulSoup) -> List[MeetingSection]:
-        """Parse midweek meeting structure"""
+        """
+        Parse midweek meeting structure with correct section assignments:
+        
+        1. Opening (Song and Prayer)
+        2. TREASURES FROM GOD'S WORD (starts after opening, includes Bible Reading)
+        3. APPLY YOURSELF TO THE FIELD MINISTRY (starts after Bible Reading)
+        4. LIVING AS CHRISTIANS (starts with a song, ends with concluding song and prayer)
+        """
         sections = []
         current_section = None
         
-        # Look for section headers with icon classes
-        section_headers = soup.select("h3.dc-icon--gem, h3.dc-icon--wheat, h3.dc-icon--users, h3.dc-icon--music")
+        # First, find all section headers and major parts
+        elements = soup.find_all(['h3', 'p', 'strong', 'span'], text=True)
         
-        # If no headers found with that selector, try more general selectors
-        if not section_headers:
-            section_headers = soup.select("h3, h2")
+        # Initialize sections
+        opening_section = MeetingSection(title="Opening", parts=[])
+        treasures_section = MeetingSection(title="TREASURES FROM GOD'S WORD", parts=[])
+        ministry_section = MeetingSection(title="APPLY YOURSELF TO THE FIELD MINISTRY", parts=[])
+        christians_section = MeetingSection(title="LIVING AS CHRISTIANS", parts=[])
+        
+        # Track which section we're in
+        current_section = None
+        in_treasures = False
+        in_ministry = False
+        in_christians = False
+        found_bible_reading = False
+        
+        # Look for opening song and prayer - usually has music icon
+        opening_elements = soup.select("h3.dc-icon--music, h3:contains('Song'), span:contains('Song')")
+        for element in opening_elements:
+            text = element.get_text().strip()
+            if "song" in text.lower() and "prayer" in text.lower() and not in_treasures:
+                duration, title = self._extract_duration_and_title(element)
+                opening_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
+                break
+        
+        # If we found the opening song, add it to sections
+        if opening_section.parts:
+            sections.append(opening_section)
+        
+        # Find main sections - these typically have icon classes or specific titles
+        section_headers = soup.select("h3.dc-icon--gem, h3.dc-icon--wheat, h3.dc-icon--users, " + 
+                                    "h2, h3:contains('TREASURES'), h3:contains('APPLY YOURSELF'), h3:contains('LIVING AS CHRISTIANS')")
         
         for header in section_headers:
             header_text = header.get_text().strip().upper()
             
-            # Skip empty headers
-            if not header_text:
-                continue
-            
-            # Check for section indicators
-            is_section = False
-            if any(keyword in header_text for keyword in ["TREASURES", "APPLY YOURSELF", "FIELD MINISTRY", "LIVING AS CHRISTIANS"]):
-                is_section = True
-            
-            # Check for icon classes that indicate sections
-            if header.get("class"):
-                classes = " ".join(header.get("class"))
-                if any(icon in classes for icon in ["dc-icon--gem", "dc-icon--wheat", "dc-icon--users"]):
-                    is_section = True
-            
-            if is_section:
-                # Create a new section
-                current_section = MeetingSection(
-                    title=header_text,
-                    parts=[]
-                )
-                sections.append(current_section)
-            elif "SONG" in header_text and "PRAYER" in header_text:
-                # Handle opening song and prayer
-                opening_section = MeetingSection(
-                    title="Opening",
-                    parts=[
-                        MeetingPart(
-                            title=header_text,
-                            duration_minutes=1
-                        )
-                    ]
-                )
-                sections.append(opening_section)
-            elif current_section:
-                # This is a part within the current section
-                duration, title = self._extract_duration_and_title(header)
-                
-                # Add the part to the current section
-                part = MeetingPart(
-                    title=title,
-                    duration_minutes=duration
-                )
-                current_section.parts.append(part)
+            if "TREASURES" in header_text or "dc-icon--gem" in str(header.get('class', [])):
+                in_treasures = True
+                in_ministry = False
+                in_christians = False
+                current_section = treasures_section
+                if treasures_section not in sections:
+                    sections.append(treasures_section)
+                    
+            elif "APPLY YOURSELF" in header_text or "FIELD MINISTRY" in header_text or "dc-icon--wheat" in str(header.get('class', [])):
+                in_treasures = False
+                in_ministry = True
+                in_christians = False
+                current_section = ministry_section
+                if ministry_section not in sections:
+                    sections.append(ministry_section)
+                    
+            elif "CHRISTIANS" in header_text or "dc-icon--users" in str(header.get('class', [])):
+                in_treasures = False
+                in_ministry = False
+                in_christians = True
+                current_section = christians_section
+                if christians_section not in sections:
+                    sections.append(christians_section)
         
-        # Look for parts in paragraphs
-        if sections:
-            paragraphs = soup.select("p")
-            for p in paragraphs:
-                p_text = p.get_text().strip()
+        # Now find all parts and assign to the correct section
+        all_parts = []
+        
+        # Look for paragraphs with part information - typically with duration info
+        for para in soup.select("p, div, h3, span"):
+            text = para.get_text().strip()
+            
+            # Skip empty paragraphs or ones without enough text
+            if not text or len(text) < 5:
+                continue
                 
-                # Skip empty paragraphs
-                if not p_text:
+            # Look for duration information
+            if re.search(r'\(\d+\s*min', text) or "Bible Reading" in text or "Congregation Bible Study" in text:
+                duration, title = self._extract_duration_and_title(para)
+                
+                # Special handling for Bible Reading - marks the end of Treasures section
+                if "Bible Reading" in title and not found_bible_reading:
+                    found_bible_reading = True
+                    treasures_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
                     continue
-                
-                # Extract part information
-                duration_match = re.search(r'(\d+)\s*min', p_text)
-                if duration_match:
-                    duration = int(duration_match.group(1))
-                    title = re.sub(r'\(\d+\s*min\.*\)', '', p_text).strip()
                     
-                    # Simple heuristic to associate with the nearest section
-                    # Find position in the list of sections
-                    matched_section = None
-                    
-                    # Check for part number prefixes like "1." to associate with sections
-                    part_num_match = re.match(r'^\d+\.', title)
-                    if part_num_match and len(sections) >= 1:
-                        matched_section = sections[0]  # Usually Treasures section
-                    elif "congregation bible study" in title.lower() and len(sections) >= 3:
-                        matched_section = sections[2]  # Usually Christians section 
-                    elif "concluding comments" in title.lower() and len(sections) >= 3:
-                        matched_section = sections[2]  # Usually Christians section
-                    elif "bible reading" in title.lower() and len(sections) >= 1:
-                        matched_section = sections[0]  # Usually Treasures section
-                    elif "initial call" in title.lower() or "return visit" in title.lower() and len(sections) >= 2:
-                        matched_section = sections[1]  # Usually Ministry section
-                    
-                    # If we found a matching section, add the part
-                    if matched_section:
-                        part = MeetingPart(
-                            title=title,
-                            duration_minutes=duration
-                        )
-                        matched_section.parts.append(part)
+                # Assign the part to the appropriate section
+                if found_bible_reading and not in_christians and "song" not in text.lower():
+                    # After Bible Reading but before Christians section -> Ministry section
+                    ministry_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
+                elif in_christians or (found_bible_reading and "song" in text.lower()):
+                    # Either in Christians section or it's a song after Bible Reading
+                    if "song" in text.lower() and not in_christians:
+                        # This is the song that starts the Christians section
+                        in_christians = True
+                    christians_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
+                elif not found_bible_reading:
+                    # Before Bible Reading -> Treasures section
+                    treasures_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
+        
+        # Make sure all sections with parts are included
+        if treasures_section.parts and treasures_section not in sections:
+            sections.append(treasures_section)
+        if ministry_section.parts and ministry_section not in sections:
+            sections.append(ministry_section)
+        if christians_section.parts and christians_section not in sections:
+            sections.append(christians_section)
         
         # If we couldn't extract any sections, create default ones
         if not sections:
-            sections = [
-                MeetingSection(
-                    title="Opening",
-                    parts=[
-                        MeetingPart(title="Song and Prayer", duration_minutes=5)
-                    ]
-                ),
-                MeetingSection(
-                    title="TREASURES FROM GOD'S WORD",
-                    parts=[
-                        MeetingPart(title="Bible Reading", duration_minutes=4)
-                    ]
-                ),
-                MeetingSection(
-                    title="APPLY YOURSELF TO THE FIELD MINISTRY",
-                    parts=[
-                        MeetingPart(title="Initial Call", duration_minutes=2),
-                        MeetingPart(title="Return Visit", duration_minutes=3)
-                    ]
-                ),
-                MeetingSection(
-                    title="LIVING AS CHRISTIANS",
-                    parts=[
-                        MeetingPart(title="Congregation Bible Study", duration_minutes=30),
-                        MeetingPart(title="Concluding Comments", duration_minutes=3)
-                    ]
-                )
-            ]
+            opening_section = MeetingSection(title="Opening", parts=[
+                MeetingPart(title="Song and Prayer", duration_minutes=5)
+            ])
+            treasures_section = MeetingSection(title="TREASURES FROM GOD'S WORD", parts=[
+                MeetingPart(title="Bible Reading", duration_minutes=4)
+            ])
+            ministry_section = MeetingSection(title="APPLY YOURSELF TO THE FIELD MINISTRY", parts=[
+                MeetingPart(title="Initial Call", duration_minutes=2),
+                MeetingPart(title="Return Visit", duration_minutes=3)
+            ])
+            christians_section = MeetingSection(title="LIVING AS CHRISTIANS", parts=[
+                MeetingPart(title="Congregation Bible Study", duration_minutes=30),
+                MeetingPart(title="Concluding Comments", duration_minutes=3),
+                MeetingPart(title="Concluding Song and Prayer", duration_minutes=5)
+            ])
+            
+            sections = [opening_section, treasures_section, ministry_section, christians_section]
         
         return sections
     
