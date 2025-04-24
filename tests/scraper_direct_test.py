@@ -13,7 +13,7 @@ parent_dir = os.path.dirname(script_dir)
 sys.path.insert(0, parent_dir)
 
 from src.utils.scraper import MeetingScraper
-from src.models.meeting import MeetingType
+from src.models.meeting import Meeting, MeetingType, MeetingSection, MeetingPart
 
 def main():
     """Main function to test scraper directly"""
@@ -150,5 +150,55 @@ def main():
     
     print("\nTesting completed successfully!")
 
+
+def test_with_actual_example():
+    """Test with the example shown in your screenshot"""
+    print("\n--- TESTING WITH EXAMPLE FROM SCREENSHOT ---")
+    
+    # Manually create meeting based on your screenshot
+    sections = [
+        MeetingSection(
+            title="TREASURES FROM GOD'S WORD",
+            parts=[
+                MeetingPart(title="SONG 76 AND PRAYER | OPENING COMMENTS (1 MIN.)", duration_minutes=1),
+                MeetingPart(title="1. What Makes for a Truly Rich Life?", duration_minutes=10),
+                MeetingPart(title="2. Diligent Hands Bring Riches", duration_minutes=10),
+                MeetingPart(title="3. Bible Reading Pr 10:1-19", duration_minutes=4)
+            ]
+        ),
+        MeetingSection(
+            title="APPLY YOURSELF TO THE FIELD MINISTRY",
+            parts=[
+                MeetingPart(title="4. Starting a Conversation", duration_minutes=5),
+                MeetingPart(title="5. Initial Call Video", duration_minutes=5),
+                MeetingPart(title="6. Return Visit", duration_minutes=4)
+            ]
+        ),
+        MeetingSection(
+            title="LIVING AS CHRISTIANS",
+            parts=[
+                MeetingPart(title="Song 111", duration_minutes=3),
+                MeetingPart(title="7. What Blessings Make God's Servants Rich?", duration_minutes=7),
+                MeetingPart(title="8. 2025 Update on the Local Design/Construction Program", duration_minutes=8),
+                MeetingPart(title="9. Congregation Bible Study", duration_minutes=30),
+                MeetingPart(title="Concluding Comments", duration_minutes=3),
+                MeetingPart(title="Song 115 and Prayer", duration_minutes=3)
+            ]
+        )
+    ]
+    
+    # Print meeting structure
+    total_minutes = 0
+    for i, section in enumerate(sections):
+        section_minutes = sum(part.duration_minutes for part in section.parts)
+        total_minutes += section_minutes
+        print(f"\nSection {i+1}: {section.title} ({section_minutes} minutes)")
+        for j, part in enumerate(section.parts):
+            print(f"  Part {j+1}: {part.title} ({part.duration_minutes} min)")
+    
+    print(f"\nTotal manual meeting duration: {total_minutes} minutes")
+
+
 if __name__ == "__main__":
     main()
+    test_with_actual_example()
