@@ -1,11 +1,11 @@
 """
-A direct test script for checking the scraper's ability to parse meeting data.
-Run this script directly to test the parsing functions without unit test framework.
+Test script for the improved MeetingScraper.
+This tests both midweek and weekend meeting extraction.
 """
 import os
 import sys
 from bs4 import BeautifulSoup
-from datetime import datetime
+import re
 
 # Add the parent directory to sys.path so we can import modules from there
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -13,192 +13,200 @@ parent_dir = os.path.dirname(script_dir)
 sys.path.insert(0, parent_dir)
 
 from src.utils.scraper import MeetingScraper
-from src.models.meeting import Meeting, MeetingType, MeetingSection, MeetingPart
 
-def main():
-    """Main function to test scraper directly"""
-    print("Testing meeting scraper directly...")
+def test_meeting_scraper():
+    """Test the scraper with sample HTML for both meeting types"""
+    print("Testing MeetingScraper with sample HTML...\n")
     
-    # Create sample HTML for testing
+    # Create scraper
+    scraper = MeetingScraper()
+    
+    # ---------- MIDWEEK MEETING TEST ----------
+    print("--- TESTING MIDWEEK MEETING EXTRACTION ---")
+    
+    # Create sample HTML for midweek meeting
     midweek_html = """
     <html>
     <body>
-        <div class="header">
-            <span id="p1" class="pageNumber" aria-hidden="true">APRIL 21-27</span>
-        </div>
-        
         <div class="bodyTxt">
-            <!-- Song and Prayer section -->
-            <h3 class="dc-icon--music dc-icon-size--basePlus1 dc-icon-margin-horizontal--8">
-                <span id="p3" data-pid="3">Song 76 and Prayer | Opening Comments (1 min.)</span>
+            <span id="p1" class="pageNumber">APRIL 21-27</span>
+            
+            <h3 class="dc-icon--music">
+                <span>Song 76 and Prayer | Opening Comments (1 min.)</span>
             </h3>
             
-            <!-- Treasures section -->
-            <h3 class="dc-icon--gem dc-icon-layout--top">
+            <h3 class="dc-icon--gem">
                 <span>TREASURES FROM GOD'S WORD</span>
             </h3>
             
-            <div>
-                <p>1. What Makes for a Truly Rich Life? (10 min.)</p>
-                <p>2. Diligent Hands Bring Riches (10 min.)</p>
-                <p>3. Bible Reading (4 min.) Pr 10:1-19</p>
-            </div>
+            <h3>
+                <strong>1. What Makes for a Truly Rich Life?</strong>
+            </h3>
+            <p>(10 min.)</p>
             
-            <!-- Ministry section -->
-            <h3 class="dc-icon--wheat dc-icon-layout--top">
+            <h3>
+                <strong>2. Spiritual Gems</strong>
+            </h3>
+            <p>(10 min.)</p>
+            
+            <h3>
+                <strong>3. Bible Reading</strong>
+            </h3>
+            <p>(4 min.)</p>
+            
+            <h3 class="dc-icon--wheat">
                 <span>APPLY YOURSELF TO THE FIELD MINISTRY</span>
             </h3>
             
-            <div>
-                <p>4. Starting a Conversation (5 min.)</p>
-                <p>5. Initial Call Video (5 min.)</p>
-                <p>6. Return Visit (4 min.)</p>
-            </div>
+            <h3>
+                <strong>4. Starting a Conversation</strong>
+            </h3>
+            <p>(4 min.) HOUSE TO HOUSE. The person tells you that he is an atheist.</p>
             
-            <!-- Christians section -->
-            <h3 class="dc-icon--users dc-icon-layout--top">
+            <h3>
+                <strong>5. Starting a Conversation</strong>
+            </h3>
+            <p>(4 min.) INFORMAL WITNESSING. Offer a Bible study.</p>
+            
+            <h3>
+                <strong>6. Following Up</strong>
+            </h3>
+            <p>(4 min.) INFORMAL WITNESSING. Show the person how to find information that may interest him on jw.org.</p>
+            
+            <h3 class="dc-icon--users">
                 <span>LIVING AS CHRISTIANS</span>
             </h3>
             
-            <div>
-                <p>7. "Keep Conquering the Evil With the Good" (15 min.)</p>
-                <p>8. Congregation Bible Study (30 min.)</p>
-                <p>9. Concluding Comments (3 min.)</p>
-                <p>10. Concluding Song and Prayer</p>
-            </div>
+            <h3 class="dc-icon--music">
+                <strong>Song 111</strong>
+            </h3>
+            
+            <h3>
+                <strong>7. What Blessings Make God's Servants Rich?</strong>
+            </h3>
+            <p>(7 min.) Discussion.</p>
+            
+            <h3>
+                <strong>8. 2025 Update on the Local Design/Construction Program</strong>
+            </h3>
+            <p>(8 min.)</p>
+            
+            <h3>
+                <strong>9. Congregation Bible Study</strong>
+            </h3>
+            <p>(30 min.)</p>
+            
+            <p>Concluding Comments (3 min.) | Song 115 and Prayer</p>
         </div>
     </body>
     </html>
     """
     
+    # Parse midweek HTML
+    midweek_soup = BeautifulSoup(midweek_html, 'html.parser')
+    
+    # Test duration extraction for each part
+    print("\nTesting duration extraction for midweek meeting parts:")
+    for part_num in range(1, 10):
+        duration = scraper._find_duration_for_part(part_num, midweek_soup)
+        print(f"Part {part_num}: Found duration: {duration} minutes")
+    
+    # Extract date
+    midweek_date = scraper._extract_date(midweek_soup)
+    print(f"\nExtracted midweek date: {midweek_date}")
+    
+    # Parse the midweek meeting
+    midweek_sections = scraper._parse_midweek_meeting(midweek_soup)
+    
+    # Print the parsed structure
+    print("\nParsed midweek meeting structure:")
+    for i, section in enumerate(midweek_sections):
+        print(f"\nSection {i+1}: {section.title}")
+        for j, part in enumerate(section.parts):
+            print(f"  Part {j}: {part.title}")
+    
+    # Calculate total duration
+    midweek_total = sum(sum(part.duration_minutes for part in section.parts) for section in midweek_sections)
+    print(f"\nTotal midweek meeting duration: {midweek_total} minutes")
+    
+    # ---------- WEEKEND MEETING TEST ----------
+    print("\n\n--- TESTING WEEKEND MEETING EXTRACTION ---")
+    
+    # Create sample HTML for weekend meeting
     weekend_html = """
     <html>
     <body>
-        <h1>
-            <span class="pageNumber">APRIL 21-27</span>
-        </h1>
-        
-        <h3 class="groupTOC">
-            <span>Study Article 7: April 21-27, 2025</span>
-        </h3>
-        
-        <p>
-            <a class="it" href="/en/wol/d/r1/lp-e/2025291">
-                <strong>Jehovah's Forgiveness—What It Means for You</strong>
-            </a>
-        </p>
-        
         <div class="bodyTxt">
+            <span id="p1" class="pageNumber">APRIL 21-27</span>
+            
+            <h3 class="groupTOC">
+                <span>Study Article 7: April 21-27, 2025</span>
+            </h3>
+            
+            <h1>
+                <strong>Jehovah's Forgiveness—What It Means for You</strong>
+            </h1>
+            
             <h3>Public Talk (30 min.)</h3>
             <p>How to Build a Happy Family</p>
             
             <h3>Watchtower Study (60 min.)</h3>
             <p>Jehovah's Forgiveness—What It Means for You</p>
+            
+            <p>SONG 51</p>
+            <p>SONG 77</p>
         </div>
     </body>
     </html>
     """
     
-    # Create scraper
-    scraper = MeetingScraper()
-    
-    # Test midweek meeting parsing
-    print("\n--- TESTING MIDWEEK MEETING PARSING ---")
-    midweek_soup = BeautifulSoup(midweek_html, 'html.parser')
-    
-    # Extract date
-    date_text = scraper._extract_date(midweek_soup)
-    print(f"Extracted date: {date_text}")
-    
-    # Parse midweek meeting
-    midweek_sections = scraper._parse_midweek_meeting(midweek_soup)
-    
-    # Print midweek meeting structure
-    print(f"\nFound {len(midweek_sections)} sections in midweek meeting:")
-    total_minutes = 0
-    for i, section in enumerate(midweek_sections):
-        section_minutes = sum(part.duration_minutes for part in section.parts)
-        total_minutes += section_minutes
-        print(f"\nSection {i+1}: {section.title} ({section_minutes} minutes)")
-        for j, part in enumerate(section.parts):
-            print(f"  Part {j+1}: {part.title} ({part.duration_minutes} min)")
-    
-    print(f"\nTotal midweek meeting duration: {total_minutes} minutes")
-    
-    # Test weekend meeting parsing
-    print("\n--- TESTING WEEKEND MEETING PARSING ---")
+    # Parse weekend HTML
     weekend_soup = BeautifulSoup(weekend_html, 'html.parser')
     
     # Extract date
-    date_text = scraper._extract_date(weekend_soup)
-    print(f"Extracted date: {date_text}")
+    weekend_date = scraper._extract_date(weekend_soup)
+    print(f"Extracted weekend date: {weekend_date}")
     
-    # Parse weekend meeting
+    # Find watchtower title
+    watchtower_title = ""
+    for h1 in weekend_soup.find_all('h1'):
+        strong_tags = h1.find_all('strong')
+        if strong_tags:
+            watchtower_title = strong_tags[0].get_text().strip()
+            break
+    
+    print(f"Extracted watchtower title: {watchtower_title}")
+    
+    # Find songs
+    songs = []
+    for el in weekend_soup.find_all(['p', 'strong', 'span']):
+        el_text = el.get_text().strip()
+        if "SONG" in el_text.upper():
+            song_num = scraper._extract_song_number(el_text)
+            if song_num:
+                songs.append(song_num)
+    
+    print(f"Extracted songs: {songs}")
+    
+    # Parse the weekend meeting
     weekend_sections = scraper._parse_weekend_meeting(weekend_soup)
     
-    # Print weekend meeting structure
-    print(f"\nFound {len(weekend_sections)} sections in weekend meeting:")
-    total_minutes = 0
+    # Print the parsed structure
+    print("\nParsed weekend meeting structure:")
     for i, section in enumerate(weekend_sections):
-        section_minutes = sum(part.duration_minutes for part in section.parts)
-        total_minutes += section_minutes
-        print(f"\nSection {i+1}: {section.title} ({section_minutes} minutes)")
+        print(f"\nSection {i+1}: {section.title}")
         for j, part in enumerate(section.parts):
-            print(f"  Part {j+1}: {part.title} ({part.duration_minutes} min)")
+            print(f"  Part {j}: {part.title}")
     
-    print(f"\nTotal weekend meeting duration: {total_minutes} minutes")
+    # Calculate total duration
+    weekend_total = sum(sum(part.duration_minutes for part in section.parts) for section in weekend_sections)
+    print(f"\nTotal weekend meeting duration: {weekend_total} minutes")
     
+    # ---------- SUMMARY ----------
+    print("\n--- TEST SUMMARY ---")
+    print(f"Midweek meeting: {len(midweek_sections)} sections, {midweek_total} minutes total")
+    print(f"Weekend meeting: {len(weekend_sections)} sections, {weekend_total} minutes total")
     print("\nTesting completed successfully!")
 
-
-def test_with_actual_example():
-    """Test with the example shown in your screenshot"""
-    print("\n--- TESTING WITH EXAMPLE FROM SCREENSHOT ---")
-    
-    # Manually create meeting based on your screenshot
-    sections = [
-        MeetingSection(
-            title="TREASURES FROM GOD'S WORD",
-            parts=[
-                MeetingPart(title="SONG 76 AND PRAYER | OPENING COMMENTS (1 MIN.)", duration_minutes=1),
-                MeetingPart(title="1. What Makes for a Truly Rich Life?", duration_minutes=10),
-                MeetingPart(title="2. Diligent Hands Bring Riches", duration_minutes=10),
-                MeetingPart(title="3. Bible Reading Pr 10:1-19", duration_minutes=4)
-            ]
-        ),
-        MeetingSection(
-            title="APPLY YOURSELF TO THE FIELD MINISTRY",
-            parts=[
-                MeetingPart(title="4. Starting a Conversation", duration_minutes=5),
-                MeetingPart(title="5. Initial Call Video", duration_minutes=5),
-                MeetingPart(title="6. Return Visit", duration_minutes=4)
-            ]
-        ),
-        MeetingSection(
-            title="LIVING AS CHRISTIANS",
-            parts=[
-                MeetingPart(title="Song 111", duration_minutes=3),
-                MeetingPart(title="7. What Blessings Make God's Servants Rich?", duration_minutes=7),
-                MeetingPart(title="8. 2025 Update on the Local Design/Construction Program", duration_minutes=8),
-                MeetingPart(title="9. Congregation Bible Study", duration_minutes=30),
-                MeetingPart(title="Concluding Comments", duration_minutes=3),
-                MeetingPart(title="Song 115 and Prayer", duration_minutes=3)
-            ]
-        )
-    ]
-    
-    # Print meeting structure
-    total_minutes = 0
-    for i, section in enumerate(sections):
-        section_minutes = sum(part.duration_minutes for part in section.parts)
-        total_minutes += section_minutes
-        print(f"\nSection {i+1}: {section.title} ({section_minutes} minutes)")
-        for j, part in enumerate(section.parts):
-            print(f"  Part {j+1}: {part.title} ({part.duration_minutes} min)")
-    
-    print(f"\nTotal manual meeting duration: {total_minutes} minutes")
-
-
 if __name__ == "__main__":
-    main()
-    test_with_actual_example()
+    test_meeting_scraper()

@@ -476,7 +476,7 @@ class MeetingScraper:
         # Look for Watchtower title in the page structure, not by specific text
         watchtower_title = ""
         
-        # First try to find it in h1 tags (as you suggested)
+        # First try to find it in h1 tags
         for h1 in soup.find_all('h1'):
             # Check if it has a strong tag
             strong_tags = h1.find_all('strong')
@@ -533,7 +533,7 @@ class MeetingScraper:
                         public_talk_title = next_p.get_text().strip()
                         break
         
-        # Add Opening Prayer
+        # Add Opening Prayer to Public Talk section
         public_talk_section.parts.append(
             MeetingPart(title="Opening Prayer", duration_minutes=1)
         )
@@ -543,6 +543,13 @@ class MeetingScraper:
             MeetingPart(title=public_talk_title, duration_minutes=30)
         )
         
+        # Add opening song to Watchtower Study section if songs are available
+        if songs:
+            opening_song_num = songs[0][0]
+            watchtower_section.parts.append(
+                MeetingPart(title=f"Song {opening_song_num}", duration_minutes=3)
+            )
+        
         # Add Watchtower Study
         if not watchtower_title:
             watchtower_title = "Watchtower Study"
@@ -551,10 +558,18 @@ class MeetingScraper:
             MeetingPart(title=watchtower_title, duration_minutes=60)
         )
         
-        # Add Concluding Prayer
-        watchtower_section.parts.append(
-            MeetingPart(title="Concluding Prayer", duration_minutes=1)
-        )
+        # Add Concluding Song and Prayer
+        closing_song_num = ""
+        if len(songs) >= 2:
+            closing_song_num = songs[1][0]
+            watchtower_section.parts.append(
+                MeetingPart(title=f"Song {closing_song_num} and Concluding Prayer", duration_minutes=4)
+            )
+        else:
+            # Don't use a fallback song, let the user enter it manually
+            watchtower_section.parts.append(
+                MeetingPart(title="Concluding Prayer", duration_minutes=1)
+            )
         
         # Return both sections
         return [public_talk_section, watchtower_section]
