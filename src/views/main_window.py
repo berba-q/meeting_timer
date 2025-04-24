@@ -14,7 +14,7 @@ from PyQt6.QtGui import QIcon, QFont, QAction
 from src.controllers.meeting_controller import MeetingController
 from src.controllers.timer_controller import TimerController
 from src.controllers.settings_controller import SettingsController
-from src.models.settings import SettingsManager, TimerDisplayMode
+from src.models.settings import SettingsManager, TimerDisplayMode, MeetingSourceMode
 from src.models.meeting import Meeting, MeetingType
 from src.models.timer import TimerState
 from src.views.timer_view import TimerView
@@ -76,6 +76,12 @@ class MainWindow(QMainWindow):
         open_meeting_action.setShortcut("Ctrl+O")
         open_meeting_action.triggered.connect(self._open_meeting)
         file_menu.addAction(open_meeting_action)
+        
+        # Edit current meeting
+        edit_meeting_action = QAction(get_icon("edit"), "&Edit Current Meeting", self)
+        edit_meeting_action.setShortcut("Ctrl+E")
+        edit_meeting_action.triggered.connect(self._edit_current_meeting)
+        file_menu.addAction(edit_meeting_action)
         
         file_menu.addSeparator()
         
@@ -529,17 +535,76 @@ class MainWindow(QMainWindow):
     
     def _create_new_meeting(self):
         """Create a new custom meeting"""
-        # This would open a dialog to create a new meeting
-        pass
+        # Show the meeting editor dialog
+        self.meeting_controller.show_meeting_editor(self)
     
     def _open_meeting(self):
         """Open an existing meeting file"""
-        # This would open a file dialog to select a meeting file
-        pass
+        from PyQt6.QtWidgets import QFileDialog
+        
+        # Show file dialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Meeting",
+            str(self.meeting_controller.meetings_dir),
+            "Meeting Files (*.json)"
+        )
+        
+        if file_path:
+            try:
+                # Load meeting
+                meeting = self.meeting_controller._load_meeting_file(file_path)
+                if meeting:
+                    # Set as current meeting
+                    self.meeting_controller.set_current_meeting(meeting)
+                    
+                    # Update meeting view
+                    self.meeting_view.set_meeting(meeting)
+                    
+                    # Add to recent meetings
+                    if file_path not in self.meeting_controller.settings_manager.settings.recent_meetings:
+                        self.meeting_controller.settings_manager.settings.recent_meetings.append(file_path)
+                        self.meeting_controller.settings_manager.save_settings()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load meeting: {str(e)}")
     
     def _update_meetings(self):
         """Update meetings from web"""
-        self.meeting_controller.update_meetings_from_web()
+        # Check meeting source mode
+        mode = self.settings_controller.get_settings().meeting_source.mode
+        if mode == MeetingSourceMode.WEB_SCRAPING:
+            # Use web scraping
+            self.meeting_controller.update_meetings_from_web()
+        else:
+            # Show options dialog
+            from PyQt6.QtWidgets import QMenu
+            
+            menu = QMenu(self)
+            web_action = menu.addAction("Update from Web")
+            web_action.triggered.connect(self.meeting_controller.update_meetings_from_web)
+            
+            edit_action = menu.addAction("Edit Current Meeting")
+            edit_action.triggered.connect(lambda: self._edit_current_meeting())
+            
+            menu.addSeparator()
+            
+            create_action = menu.addAction("Create New Meeting")
+            create_action.triggered.connect(self._create_new_meeting)
+            
+            # Position menu below the update button
+            menu.exec(self.sender().mapToGlobal(self.sender().rect().bottomLeft()))
+    
+    def _edit_current_meeting(self):
+        """Edit the currently selected meeting"""
+        if not self.meeting_controller.current_meeting:
+            QMessageBox.warning(self, "No Meeting Selected", 
+                                "Please select a meeting to edit.")
+            return
+        
+        # Show the meeting editor dialog with the current meeting
+        self.meeting_controller.show_meeting_editor(
+            self, self.meeting_controller.current_meeting
+        )
     
     def _open_settings(self):
         """Open settings dialog"""
