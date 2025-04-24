@@ -8,7 +8,8 @@ from PyQt6.QtGui import QScreen
 
 from src.models.settings import (
     SettingsManager, AppSettings, MeetingSettings, 
-    DisplaySettings, DayOfWeek, TimerDisplayMode
+    DisplaySettings, DayOfWeek, TimerDisplayMode, 
+    MeetingSourceMode, MeetingSourceSettings
 )
 
 
@@ -20,6 +21,7 @@ class SettingsController(QObject):
     language_changed = pyqtSignal(str)
     display_mode_changed = pyqtSignal(TimerDisplayMode)
     theme_changed = pyqtSignal(str)
+    meeting_source_mode_changed = pyqtSignal(MeetingSourceMode)
     
     def __init__(self, settings_manager: SettingsManager):
         super().__init__()
@@ -107,9 +109,30 @@ class SettingsController(QObject):
         self.settings_manager.save_settings()
         self.settings_changed.emit()
     
+    # New methods for meeting source settings
+    def set_meeting_source_mode(self, mode: MeetingSourceMode):
+        """Set meeting source mode (web scraping, manual entry, template-based)"""
+        if mode != self.settings_manager.settings.meeting_source.mode:
+            self.settings_manager.settings.meeting_source.mode = mode
+            self.settings_manager.save_settings()
+            self.meeting_source_mode_changed.emit(mode)
+            self.settings_changed.emit()
+    
     def set_auto_update_meetings(self, enabled: bool):
-        """Enable/disable auto-update of meetings"""
-        self.settings_manager.settings.auto_update_meetings = enabled
+        """Enable/disable auto-update of meetings from web"""
+        self.settings_manager.settings.meeting_source.auto_update_meetings = enabled
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+    
+    def set_save_scraped_as_template(self, enabled: bool):
+        """Enable/disable saving scraped meetings as templates"""
+        self.settings_manager.settings.meeting_source.save_scraped_as_template = enabled
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+    
+    def set_weekend_songs_manual(self, enabled: bool):
+        """Enable/disable manual weekend song entry"""
+        self.settings_manager.settings.meeting_source.weekend_songs_manual = enabled
         self.settings_manager.save_settings()
         self.settings_changed.emit()
     
