@@ -3,7 +3,7 @@ Web scraper for fetching meeting data from wol.jw.org
 """
 import re
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
 from dateutil.parser import parse as parse_date
@@ -169,169 +169,153 @@ class MeetingScraper:
         # Look for patterns like "(10 min.)" or "(10 min)"
         duration_match = re.search(r'\((\d+)\s*min', text)
         if duration_match:
-            duration = int(duration_match.group(1))
-            # Remove the duration part from the title
-            title = re.sub(r'\(\d+\s*min\.*\)', '', text).strip()
-        else:
-            # Handle special cases
-            title = text
-            if "song" in text.lower() or "prayer" in text.lower():
-                duration = 1  # Default for songs and prayers
-            elif "opening comments" in text.lower():
-                duration = 1  # Default for opening comments
-            elif "bible reading" in text.lower():
-                duration = 4  # Default for Bible reading
-            elif "concluding comments" in text.lower():
-                duration = 3  # Default for concluding comments
-            elif "spiritual gems" in text.lower():
-                duration = 10  # Default for spiritual gems
-            elif "congregation bible study" in text.lower():
-                duration = 30  # Default for congregation Bible study
-            elif "watchtower study" in text.lower():
-                duration = 60  # Default for Watchtower study
-            elif "public talk" in text.lower():
-                duration = 30  # Default for public talk
-            else:
-                duration = 5  # Default for other parts
+            # Extract the duration in minutes
+            return int(duration_match.group(1))
         
-        return duration, title
+        return None
     
     def _parse_midweek_meeting(self, soup: BeautifulSoup) -> List[MeetingSection]:
         """
-        Parse midweek meeting structure with correct section assignments:
-        
-        1. Opening (Song and Prayer)
-        2. TREASURES FROM GOD'S WORD (starts after opening, includes Bible Reading)
-        3. APPLY YOURSELF TO THE FIELD MINISTRY (starts after Bible Reading)
-        4. LIVING AS CHRISTIANS (starts with a song, ends with concluding song and prayer)
+        Parse midweek meeting using h3>strong numbering and song icons.
         """
-        sections = []
-        current_section = None
-        
-        # First, find all section headers and major parts
-        elements = soup.find_all(['h3', 'p', 'strong', 'span'], text=True)
-        
-        # Initialize sections
-        opening_section = MeetingSection(title="Opening", parts=[])
-        treasures_section = MeetingSection(title="TREASURES FROM GOD'S WORD", parts=[])
-        ministry_section = MeetingSection(title="APPLY YOURSELF TO THE FIELD MINISTRY", parts=[])
-        christians_section = MeetingSection(title="LIVING AS CHRISTIANS", parts=[])
-        
-        # Track which section we're in
-        current_section = None
-        in_treasures = False
-        in_ministry = False
-        in_christians = False
-        found_bible_reading = False
-        
-        # Look for opening song and prayer - usually has music icon
-        opening_elements = soup.select("h3.dc-icon--music, h3:contains('Song'), span:contains('Song')")
-        for element in opening_elements:
-            text = element.get_text().strip()
-            if "song" in text.lower() and "prayer" in text.lower() and not in_treasures:
-                duration, title = self._extract_duration_and_title(element)
-                opening_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
-                break
-        
-        # If we found the opening song, add it to sections
-        if opening_section.parts:
-            sections.append(opening_section)
-        
-        # Find main sections - these typically have icon classes or specific titles
-        section_headers = soup.select("h3.dc-icon--gem, h3.dc-icon--wheat, h3.dc-icon--users, " + 
-                                    "h2, h3:contains('TREASURES'), h3:contains('APPLY YOURSELF'), h3:contains('LIVING AS CHRISTIANS')")
-        
-        for header in section_headers:
-            header_text = header.get_text().strip().upper()
-            
-            if "TREASURES" in header_text or "dc-icon--gem" in str(header.get('class', [])):
-                in_treasures = True
-                in_ministry = False
-                in_christians = False
-                current_section = treasures_section
-                if treasures_section not in sections:
-                    sections.append(treasures_section)
-                    
-            elif "APPLY YOURSELF" in header_text or "FIELD MINISTRY" in header_text or "dc-icon--wheat" in str(header.get('class', [])):
-                in_treasures = False
-                in_ministry = True
-                in_christians = False
-                current_section = ministry_section
-                if ministry_section not in sections:
-                    sections.append(ministry_section)
-                    
-            elif "CHRISTIANS" in header_text or "dc-icon--users" in str(header.get('class', [])):
-                in_treasures = False
-                in_ministry = False
-                in_christians = True
-                current_section = christians_section
-                if christians_section not in sections:
-                    sections.append(christians_section)
-        
-        # Now find all parts and assign to the correct section
-        all_parts = []
-        
-        # Look for paragraphs with part information - typically with duration info
-        for para in soup.select("p, div, h3, span"):
-            text = para.get_text().strip()
-            
-            # Skip empty paragraphs or ones without enough text
-            if not text or len(text) < 5:
-                continue
-                
-            # Look for duration information
-            if re.search(r'\(\d+\s*min', text) or "Bible Reading" in text or "Congregation Bible Study" in text:
-                duration, title = self._extract_duration_and_title(para)
-                
-                # Special handling for Bible Reading - marks the end of Treasures section
-                if "Bible Reading" in title and not found_bible_reading:
-                    found_bible_reading = True
-                    treasures_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
+        sections_data = {
+            "Opening": MeetingSection(title="Opening", parts=[]),
+            "Treasures": MeetingSection(title="TREASURES FROM GOD'S WORD", parts=[]),
+            "Ministry": MeetingSection(title="APPLY YOURSELF TO THE FIELD MINISTRY", parts=[]),
+            "Christians": MeetingSection(title="LIVING AS CHRISTIANS", parts=[])
+        }
+        ordered_sections = []
+        current_section_key = None
+        song_count = 0
+
+        # Find the main content container if possible (adjust selector if needed)
+        # Using 'body' as a fallback if a specific container isn't obvious
+        content_area = soup.find('div', class_='bodyTxt') or soup.body
+
+        # Iterate through direct children or relevant tags within the content area
+        # We look for h3 tags (for sections, parts, songs) and p tags (for durations)
+        for element in content_area.find_all(['h3', 'p'], recursive=False): # recursive=False might be too strict, adjust if needed
+
+            if element.name == 'h3':
+                # Check for Section Headers (using icons as primary identifier)
+                if element.select_one("span:contains('TREASURES FROM GOD')") or 'dc-icon--gem' in element.get('class', []):
+                    current_section_key = "Treasures"
+                    if sections_data[current_section_key] not in ordered_sections:
+                         ordered_sections.append(sections_data[current_section_key])
+                    continue # Move to next element after identifying header
+                elif element.select_one("span:contains('APPLY YOURSELF')") or 'dc-icon--wheat' in element.get('class', []):
+                    current_section_key = "Ministry"
+                    if sections_data[current_section_key] not in ordered_sections:
+                         ordered_sections.append(sections_data[current_section_key])
                     continue
-                    
-                # Assign the part to the appropriate section
-                if found_bible_reading and not in_christians and "song" not in text.lower():
-                    # After Bible Reading but before Christians section -> Ministry section
-                    ministry_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
-                elif in_christians or (found_bible_reading and "song" in text.lower()):
-                    # Either in Christians section or it's a song after Bible Reading
-                    if "song" in text.lower() and not in_christians:
-                        # This is the song that starts the Christians section
-                        in_christians = True
-                    christians_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
-                elif not found_bible_reading:
-                    # Before Bible Reading -> Treasures section
-                    treasures_section.parts.append(MeetingPart(title=title, duration_minutes=duration))
+                elif element.select_one("span:contains('LIVING AS CHRISTIANS')") or 'dc-icon--users' in element.get('class', []):
+                    current_section_key = "Christians"
+                    if sections_data[current_section_key] not in ordered_sections:
+                         ordered_sections.append(sections_data[current_section_key])
+                    continue
+
+                # Check for Songs (using music icon)
+                if 'dc-icon--music' in element.get('class', []):
+                    song_count += 1
+                    duration, title = self._extract_duration_and_title(element) # Use your existing helper
+                    part = MeetingPart(title=title, duration_minutes=duration)
+
+                    if song_count == 1: # Opening Song
+                        # Add to Opening section
+                        if sections_data["Opening"] not in ordered_sections:
+                            ordered_sections.insert(0, sections_data["Opening"])
+                        sections_data["Opening"].parts.append(part)
+                    elif song_count == 2: # Middle Song (Assume it starts Christians section)
+                        current_section_key = "Christians" # Ensure we are in Christians section
+                        if sections_data[current_section_key] not in ordered_sections:
+                            ordered_sections.append(sections_data[current_section_key])
+                        sections_data[current_section_key].parts.append(part)
+                    else: # Concluding Song (Assume it's part of Christians)
+                        # It might be preceded by concluding comments, handle later if needed
+                         if sections_data["Christians"] not in ordered_sections:
+                             ordered_sections.append(sections_data["Christians"])
+                         sections_data["Christians"].parts.append(part)
+                    continue # Move to next element after processing song
+
+                # Check for Numbered Parts (h3 > strong starting with digit.)
+                strong_tag = element.find('strong', recursive=False)
+                if strong_tag and strong_tag.get_text(strip=True).startswith(tuple(f"{i}." for i in range(1, 15))): # Check for "1.", "2.", etc.
+                    part_title = element.get_text(strip=True)
+                    part_duration = 0 # Default duration
+
+                    # Find duration in the *next* sibling 'p' tag
+                    next_sibling = element.find_next_sibling()
+                    while next_sibling:
+                        if next_sibling.name == 'p':
+                            duration = self._extract_duration_from_text(next_sibling.get_text())
+                            if duration is not None:
+                                part_duration = duration
+                                break # Found duration
+                        # Stop searching if we hit another h3, assuming it's the next part/section
+                        if next_sibling.name == 'h3':
+                             break
+                        next_sibling = next_sibling.find_next_sibling()
+
+                    # Add the part to the current section if identified
+                    if current_section_key:
+                        if sections_data[current_section_key] not in ordered_sections:
+                             ordered_sections.append(sections_data[current_section_key]) # Ensure section is added if it wasn't already
+                        sections_data[current_section_key].parts.append(
+                            MeetingPart(title=part_title, duration_minutes=part_duration)
+                        )
+                    else:
+                        print(f"Warning: Found numbered part '{part_title}' but no current section context.")
+
+                # Handle specific non-numbered parts like 'Concluding Comments' if needed
+                elif "Concluding Comments" in element.get_text():
+                     # Assume 3 mins default or extract if pattern exists
+                     duration, title = self._extract_duration_and_title(element)
+                     if current_section_key == "Christians":
+                          sections_data[current_section_key].parts.append(
+                               MeetingPart(title=title, duration_minutes=duration)
+                          )
+
+
+        # Filter out sections that ended up empty
+        final_sections = [sec for sec in ordered_sections if sec.parts]
         
-        # Make sure all sections with parts are included
-        if treasures_section.parts and treasures_section not in sections:
-            sections.append(treasures_section)
-        if ministry_section.parts and ministry_section not in sections:
-            sections.append(ministry_section)
-        if christians_section.parts and christians_section not in sections:
-            sections.append(christians_section)
-        
-        # If we couldn't extract any sections, create default ones
-        if not sections:
-            opening_section = MeetingSection(title="Opening", parts=[
-                MeetingPart(title="Song and Prayer", duration_minutes=5)
-            ])
-            treasures_section = MeetingSection(title="TREASURES FROM GOD'S WORD", parts=[
-                MeetingPart(title="Bible Reading", duration_minutes=4)
-            ])
-            ministry_section = MeetingSection(title="APPLY YOURSELF TO THE FIELD MINISTRY", parts=[
-                MeetingPart(title="Initial Call", duration_minutes=2),
-                MeetingPart(title="Return Visit", duration_minutes=3)
-            ])
-            christians_section = MeetingSection(title="LIVING AS CHRISTIANS", parts=[
-                MeetingPart(title="Congregation Bible Study", duration_minutes=30),
-                MeetingPart(title="Concluding Comments", duration_minutes=3),
-                MeetingPart(title="Concluding Song and Prayer", duration_minutes=5)
-            ])
-            
-            sections = [opening_section, treasures_section, ministry_section, christians_section]
-        
-        return sections
+        return final_sections
+    
+    def _extract_duration_and_title(self, element: Tag) -> Tuple[int, str]:
+        """Extract duration in minutes and title from an element (Keep your existing refined version)"""
+        text = element.get_text(strip=True)
+        duration = 5 # Default fallback
+        title = text
+
+        # Look for patterns like "(10 min.)" or "(10 min)"
+        duration_match = re.search(r'\((\d+)\s*min', text)
+        if duration_match:
+            duration = int(duration_match.group(1))
+            # Remove the duration part from the title
+            title = re.sub(r'\(\d+\s*min\.*\)\s*$', '', text, flags=re.IGNORECASE).strip()
+        else:
+            # Handle defaults based on keywords more robustly
+            lower_text = text.lower()
+            if "song" in lower_text and "prayer" in lower_text:
+                duration = 5 # Opening/Concluding songs often grouped with prayer
+            elif "song" in lower_text:
+                 duration = 3 # Midweek songs often ~3 mins
+            elif "opening comments" in lower_text:
+                 duration = 1
+            elif "bible reading" in lower_text:
+                 duration = 4
+            elif "concluding comments" in lower_text:
+                 duration = 3
+            elif "spiritual gems" in lower_text or "digging for spiritual gems" in lower_text:
+                 duration = 10
+            elif "congregation bible study" in lower_text:
+                 duration = 30
+            # Add more specific keyword checks if needed for Ministry parts
+
+        # Clean up title (remove potential numbering if captured accidentally, etc.)
+        title = re.sub(r'^\d+\.\s*', '', title).strip() # Remove leading "1. " etc.
+
+        return duration, title
     
     def _parse_weekend_meeting(self, soup: BeautifulSoup) -> List[MeetingSection]:
         """Parse weekend meeting structure"""
