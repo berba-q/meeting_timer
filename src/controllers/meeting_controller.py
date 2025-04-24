@@ -3,13 +3,15 @@ Controller for managing meetings in the JW Meeting Timer application.
 """
 import os
 import json
-from datetime import datetime
+from datetime import datetime, time
 from typing import Dict, List, Optional
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from src.models.meeting import Meeting, MeetingType
-from src.models.settings import SettingsManager
+from src.models.meeting import Meeting, MeetingType, MeetingSection, MeetingPart
+from src.models.settings import SettingsManager, MeetingSourceMode
+from src.models.meeting_template import MeetingTemplate, TemplateType
 from src.utils.scraper import MeetingScraper
+from src.utils.helpers import safe_json_load, safe_json_save
 
 
 class MeetingController(QObject):
@@ -42,14 +44,20 @@ class MeetingController(QObject):
         
         # Initialize scraper
         self.scraper = MeetingScraper(self.settings_manager.settings.language)
+        
+        # Initialize template manager
+        self.template_manager = MeetingTemplate()
     
     def load_meetings(self):
         """Load the most recent meetings"""
+        meeting_source_mode = self.settings_manager.settings.meeting_source.mode
+        
         # Check if we need to update meetings from web
-        if self.settings_manager.settings.auto_update_meetings:
+        if (meeting_source_mode == MeetingSourceMode.WEB_SCRAPING and 
+            self.settings_manager.settings.meeting_source.auto_update_meetings):
             self.update_meetings_from_web()
         else:
-            # Load from local files
+            # Load from local files or templates based on mode
             self._load_local_meetings()
     
     def update_meetings_from_web(self):
@@ -60,6 +68,15 @@ class MeetingController(QObject):
             
             # Fetch meetings
             meetings = self.scraper.update_meetings()
+            
+            # Handle weekend songs manual entry if enabled
+            if self.settings_manager.settings.meeting_source.weekend_songs_manual:
+                if MeetingType.WEEKEND in meetings:
+                    self._clear_weekend_songs(meetings[MeetingType.WEEKEND])
+            
+            # Save scraped meetings as templates if option enabled
+            if self.settings_manager.settings.meeting_source.save_scraped_as_template:
+                self._save_meetings_as_templates(meetings)
             
             # Update current meetings
             self.current_meetings = meetings
@@ -79,45 +96,156 @@ class MeetingController(QObject):
             # If update fails, try loading from local files
             self._load_local_meetings()
     
+    def _clear_weekend_songs(self, meeting: Meeting):
+        """Clear song information from weekend meeting to be manually entered"""
+        for section in meeting.sections:
+            for part in section.parts:
+                if "song" in part.title.lower() or "song" in section.title.lower():
+                    # Keep the part but clear specific song number
+                    if part.title.lower().startswith("song"):
+                        # Try to preserve the structure (e.g., "Song 123" -> "Song")
+                        part.title = "Song"
+                    elif "song" in part.title.lower():
+                        # If song is mentioned in the middle, preserve the text
+                        # E.g., "Opening Song and Prayer" stays the same
+                        pass
+    
+    def _save_meetings_as_templates(self, meetings: Dict[MeetingType, Meeting]):
+        """Save fetched meetings as templates for future use"""
+        for meeting_type, meeting in meetings.items():
+            # Convert to template format
+            template_data = {
+                'title': meeting.title,
+                'language': meeting.language,
+                'sections': []
+            }
+            
+            for section in meeting.sections:
+                section_data = {
+                    'title': section.title,
+                    'parts': []
+                }
+                
+                for part in section.parts:
+                    part_data = {
+                        'title': part.title,
+                        'duration_minutes': part.duration_minutes,
+                        'presenter': part.presenter,
+                        'notes': part.notes
+                    }
+                    section_data['parts'].append(part_data)
+                
+                template_data['sections'].append(section_data)
+            
+            # Save as template
+            if meeting_type == MeetingType.MIDWEEK:
+                self.template_manager.save_template(TemplateType.MIDWEEK, template_data)
+            elif meeting_type == MeetingType.WEEKEND:
+                self.template_manager.save_template(TemplateType.WEEKEND, template_data)
+    
     def _load_local_meetings(self):
         """Load the most recent meetings from local files"""
         meetings = {}
         
-        try:
-            # Get all meeting files
-            meeting_files = [f for f in os.listdir(self.meetings_dir) 
-                           if f.endswith('.json')]
+        # Check if we should use templates instead of saved meetings
+        meeting_source_mode = self.settings_manager.settings.meeting_source.mode
+        
+        if meeting_source_mode == MeetingSourceMode.TEMPLATE_BASED:
+            # Create meetings from templates
+            meetings = self._create_meetings_from_templates()
+        else:
+            try:
+                # Get all meeting files
+                meeting_files = [f for f in os.listdir(self.meetings_dir) 
+                               if f.endswith('.json')]
+                
+                # Group by meeting type
+                midweek_files = [f for f in meeting_files if 'midweek' in f.lower()]
+                weekend_files = [f for f in meeting_files if 'weekend' in f.lower()]
+                
+                # Sort by date (assuming filename contains date)
+                midweek_files.sort(reverse=True)
+                weekend_files.sort(reverse=True)
+                
+                # Load most recent of each type
+                if midweek_files:
+                    midweek_meeting = self._load_meeting_file(
+                        os.path.join(self.meetings_dir, midweek_files[0])
+                    )
+                    if midweek_meeting:
+                        meetings[MeetingType.MIDWEEK] = midweek_meeting
+                
+                if weekend_files:
+                    weekend_meeting = self._load_meeting_file(
+                        os.path.join(self.meetings_dir, weekend_files[0])
+                    )
+                    if weekend_meeting:
+                        meetings[MeetingType.WEEKEND] = weekend_meeting
             
-            # Group by meeting type
-            midweek_files = [f for f in meeting_files if 'midweek' in f.lower()]
-            weekend_files = [f for f in meeting_files if 'weekend' in f.lower()]
-            
-            # Sort by date (assuming filename contains date)
-            midweek_files.sort(reverse=True)
-            weekend_files.sort(reverse=True)
-            
-            # Load most recent of each type
-            if midweek_files:
-                midweek_meeting = self._load_meeting_file(
-                    os.path.join(self.meetings_dir, midweek_files[0])
-                )
-                if midweek_meeting:
-                    meetings[MeetingType.MIDWEEK] = midweek_meeting
-            
-            if weekend_files:
-                weekend_meeting = self._load_meeting_file(
-                    os.path.join(self.meetings_dir, weekend_files[0])
-                )
-                if weekend_meeting:
-                    meetings[MeetingType.WEEKEND] = weekend_meeting
-            
-            self.current_meetings = meetings
-            self.meetings_loaded.emit(meetings)
-            
-        except Exception as e:
-            error_message = f"Failed to load meetings: {str(e)}"
-            print(error_message)
-            self.error_occurred.emit(error_message)
+            except Exception as e:
+                error_message = f"Failed to load meetings: {str(e)}"
+                print(error_message)
+                self.error_occurred.emit(error_message)
+                
+                # Fall back to templates if local loading fails
+                if not meetings:
+                    meetings = self._create_meetings_from_templates()
+        
+        self.current_meetings = meetings
+        self.meetings_loaded.emit(meetings)
+    
+    def _create_meetings_from_templates(self) -> Dict[MeetingType, Meeting]:
+        """Create meetings from templates for the current week"""
+        meetings = {}
+        
+        # Get current date/time
+        now = datetime.now()
+        
+        # Create midweek meeting
+        midweek_day = self.settings_manager.settings.midweek_meeting.day.value
+        midweek_time = self.settings_manager.settings.midweek_meeting.time
+        
+        # Calculate the date for the next midweek meeting
+        days_until_midweek = (midweek_day - now.weekday()) % 7
+        if days_until_midweek == 0 and now.time() > midweek_time:
+            days_until_midweek = 7  # Move to next week if today's meeting passed
+        
+        midweek_date = now.replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) + datetime.timedelta(days=days_until_midweek)
+        
+        # Create midweek meeting from template
+        midweek_meeting = self.template_manager.create_meeting_from_template(
+            TemplateType.MIDWEEK,
+            midweek_date,
+            midweek_time
+        )
+        
+        meetings[MeetingType.MIDWEEK] = midweek_meeting
+        
+        # Create weekend meeting
+        weekend_day = self.settings_manager.settings.weekend_meeting.day.value
+        weekend_time = self.settings_manager.settings.weekend_meeting.time
+        
+        # Calculate the date for the next weekend meeting
+        days_until_weekend = (weekend_day - now.weekday()) % 7
+        if days_until_weekend == 0 and now.time() > weekend_time:
+            days_until_weekend = 7  # Move to next week if today's meeting passed
+        
+        weekend_date = now.replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) + datetime.timedelta(days=days_until_weekend)
+        
+        # Create weekend meeting from template
+        weekend_meeting = self.template_manager.create_meeting_from_template(
+            TemplateType.WEEKEND,
+            weekend_date,
+            weekend_time
+        )
+        
+        meetings[MeetingType.WEEKEND] = weekend_meeting
+        
+        return meetings
     
     def _load_meeting_file(self, file_path: str) -> Optional[Meeting]:
         """Load a meeting from a file"""
@@ -174,8 +302,6 @@ class MeetingController(QObject):
     
     def add_section_to_meeting(self, meeting: Meeting, section_title: str) -> Meeting:
         """Add a new section to a meeting"""
-        from src.models.meeting import MeetingSection
-        
         # Create new section
         section = MeetingSection(
             title=section_title,
@@ -194,8 +320,6 @@ class MeetingController(QObject):
     def add_part_to_section(self, meeting: Meeting, section_index: int, 
                             part_title: str, duration_minutes: int) -> Meeting:
         """Add a new part to a section in a meeting"""
-        from src.models.meeting import MeetingPart
-        
         # Create new part
         part = MeetingPart(
             title=part_title,
@@ -211,3 +335,29 @@ class MeetingController(QObject):
             self.meeting_updated.emit(meeting)
         
         return meeting
+    
+    def show_meeting_editor(self, parent=None, meeting: Optional[Meeting] = None):
+        """Show the meeting editor dialog"""
+        from src.views.meeting_editor_dialog import MeetingEditorDialog
+        
+        dialog = MeetingEditorDialog(parent, meeting)
+        
+        # Connect the signal from the dialog
+        dialog.meeting_updated.connect(self._handle_meeting_updated)
+        
+        # Show the dialog
+        dialog.exec()
+    
+    def _handle_meeting_updated(self, meeting: Meeting):
+        """Handle a meeting being updated from the editor"""
+        # Save the meeting
+        self.save_meeting(meeting)
+        
+        # Update current meetings dictionary
+        self.current_meetings[meeting.meeting_type] = meeting
+        
+        # Set as current meeting
+        self.set_current_meeting(meeting)
+        
+        # Emit signal
+        self.meetings_loaded.emit(self.current_meetings)
