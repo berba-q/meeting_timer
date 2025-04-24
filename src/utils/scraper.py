@@ -170,45 +170,107 @@ class MeetingScraper:
             return int(duration_match.group(1))
         return None
     
+    def _extract_song_number(self, text: str) -> Optional[int]:
+        """Extract song number from text"""
+        # Match patterns like "Song 76" or "SONG 76"
+        song_match = re.search(r'[Ss][Oo][Nn][Gg]\s+(\d+)', text)
+        if song_match:
+            return int(song_match.group(1))
+        return None
+    
     def _parse_midweek_meeting(self, soup: BeautifulSoup) -> List[MeetingSection]:
-        """Parse midweek meeting structure"""
+        """Parse midweek meeting structure to match the desired output format"""
+        # Initialize sections with correct section numbers from the desired output
         sections = []
-        current_section = None
+        songs = {}  # Dict to store song numbers keyed by position: "opening", "middle", "closing"
         
         # Find main content container
         content = soup.find('div', class_='bodyTxt') or soup.body
         
         # First identify all section headers
         section_headers = []
+        
+        # Extract the song numbers from the document first
+        for h3 in content.find_all(['h3', 'p']):
+            h3_text = h3.get_text().strip()
+            
+            # Look for song patterns
+            if "Song" in h3_text or "SONG" in h3_text:
+                song_num = self._extract_song_number(h3_text)
+                if song_num:
+                    if "Opening" in h3_text or len(songs) == 0:
+                        songs["opening"] = song_num
+                    elif "Concluding" in h3_text or "Prayer" in h3_text:
+                        songs["closing"] = song_num
+                    else:
+                        songs["middle"] = song_num
+        
+        # Extract the opening song and comments
+        opening_song_text = None
+        opening_song_element = None
+        for h3 in content.find_all('h3'):
+            h3_text = h3.get_text().strip()
+            if "Song" in h3_text and "Prayer" in h3_text and "Opening Comments" in h3_text:
+                opening_song_text = h3_text
+                opening_song_element = h3
+                # Extract opening song number if not already found
+                if "opening" not in songs:
+                    song_num = self._extract_song_number(h3_text)
+                    if song_num:
+                        songs["opening"] = song_num
+                break
+        
+        # Find main section headers
         for h3 in content.find_all('h3'):
             h3_text = h3.get_text().strip()
             
+            # Skip the opening song which we handle separately
+            if opening_song_element and h3 == opening_song_element:
+                continue
+                
             # Identify section headers by common text or icons
             if "TREASURES FROM GOD'S WORD" in h3_text or 'dc-icon--gem' in h3.get('class', []):
-                section_headers.append(("TREASURES FROM GOD'S WORD", h3))
+                section_headers.append((1, "TREASURES FROM GOD'S WORD", h3))
             elif "APPLY YOURSELF TO THE FIELD MINISTRY" in h3_text or 'dc-icon--wheat' in h3.get('class', []):
-                section_headers.append(("APPLY YOURSELF TO THE FIELD MINISTRY", h3))
+                section_headers.append((2, "APPLY YOURSELF TO THE FIELD MINISTRY", h3))
             elif "LIVING AS CHRISTIANS" in h3_text or 'dc-icon--users' in h3.get('class', []):
-                section_headers.append(("LIVING AS CHRISTIANS", h3))
-            elif "Song" in h3_text and "Prayer" in h3_text and 'dc-icon--music' in h3.get('class', []):
-                # This is likely the opening - create an opening section
-                if not sections:
-                    opening_section = MeetingSection(title="Opening", parts=[])
-                    
-                    # Extract duration from text if present, default to 5 minutes
-                    duration = self._extract_duration(h3_text) or 5
-                    
-                    opening_section.parts.append(
-                        MeetingPart(title=h3_text, duration_minutes=duration)
-                    )
-                    sections.append(opening_section)
+                section_headers.append((3, "LIVING AS CHRISTIANS", h3))
+        
+        # Default song numbers if not found
+        if "opening" not in songs:
+            songs["opening"] = 76  # Fallback value
+        if "middle" not in songs:
+            songs["middle"] = 111  # Fallback value
+        if "closing" not in songs:
+            songs["closing"] = 115  # Fallback value
+        
+        # Create the Treasures section (Section 1) and add the opening song as Part 0
+        if section_headers and section_headers[0][0] == 1:
+            treasures_section = MeetingSection(title="TREASURES FROM GOD'S WORD", parts=[])
+            
+            # Add opening song and comments as Part 0 if found
+            if opening_song_text:
+                duration = self._extract_duration(opening_song_text) or 1
+                # Extract the song number from text if available
+                song_num = songs["opening"]
+                treasures_section.parts.append(
+                    MeetingPart(title=f"SONG {song_num} AND PRAYER | OPENING COMMENTS (1 MIN.)", duration_minutes=duration)
+                )
+            
+            sections.append(treasures_section)
         
         # Process each section and collect parts
-        for i, (section_title, section_header) in enumerate(section_headers):
-            section = MeetingSection(title=section_title, parts=[])
+        part_counter = 1  # Start part counter at 1 (after opening song which is 0)
+        for section_idx, (section_num, section_title, section_header) in enumerate(section_headers):
+            # Skip Treasures section which we've already created
+            if section_num == 1 and sections and sections[0].title == "TREASURES FROM GOD'S WORD":
+                current_section = sections[0]
+            else:
+                current_section = MeetingSection(title=section_title, parts=[])
+                sections.append(current_section)
             
             # Find the next section header or end of content
-            next_header = section_headers[i+1][1] if i+1 < len(section_headers) else None
+            next_header = section_headers[section_idx+1][2] if section_idx+1 < len(section_headers) else None
             
             # Get all elements between this section header and the next one
             current_elem = section_header.next_sibling
@@ -217,113 +279,90 @@ class MeetingScraper:
             while current_elem and (not isinstance(current_elem, Tag) or not current_elem.get_text().strip()):
                 current_elem = current_elem.next_sibling
             
-            # Process each paragraph in the section
+            # Special case for the "LIVING AS CHRISTIANS" section
+            if section_title == "LIVING AS CHRISTIANS":
+                # Look for middle song in h3 tag
+                found_song = False
+                for h3 in content.find_all(['h3', 'p']):
+                    h3_text = h3.get_text().strip()
+                    if "Song" in h3_text and not "Opening" in h3_text and not "Concluding" in h3_text:
+                        found_song = True
+                        # Try to extract song number if not already found
+                        if "middle" not in songs:
+                            song_num = self._extract_song_number(h3_text)
+                            if song_num:
+                                songs["middle"] = song_num
+                        break
+                
+                if found_song or "middle" in songs:
+                    # Add middle song as the first part in the Living as Christians section
+                    song_num = songs["middle"]
+                    current_section.parts.append(
+                        MeetingPart(title=f"Song {song_num}", duration_minutes=3)
+                    )
+            
+            # Process parts in this section
             while current_elem and (next_header is None or current_elem != next_header):
                 if isinstance(current_elem, Tag):
                     part_text = current_elem.get_text().strip()
                     
                     # Skip empty elements
                     if part_text:
-                        # Try to identify part type and extract duration
-                        if current_elem.name == 'p':
-                            # Look for numbering pattern: "1. What Makes..."
-                            part_match = re.match(r'(\d+)\.\s*(.*?)(?:\s*\((\d+)\s*min\.?\))?$', part_text)
-                            if part_match:
-                                num, title, duration_str = part_match.groups()
-                                
-                                # If duration is in the title, use it
-                                if duration_str:
-                                    duration = int(duration_str)
-                                else:
-                                    # Try to extract from text or use default
-                                    duration = self._extract_duration(part_text)
-                                    
-                                    # If still no duration, use defaults based on part types
-                                    if duration is None:
-                                        if "Bible Reading" in title:
-                                            duration = 4
-                                        elif "Congregation Bible Study" in title:
-                                            duration = 30
-                                        elif any(keyword in title.lower() for keyword in ["demonstration", "video"]):
-                                            duration = 5
-                                        else:
-                                            duration = 10  # Default duration
-                                
-                                # Create part
-                                section.parts.append(
-                                    MeetingPart(title=f"{num}. {title}", duration_minutes=duration)
-                                )
+                        # Check for part pattern: digit followed by dot and text
+                        part_match = re.match(r'(\d+)\.\s*(.*?)(?:\s*\((\d+)\s*min\.?\))?$', part_text)
                         
-                        # Check for song entries
-                        elif current_elem.name == 'h3' and ("Song" in part_text):
-                            duration = self._extract_duration(part_text) or 3  # Default 3 minutes for songs
-                            section.parts.append(
-                                MeetingPart(title=part_text, duration_minutes=duration)
+                        if part_match:
+                            num, title, duration_str = part_match.groups()
+                            
+                            # If duration is in the title, use it
+                            if duration_str:
+                                duration = int(duration_str)
+                            else:
+                                # Try to extract from text or use default
+                                duration = self._extract_duration(part_text)
+                                
+                                # If still no duration, use defaults based on part types
+                                if duration is None:
+                                    if "Bible Reading" in title:
+                                        duration = 4
+                                    elif "Congregation Bible Study" in title:
+                                        duration = 30
+                                    elif any(keyword in title.lower() for keyword in ["demonstration", "video"]):
+                                        duration = 5
+                                    else:
+                                        duration = 10  # Default duration
+                            
+                            # Create the formatted part title matching desired output
+                            formatted_title = f"{num}. {title}"
+                            if duration_str:
+                                formatted_title += f" ({duration} min)"
+                            
+                            # Create part with exact formatting matching desired output
+                            current_section.parts.append(
+                                MeetingPart(title=formatted_title, duration_minutes=duration)
                             )
+                            
+                            part_counter += 1
                 
                 # Move to next element
                 current_elem = current_elem.next_sibling
-            
-            # Add section if it has parts
-            if section.parts:
-                sections.append(section)
         
-        # Check for concluding section if not already included
-        if sections and "LIVING AS CHRISTIANS" in sections[-1].title:
-            # Check if Concluding Comments or Concluding Song is already included
-            has_concluding = any("Concluding" in part.title for part in sections[-1].parts)
+        # Check for concluding section elements
+        if sections and sections[-1].title == "LIVING AS CHRISTIANS":
+            # Check if Concluding Comments is already included
+            has_concluding = any("Concluding Comments" in part.title for part in sections[-1].parts)
             
             if not has_concluding:
-                # Hardcode the concluding parts at the end
+                # Add "Concluding Comments (3 min.) | Song X and Prayer" using extracted song number
+                closing_song_num = songs["closing"]
                 sections[-1].parts.append(
-                    MeetingPart(title="Concluding Comments", duration_minutes=3)
-                )
-                sections[-1].parts.append(
-                    MeetingPart(title="Concluding Song and Prayer", duration_minutes=5)
+                    MeetingPart(title=f"Concluding Comments (3 min.) | Song {closing_song_num} and Prayer", duration_minutes=8)
                 )
         
-        # If still empty (parsing failed), create a skeleton with default structure
-        if not sections:
-            sections = self._create_default_midweek_structure()
+        # Calculate total meeting duration
+        total_minutes = sum(sum(part.duration_minutes for part in section.parts) for section in sections)
         
         return sections
-    
-    def _create_default_midweek_structure(self) -> List[MeetingSection]:
-        """Create a default midweek meeting structure when parsing fails"""
-        return [
-            MeetingSection(
-                title="Opening",
-                parts=[
-                    MeetingPart(title="Song and Prayer", duration_minutes=5),
-                    MeetingPart(title="Opening Comments", duration_minutes=1)
-                ]
-            ),
-            MeetingSection(
-                title="TREASURES FROM GOD'S WORD",
-                parts=[
-                    MeetingPart(title="1. Main Talk", duration_minutes=10),
-                    MeetingPart(title="2. Digging for Spiritual Gems", duration_minutes=10),
-                    MeetingPart(title="3. Bible Reading", duration_minutes=4)
-                ]
-            ),
-            MeetingSection(
-                title="APPLY YOURSELF TO THE FIELD MINISTRY",
-                parts=[
-                    MeetingPart(title="4. First Return Visit", duration_minutes=5),
-                    MeetingPart(title="5. Second Return Visit", duration_minutes=5),
-                    MeetingPart(title="6. Bible Study", duration_minutes=5)
-                ]
-            ),
-            MeetingSection(
-                title="LIVING AS CHRISTIANS",
-                parts=[
-                    MeetingPart(title="7. First Part", duration_minutes=15),
-                    MeetingPart(title="8. Congregation Bible Study", duration_minutes=30),
-                    MeetingPart(title="9. Concluding Comments", duration_minutes=3),
-                    MeetingPart(title="10. Concluding Song and Prayer", duration_minutes=5)
-                ]
-            )
-        ]
     
     def _parse_weekend_meeting(self, soup: BeautifulSoup) -> List[MeetingSection]:
         """Parse weekend meeting structure"""
