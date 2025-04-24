@@ -6,12 +6,13 @@ from datetime import time
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QComboBox, QCheckBox, QTimeEdit, QPushButton,
-    QGroupBox, QFormLayout, QSpinBox, QDialogButtonBox
+    QGroupBox, QFormLayout, QSpinBox, QDialogButtonBox,
+    QRadioButton, QButtonGroup
 )
 from PyQt6.QtCore import Qt, QTime
 
 from src.controllers.settings_controller import SettingsController
-from src.models.settings import DayOfWeek, TimerDisplayMode
+from src.models.settings import DayOfWeek, TimerDisplayMode, MeetingSourceMode
 
 
 class SettingsDialog(QDialog):
@@ -54,15 +55,18 @@ class SettingsDialog(QDialog):
         self.general_tab = QWidget()
         self.meetings_tab = QWidget()
         self.display_tab = QWidget()
+        self.meeting_source_tab = QWidget()  # New tab for meeting source options
         
         self._setup_general_tab()
         self._setup_meetings_tab()
         self._setup_display_tab()
+        self._setup_meeting_source_tab()  # Setup new tab
         
         # Add tabs to tab widget
         self.tab_widget.addTab(self.general_tab, "General")
         self.tab_widget.addTab(self.meetings_tab, "Meetings")
         self.tab_widget.addTab(self.display_tab, "Display")
+        self.tab_widget.addTab(self.meeting_source_tab, "Meeting Source")
         
         # Add tab widget to layout
         layout.addWidget(self.tab_widget)
@@ -96,16 +100,8 @@ class SettingsDialog(QDialog):
         
         language_layout.addRow("Interface Language:", self.language_combo)
         
-        # Auto update settings
-        update_group = QGroupBox("Updates")
-        update_layout = QVBoxLayout(update_group)
-        
-        self.auto_update_check = QCheckBox("Automatically update meetings from the web")
-        update_layout.addWidget(self.auto_update_check)
-        
         # Add groups to layout
         layout.addWidget(language_group)
-        layout.addWidget(update_group)
         layout.addStretch()
     
     def _setup_meetings_tab(self):
@@ -219,6 +215,89 @@ class SettingsDialog(QDialog):
         layout.addWidget(screen_group)
         layout.addStretch()
     
+    def _setup_meeting_source_tab(self):
+        """Setup meeting source settings tab"""
+        layout = QVBoxLayout(self.meeting_source_tab)
+        
+        # Meeting source mode
+        source_mode_group = QGroupBox("Meeting Data Source")
+        source_mode_layout = QVBoxLayout(source_mode_group)
+        
+        # Create radio buttons for each mode
+        self.source_mode_radios = {}
+        self.source_mode_group = QButtonGroup(self)
+        
+        for mode in MeetingSourceMode:
+            radio = QRadioButton(self._get_source_mode_display_name(mode))
+            self.source_mode_radios[mode] = radio
+            self.source_mode_group.addButton(radio)
+            source_mode_layout.addWidget(radio)
+        
+        # Web scraping options
+        self.web_options_group = QGroupBox("Web Scraping Options")
+        web_options_layout = QVBoxLayout(self.web_options_group)
+        
+        self.auto_update_check = QCheckBox("Automatically update meetings from the web")
+        self.auto_update_check.setToolTip("Update meetings from wol.jw.org when the application starts")
+        
+        self.save_scraped_check = QCheckBox("Save scraped meetings as templates")
+        self.save_scraped_check.setToolTip("Save scraped meeting data as templates for future use")
+        
+        web_options_layout.addWidget(self.auto_update_check)
+        web_options_layout.addWidget(self.save_scraped_check)
+        
+        # Song options
+        self.song_options_group = QGroupBox("Song Entry Options")
+        song_options_layout = QVBoxLayout(self.song_options_group)
+        
+        self.weekend_songs_manual_check = QCheckBox("Always manually enter weekend songs")
+        self.weekend_songs_manual_check.setToolTip("Weekend songs must be entered manually for each meeting")
+        
+        song_options_layout.addWidget(self.weekend_songs_manual_check)
+        
+        # Connect source mode changes to toggle option groups
+        for mode, radio in self.source_mode_radios.items():
+            radio.toggled.connect(self._update_source_options_visibility)
+        
+        # Add groups to layout
+        layout.addWidget(source_mode_group)
+        layout.addWidget(self.web_options_group)
+        layout.addWidget(self.song_options_group)
+        layout.addStretch()
+    
+    def _get_source_mode_display_name(self, mode: MeetingSourceMode) -> str:
+        """Get a user-friendly display name for source modes"""
+        if mode == MeetingSourceMode.WEB_SCRAPING:
+            return "Web Scraping (Automatically download from wol.jw.org)"
+        elif mode == MeetingSourceMode.MANUAL_ENTRY:
+            return "Manual Entry (Enter meeting parts manually)"
+        elif mode == MeetingSourceMode.TEMPLATE_BASED:
+            return "Template-Based (Use templates with modifications)"
+        return str(mode)
+    
+    def _update_source_options_visibility(self):
+        """Update visibility of option groups based on selected source mode"""
+        # Determine which mode is selected
+        selected_mode = None
+        for mode, radio in self.source_mode_radios.items():
+            if radio.isChecked():
+                selected_mode = mode
+                break
+        
+        # Update visibility based on selected mode
+        if selected_mode == MeetingSourceMode.WEB_SCRAPING:
+            self.web_options_group.setVisible(True)
+            self.auto_update_check.setEnabled(True)
+            self.save_scraped_check.setEnabled(True)
+        else:
+            self.web_options_group.setVisible(False)
+        
+        # Song options are always visible, but context changes
+        if selected_mode == MeetingSourceMode.WEB_SCRAPING:
+            self.weekend_songs_manual_check.setText("Always manually enter weekend songs")
+        else:
+            self.weekend_songs_manual_check.setText("Include song placeholders in templates")
+    
     def _load_settings(self):
         """Load current settings into UI"""
         settings = self.settings_controller.get_settings()
@@ -227,8 +306,6 @@ class SettingsDialog(QDialog):
         language_index = self.language_combo.findData(settings.language)
         if language_index >= 0:
             self.language_combo.setCurrentIndex(language_index)
-        
-        self.auto_update_check.setChecked(settings.auto_update_meetings)
         
         # Meeting settings
         self.midweek_day_combo.setCurrentIndex(settings.midweek_meeting.day.value)
@@ -267,14 +344,24 @@ class SettingsDialog(QDialog):
         
         self.use_secondary_check.setChecked(settings.display.use_secondary_screen)
         self._toggle_secondary_screen(settings.display.use_secondary_screen)
+        
+        # Meeting source settings
+        source_mode = settings.meeting_source.mode
+        if source_mode in self.source_mode_radios:
+            self.source_mode_radios[source_mode].setChecked(True)
+        
+        self.auto_update_check.setChecked(settings.meeting_source.auto_update_meetings)
+        self.save_scraped_check.setChecked(settings.meeting_source.save_scraped_as_template)
+        self.weekend_songs_manual_check.setChecked(settings.meeting_source.weekend_songs_manual)
+        
+        # Update visibility based on current settings
+        self._update_source_options_visibility()
     
     def _apply_settings(self):
         """Apply settings changes"""
         # General settings
         language = self.language_combo.currentData()
         self.settings_controller.set_language(language)
-        
-        self.settings_controller.set_auto_update_meetings(self.auto_update_check.isChecked())
         
         # Meeting settings
         midweek_day = DayOfWeek(self.midweek_day_combo.currentData())
@@ -309,6 +396,16 @@ class SettingsDialog(QDialog):
             self.settings_controller.set_secondary_screen(secondary_screen)
         else:
             self.settings_controller.toggle_secondary_screen(False)
+        
+        # Meeting source settings
+        for mode, radio in self.source_mode_radios.items():
+            if radio.isChecked():
+                self.settings_controller.set_meeting_source_mode(mode)
+                break
+        
+        self.settings_controller.set_auto_update_meetings(self.auto_update_check.isChecked())
+        self.settings_controller.set_save_scraped_as_template(self.save_scraped_check.isChecked())
+        self.settings_controller.set_weekend_songs_manual(self.weekend_songs_manual_check.isChecked())
     
     def _reset_settings(self):
         """Reset settings to defaults"""
