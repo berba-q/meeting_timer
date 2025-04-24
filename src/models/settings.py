@@ -21,6 +21,13 @@ class DayOfWeek(Enum):
     SUNDAY = 6
 
 
+class MeetingSourceMode(Enum):
+    """Meeting source modes"""
+    WEB_SCRAPING = 0  # Automatically scrape from web
+    MANUAL_ENTRY = 1  # Manually enter meeting parts
+    TEMPLATE_BASED = 2  # Use templates with manual adjustments
+
+
 @dataclass
 class MeetingSettings:
     """Settings for a specific meeting type"""
@@ -78,6 +85,34 @@ class DisplaySettings:
 
 
 @dataclass
+class MeetingSourceSettings:
+    """Settings for meeting data sources"""
+    mode: MeetingSourceMode = MeetingSourceMode.WEB_SCRAPING
+    auto_update_meetings: bool = True
+    save_scraped_as_template: bool = False  # Option to save scraped meetings as templates
+    weekend_songs_manual: bool = True  # Always manually enter weekend songs
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage"""
+        return {
+            'mode': self.mode.value,
+            'auto_update_meetings': self.auto_update_meetings,
+            'save_scraped_as_template': self.save_scraped_as_template,
+            'weekend_songs_manual': self.weekend_songs_manual
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'MeetingSourceSettings':
+        """Create from dictionary"""
+        return cls(
+            mode=MeetingSourceMode(data.get('mode', MeetingSourceMode.WEB_SCRAPING.value)),
+            auto_update_meetings=data.get('auto_update_meetings', True),
+            save_scraped_as_template=data.get('save_scraped_as_template', False),
+            weekend_songs_manual=data.get('weekend_songs_manual', True)
+        )
+
+
+@dataclass
 class AppSettings:
     """Global application settings"""
     language: str = "en"
@@ -87,7 +122,7 @@ class AppSettings:
         time=time(10, 0)  # Default 10:00 AM
     ))
     display: DisplaySettings = field(default_factory=DisplaySettings)
-    auto_update_meetings: bool = True
+    meeting_source: MeetingSourceSettings = field(default_factory=MeetingSourceSettings)
     recent_meetings: List[str] = field(default_factory=list)  # List of meeting file paths
     
     def to_dict(self) -> dict:
@@ -97,7 +132,7 @@ class AppSettings:
             'midweek_meeting': self.midweek_meeting.to_dict(),
             'weekend_meeting': self.weekend_meeting.to_dict(),
             'display': self.display.to_dict(),
-            'auto_update_meetings': self.auto_update_meetings,
+            'meeting_source': self.meeting_source.to_dict(),
             'recent_meetings': self.recent_meetings
         }
     
@@ -109,7 +144,7 @@ class AppSettings:
             midweek_meeting=MeetingSettings.from_dict(data.get('midweek_meeting', {})),
             weekend_meeting=MeetingSettings.from_dict(data.get('weekend_meeting', {})),
             display=DisplaySettings.from_dict(data.get('display', {})),
-            auto_update_meetings=data.get('auto_update_meetings', True),
+            meeting_source=MeetingSourceSettings.from_dict(data.get('meeting_source', {})),
             recent_meetings=data.get('recent_meetings', [])
         )
 
