@@ -141,6 +141,9 @@ class SettingsController(QObject):
         from PyQt6.QtWidgets import QApplication
         
         screens = []
+        app = QApplication.instance()
+        primary_screen = app.primaryScreen()
+        
         for i, screen in enumerate(QApplication.screens()):
             geometry = screen.geometry()
             screens.append({
@@ -148,7 +151,7 @@ class SettingsController(QObject):
                 'name': screen.name(),
                 'width': geometry.width(),
                 'height': geometry.height(),
-                'primary': screen.isPrimary()
+                'primary': (screen == primary_screen)  # Compare to primary screen
             })
         
         return screens
