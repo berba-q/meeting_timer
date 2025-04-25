@@ -4,7 +4,8 @@ Meeting view component for displaying and managing meeting parts.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QFrame, QTreeWidget, QTreeWidgetItem, QHeaderView,
-    QSizePolicy, QSpacerItem, QMenu
+    QSizePolicy, QSpacerItem, QMenu, QDialog, QFormLayout, QLineEdit,
+    QSpinBox, QDialogButtonBox, QMessageBox
 )
 from PyQt6.QtCore import Qt, pyqtSlot, QSize
 from PyQt6.QtGui import QAction, QColor, QBrush, QIcon, QFont
@@ -12,6 +13,54 @@ from PyQt6.QtGui import QAction, QColor, QBrush, QIcon, QFont
 from src.controllers.meeting_controller import MeetingController
 from src.controllers.timer_controller import TimerController
 from src.models.meeting import Meeting, MeetingSection, MeetingPart
+
+
+class PartEditDialog(QDialog):
+    """Dialog for editing a meeting part"""
+    
+    def __init__(self, part: MeetingPart, parent=None):
+        super().__init__(parent)
+        self.part = part
+        self.setWindowTitle("Edit Part")
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """Set up the dialog UI"""
+        layout = QFormLayout(self)
+        
+        # Title field
+        self.title_edit = QLineEdit(self.part.title)
+        layout.addRow("Title:", self.title_edit)
+        
+        # Duration field
+        self.duration_spin = QSpinBox()
+        self.duration_spin.setMinimum(1)
+        self.duration_spin.setMaximum(120)
+        self.duration_spin.setValue(self.part.duration_minutes)
+        layout.addRow("Duration (minutes):", self.duration_spin)
+        
+        # Presenter field
+        self.presenter_edit = QLineEdit(self.part.presenter)
+        layout.addRow("Presenter:", self.presenter_edit)
+        
+        # Buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | 
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+    
+    def get_updated_part(self) -> MeetingPart:
+        """Get the updated part data"""
+        return MeetingPart(
+            title=self.title_edit.text(),
+            duration_minutes=self.duration_spin.value(),
+            presenter=self.presenter_edit.text(),
+            notes=self.part.notes,
+            is_completed=self.part.is_completed
+        )
 
 
 class MeetingView(QWidget):
@@ -120,9 +169,11 @@ class MeetingView(QWidget):
                 part_item.setText(0, part.title)
                 part_item.setText(1, f"{part.duration_minutes} min")
                 
-                # Store global part index for jumping
+                # Store additional data for context menu
                 global_part_index = self._get_global_part_index(section_index, part_index)
                 part_item.setData(0, Qt.ItemDataRole.UserRole, ("part", global_part_index))
+                part_item.setData(0, Qt.ItemDataRole.UserRole + 1, section_index)
+                part_item.setData(0, Qt.ItemDataRole.UserRole + 2, part_index)
                 
                 # Set status
                 if part.is_completed:
@@ -219,7 +270,32 @@ class MeetingView(QWidget):
                     start_action.triggered.connect(lambda: self.timer_controller.jump_to_part(item_index))
                     menu.addAction(start_action)
                     
-                    # Add more actions here
+                    # Add edit action
+                    edit_action = QAction("Edit Part", self)
+                    edit_action.triggered.connect(lambda: self._edit_part(item))
+                    menu.addAction(edit_action)
+                    
+                    # Add remove action
+                    remove_action = QAction("Remove Part", self)
+                    remove_action.triggered.connect(lambda: self._remove_part(item))
+                    menu.addAction(remove_action)
+                    
+                    # Add move actions if appropriate
+                    section_index = item.data(0, Qt.ItemDataRole.UserRole + 1)
+                    part_index = item.data(0, Qt.ItemDataRole.UserRole + 2)
+                    section = self.meeting.sections[section_index]
+                    
+                    # Move up action (if not the first part)
+                    if part_index > 0:
+                        move_up_action = QAction("Move Up", self)
+                        move_up_action.triggered.connect(lambda: self._move_part_up(item))
+                        menu.addAction(move_up_action)
+                    
+                    # Move down action (if not the last part)
+                    if part_index < len(section.parts) - 1:
+                        move_down_action = QAction("Move Down", self)
+                        move_down_action.triggered.connect(lambda: self._move_part_down(item))
+                        menu.addAction(move_down_action)
                 
                 elif item_type == "section":
                     # Section context menu
@@ -228,6 +304,38 @@ class MeetingView(QWidget):
                 
                 if menu.actions():
                     menu.exec(self.parts_tree.mapToGlobal(position))
+    
+    def _edit_part(self, item):
+        """Edit the selected part"""
+        if not self.meeting:
+            return
+        
+        # Get section and part indices
+        section_index = item.data(0, Qt.ItemDataRole.UserRole + 1)
+        part_index = item.data(0, Qt.ItemDataRole.UserRole + 2)
+        
+        # Get the part to edit
+        section = self.meeting.sections[section_index]
+        part = section.parts[part_index]
+        
+        # Create and show edit dialog
+        dialog = PartEditDialog(part, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Update part with new values
+            updated_part = dialog.get_updated_part()
+            
+            # Update the part in the model
+            section.parts[part_index] = updated_part
+            
+            # Update the display
+            item.setText(0, updated_part.title)
+            item.setText(1, f"{updated_part.duration_minutes} min")
+            
+            # Save the updated meeting
+            self.meeting_controller.save_meeting(self.meeting)
+            
+            # Update the current meeting in the controller
+            self.meeting_controller.set_current_meeting(self.meeting)
     
     def _get_global_part_index(self, section_index, part_index):
         """Convert section and part indices to global part index"""
