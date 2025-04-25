@@ -195,7 +195,10 @@ class SettingsDialog(QDialog):
         
         # Secondary screen selection
         self.secondary_screen_combo = QComboBox()
+        self.secondary_screen_combo.clear()  # Clear any existing items
         self.secondary_screen_combo.addItem("None", None)
+
+        # Add all screens to the secondary dropdown
         for screen in self.available_screens:
             self.secondary_screen_combo.addItem(
                 f"{screen['name']} ({screen['width']}x{screen['height']})", 
