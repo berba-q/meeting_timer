@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from src.models.meeting import Meeting, MeetingPart
+from src.models.meeting import Meeting, MeetingPart, MeetingType
 from src.models.timer import Timer, TimerState
 
 
@@ -215,9 +215,10 @@ class TimerController(QObject):
         # Start the timer
         self.timer.start(transition_seconds)
         
-        # Emit a signal that we're in transition mode
-        self.transition_started = pyqtSignal()
-        self.transition_started.emit()
+        # Emit a signal that we're in transition mode - FIXED VERSION
+        # Make sure we're providing the argument expected by the signal
+        transition_msg = "Chairman transition"
+        self.transition_started.emit(transition_msg)
         
         # Store that we're in transition mode and which part is next
         self._in_transition = True
