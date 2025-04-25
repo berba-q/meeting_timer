@@ -132,41 +132,44 @@ class TimerView(QWidget):
             self._update_analog_display()
     
     def _update_digital_display(self):
-        """Update the digital timer display"""
+        """Update the digital timer display with enhanced visibility"""
         if self.timer_state == TimerState.OVERTIME:
             # For overtime, show negative time
             seconds = abs(self.remaining_seconds)
             sign = "-"
+            color_class = "digitalTimerDanger"
         else:
             seconds = abs(self.remaining_seconds)
             sign = ""
+            
+            # Set color based on state
+            if self.timer_state == TimerState.RUNNING:
+                if self.remaining_seconds <= 60:  # Last minute
+                    color_class = "digitalTimerWarning"
+                else:
+                    color_class = "digitalTimerRunning"
+            elif self.timer_state == TimerState.PAUSED:
+                color_class = "digitalTimerPaused"
+            elif self.timer_state == TimerState.TRANSITION:
+                color_class = "digitalTimerTransition"
+            else:  # STOPPED or COUNTDOWN
+                color_class = "digitalTimerStopped"
         
         # Format time as mm:ss
         minutes = seconds // 60
         seconds = seconds % 60
         time_str = f"{sign}{minutes:02d}:{seconds:02d}"
         
-        # Set color based on state
-        if self.timer_state == TimerState.OVERTIME:
-            color = "red"
-        elif self.timer_state == TimerState.RUNNING:
-            if self.remaining_seconds <= 60:  # Last minute
-                color = "orange"
-            else:
-                color = "green"
-        elif self.timer_state == TimerState.PAUSED:
-            color = "blue"
-        else:  # STOPPED or COUNTDOWN
-            color = "black"
-        
         # Update label
         self.timer_label.setText(time_str)
-        self.timer_label.setStyleSheet(f"""
-            font-size: 120px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-            color: {color};
-        """)
+        
+        # Set object name for QSS styling
+        self.timer_label.setObjectName(color_class)
+        
+        # Force style update
+        self.timer_label.style().unpolish(self.timer_label)
+        self.timer_label.style().polish(self.timer_label)
+        self.timer_label.update()
     
     def _update_analog_display(self):
         """Update the analog timer display"""

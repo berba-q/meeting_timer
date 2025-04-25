@@ -242,6 +242,9 @@ class MeetingEditorDialog(QDialog):
     
     def _section_selected(self, index):
         """Handle section selection change"""
+        # Clear the part selection to prevent stale selections
+        self.parts_table.clearSelection()
+        
         if index < 0:
             self.current_section_label.setText("No section selected")
             self.parts_table.setRowCount(0)
@@ -255,6 +258,15 @@ class MeetingEditorDialog(QDialog):
         
         # Get parts for this section
         parts_data = item.data(Qt.ItemDataRole.UserRole)
+        
+        # Disconnect selection changed signal temporarily to avoid multiple calls
+        if hasattr(self, '_selection_connected') and self._selection_connected:
+            try:
+                self.parts_table.itemSelectionChanged.disconnect(self._update_controls_state)
+                self._selection_connected = False
+            except TypeError:
+                # Signal was not connected
+                pass
         
         # Populate parts table
         self.parts_table.setRowCount(len(parts_data))
@@ -271,6 +283,10 @@ class MeetingEditorDialog(QDialog):
             # Presenter
             presenter_item = QTableWidgetItem(part.get('presenter', ''))
             self.parts_table.setItem(i, 2, presenter_item)
+        
+        # Reconnect selection changed signal
+        self.parts_table.itemSelectionChanged.connect(self._update_controls_state)
+        self._selection_connected = True
         
         self._update_controls_state()
     
@@ -367,7 +383,16 @@ class MeetingEditorDialog(QDialog):
         if not selected_rows:
             return
         
+        # Get the row of the first selected item
         selected_row = selected_rows[0].row()
+        
+        # Make sure all selected items are in the same row
+        same_row = all(item.row() == selected_row for item in selected_rows)
+        if not same_row:
+            # Select only the first row
+            self.parts_table.setRangeSelected(
+                self.parts_table.selectedRanges()[0], False)
+            self.parts_table.selectRow(selected_row)
         
         # Get current part data
         title_item = self.parts_table.item(selected_row, 0)
@@ -423,11 +448,12 @@ class MeetingEditorDialog(QDialog):
     
     def _remove_part(self):
         """Remove selected part"""
-        selected_rows = self.parts_table.selectedItems()
-        if not selected_rows:
+        selected_items = self.parts_table.selectedItems()
+        if not selected_items:
             return
         
-        selected_row = selected_rows[0].row()
+        # Get the row of the first selected item
+        selected_row = selected_items[0].row()
         
         reply = QMessageBox.question(
             self, "Confirm Removal", 
@@ -458,9 +484,97 @@ class MeetingEditorDialog(QDialog):
         remove_action.triggered.connect(self._remove_part)
         menu.addAction(remove_action)
         
-        # Add action for moving parts up/down (future enhancement)
+        # Add move up/down actions
+        move_up_action = QAction("Move Up", self)
+        move_up_action.triggered.connect(self._move_part_up)
+        menu.addAction(move_up_action)
         
+        move_down_action = QAction("Move Down", self)
+        move_down_action.triggered.connect(self._move_part_down)
+        menu.addAction(move_down_action)
+        
+        # Show the menu
         menu.exec(self.parts_table.mapToGlobal(position))
+    
+    def _move_part_up(self):
+        """Move selected part up in the list"""
+        selected_items = self.parts_table.selectedItems()
+        if not selected_items:
+            return
+        
+        # Get the row of the first selected item
+        selected_row = selected_items[0].row()
+        
+        # Check if we can move up
+        if selected_row <= 0:
+            return
+        
+        # Get data from both rows
+        current_row_data = []
+        above_row_data = []
+        
+        for col in range(self.parts_table.columnCount()):
+            current_item = self.parts_table.item(selected_row, col)
+            above_item = self.parts_table.item(selected_row - 1, col)
+            
+            if current_item and above_item:
+                current_row_data.append(current_item.text())
+                above_row_data.append(above_item.text())
+            else:
+                current_row_data.append("")
+                above_row_data.append("")
+        
+        # Swap the data
+        for col in range(self.parts_table.columnCount()):
+            self.parts_table.setItem(selected_row - 1, col, QTableWidgetItem(current_row_data[col]))
+            self.parts_table.setItem(selected_row, col, QTableWidgetItem(above_row_data[col]))
+        
+        # Update selection
+        self.parts_table.clearSelection()
+        self.parts_table.selectRow(selected_row - 1)
+        
+        # Update section's parts data
+        self._update_section_parts_data()
+    
+    def _move_part_down(self):
+        """Move selected part down in the list"""
+        selected_items = self.parts_table.selectedItems()
+        if not selected_items:
+            return
+        
+        # Get the row of the first selected item
+        selected_row = selected_items[0].row()
+        
+        # Check if we can move down
+        if selected_row >= self.parts_table.rowCount() - 1:
+            return
+        
+        # Get data from both rows
+        current_row_data = []
+        below_row_data = []
+        
+        for col in range(self.parts_table.columnCount()):
+            current_item = self.parts_table.item(selected_row, col)
+            below_item = self.parts_table.item(selected_row + 1, col)
+            
+            if current_item and below_item:
+                current_row_data.append(current_item.text())
+                below_row_data.append(below_item.text())
+            else:
+                current_row_data.append("")
+                below_row_data.append("")
+        
+        # Swap the data
+        for col in range(self.parts_table.columnCount()):
+            self.parts_table.setItem(selected_row + 1, col, QTableWidgetItem(current_row_data[col]))
+            self.parts_table.setItem(selected_row, col, QTableWidgetItem(below_row_data[col]))
+        
+        # Update selection
+        self.parts_table.clearSelection()
+        self.parts_table.selectRow(selected_row + 1)
+        
+        # Update section's parts data
+        self._update_section_parts_data()
     
     def _update_section_parts_data(self):
         """Update the selected section's parts data from the table"""
@@ -485,7 +599,8 @@ class MeetingEditorDialog(QDialog):
                 part_data = {
                     'title': title_item.text(),
                     'duration_minutes': duration,
-                    'presenter': presenter_item.text() if presenter_item else ""
+                    'presenter': presenter_item.text() if presenter_item else "",
+                    'notes': ""  # Default empty notes
                 }
                 parts_data.append(part_data)
         
@@ -539,9 +654,15 @@ class MeetingEditorDialog(QDialog):
         # Part controls
         self.add_part_btn.setEnabled(has_section)
         
-        has_part = has_section and self.parts_table.selectedItems()
+        # Check if there are any selected items in the parts table
+        has_part = bool(self.parts_table.selectedItems())  # Convert to boolean
         self.edit_part_btn.setEnabled(has_part)
         self.remove_part_btn.setEnabled(has_part)
+        
+        # Connect selection changed signal if not already connected
+        if not hasattr(self, '_selection_connected'):
+            self.parts_table.itemSelectionChanged.connect(self._update_controls_state)
+            self._selection_connected = True
     
     def _load_meeting_data(self):
         """Load meeting data into the UI when editing an existing meeting"""

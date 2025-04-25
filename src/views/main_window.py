@@ -298,6 +298,7 @@ class MainWindow(QMainWindow):
         self.meeting_controller.meetings_loaded.connect(self._meetings_loaded)
         self.meeting_controller.meeting_updated.connect(self._meeting_updated)
         self.meeting_controller.error_occurred.connect(self._show_error)
+        self.meeting_controller.part_updated.connect(self._part_updated)
         
         # Timer controller signals
         self.timer_controller.part_changed.connect(self._part_changed)
@@ -347,6 +348,21 @@ class MainWindow(QMainWindow):
         """Handle part change"""
         self.current_part_label.setText(f"Current part: {part.title} ({part.duration_minutes} min)")
         self.meeting_view.highlight_part(index)
+        
+    def _part_updated(self, part, section_index, part_index):
+        """Handle a part being updated"""
+        # Update the timer controller if needed
+        if self.timer_controller.current_part_index != -1:
+            # Check if the updated part is the current part
+            global_part_index = self._get_global_part_index(section_index, part_index)
+            if global_part_index == self.timer_controller.current_part_index:
+                # Update the timer with the new duration if it has changed
+                current_part = self.timer_controller.parts_list[global_part_index]
+                if current_part.duration_minutes != part.duration_minutes:
+                    # Adjust the timer duration
+                    # This requires additional logic to handle currently running timers
+                    # For now, just update the display
+                    self.timer_controller.part_changed.emit(part, global_part_index)
     
     def _meeting_started(self):
         """Handle meeting start"""
@@ -358,6 +374,8 @@ class MainWindow(QMainWindow):
         self.start_button.setStyleSheet("")  # Force style refresh
         self.start_button.clicked.disconnect()
         self.start_button.clicked.connect(self._stop_meeting)
+    
+    
         
         # Enable controls
         self.pause_resume_button.setEnabled(True)
@@ -407,6 +425,20 @@ class MainWindow(QMainWindow):
         # Update secondary display if available
         if self.secondary_display:
             self.secondary_display.current_part_label.setText(transition_msg)
+    
+    def _get_global_part_index(self, section_index, part_index):
+        """Helper method to get global part index from section and part indices"""
+        if not self.meeting_controller.current_meeting:
+            return -1
+        
+        meeting = self.meeting_controller.current_meeting
+        global_index = 0
+        
+        for i in range(section_index):
+            global_index += len(meeting.sections[i].parts)
+        
+        global_index += part_index
+        return global_index
     
     def _settings_changed(self):
         """Handle settings changes"""
@@ -470,33 +502,43 @@ class MainWindow(QMainWindow):
         if self.secondary_display:
             self._apply_secondary_display_theme()
     
-    def _apply_secondary_display_theme(self):
-        """Apply the current theme to the secondary display"""
+    def _apply_secondary_display_styling(self):
+        """Apply high-contrast styling to the secondary display regardless of theme"""
         if not self.secondary_display:
             return
-            
-        # Apply styling specific to secondary display
-        theme = self.settings_controller.get_settings().display.theme
         
-        # Custom styling for the secondary display
-        if theme == "dark":
-            self.secondary_display.setStyleSheet("""
-                QMainWindow, QWidget {
-                    background-color: #1a1a1a;
-                    color: #ffffff;
-                }
-                
-                QLabel {
-                    color: #ffffff;
-                }
-                
-                QFrame {
-                    background-color: #2d2d2d;
-                    border: 1px solid #1d1d1d;
-                }
-            """)
-        else:
-            self.secondary_display.setStyleSheet("")
+        # Always apply a black background with white text for maximum visibility
+        self.secondary_display.setStyleSheet("""
+            QMainWindow, QWidget {
+                background-color: #000000;
+                color: #ffffff;
+            }
+            
+            QLabel {
+                color: #ffffff;
+                font-weight: bold;
+            }
+            
+            QFrame {
+                background-color: rgba(50, 50, 50, 180);
+                border: 2px solid #ffffff;
+                border-radius: 15px;
+            }
+            
+            TimerView {
+                background-color: #000000;
+                border: 2px solid #333333;
+            }
+            
+            TimerView QLabel {
+                color: #ffffff;
+                font-weight: bold;
+            }
+        """)
+        
+        # Ensure timer display is properly styled
+        if hasattr(self.secondary_display, 'timer_view') and hasattr(self.secondary_display.timer_view, 'timer_label'):
+            self.secondary_display.timer_view.timer_label.setStyleSheet("color: #ffffff; font-weight: bold;")
     
     def _start_meeting(self):
         """Start the current meeting"""
@@ -605,7 +647,7 @@ class MainWindow(QMainWindow):
         """Edit the currently selected meeting"""
         if not self.meeting_controller.current_meeting:
             QMessageBox.warning(self, "No Meeting Selected", 
-                                "Please select a meeting to edit.")
+                            "Please select a meeting to edit.")
             return
         
         # Show the meeting editor dialog with the current meeting
@@ -635,8 +677,8 @@ class MainWindow(QMainWindow):
             if not self.secondary_display:
                 self.secondary_display = SecondaryDisplay(self.timer_controller)
             
-            # Apply theme
-            self._apply_secondary_display_theme()
+            # Apply proper styling to ensure visibility
+            self._apply_secondary_display_styling()
             
             # Show and position on the correct screen
             self.secondary_display.show()
@@ -667,7 +709,7 @@ class MainWindow(QMainWindow):
             # Center on the selected screen
             self.secondary_display.setGeometry(geometry)
             self.secondary_display.showFullScreen()
-    
+        
     def _toggle_display_mode(self):
         """Toggle between digital and analog display modes"""
         settings = self.settings_controller.get_settings()
