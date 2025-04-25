@@ -4,7 +4,7 @@ Controller for managing meetings in the JW Meeting Timer application.
 import os
 import json
 from datetime import datetime, time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from src.models.meeting import Meeting, MeetingType, MeetingSection, MeetingPart
@@ -21,6 +21,7 @@ class MeetingController(QObject):
     meeting_updated = pyqtSignal(Meeting)
     meetings_loaded = pyqtSignal(dict)  # Dict[MeetingType, Meeting]
     error_occurred = pyqtSignal(str)
+    part_updated = pyqtSignal(MeetingPart, int, int)  # part, section_index, part_index
     
     def __init__(self):
         super().__init__()
@@ -318,23 +319,98 @@ class MeetingController(QObject):
         return meeting
     
     def add_part_to_section(self, meeting: Meeting, section_index: int, 
-                            part_title: str, duration_minutes: int) -> Meeting:
+                           part_title: str, duration_minutes: int, 
+                           presenter: str = "") -> Meeting:
         """Add a new part to a section in a meeting"""
         # Create new part
         part = MeetingPart(
             title=part_title,
-            duration_minutes=duration_minutes
+            duration_minutes=duration_minutes,
+            presenter=presenter
         )
         
         # Add to section
         if 0 <= section_index < len(meeting.sections):
             meeting.sections[section_index].parts.append(part)
+            
+            # Emit part updated signal
+            part_index = len(meeting.sections[section_index].parts) - 1
+            self.part_updated.emit(part, section_index, part_index)
         
         # If this is the current meeting, emit update
         if meeting is self.current_meeting:
             self.meeting_updated.emit(meeting)
         
         return meeting
+    
+    def update_part(self, meeting: Meeting, section_index: int, part_index: int, 
+                   updated_part: MeetingPart) -> Meeting:
+        """Update a part in a meeting section"""
+        # Check bounds
+        if (0 <= section_index < len(meeting.sections) and 
+            0 <= part_index < len(meeting.sections[section_index].parts)):
+            
+            # Update the part
+            meeting.sections[section_index].parts[part_index] = updated_part
+            
+            # Emit part updated signal
+            self.part_updated.emit(updated_part, section_index, part_index)
+            
+            # If this is the current meeting, save and emit update
+            if meeting is self.current_meeting:
+                self.save_meeting(meeting)
+                self.meeting_updated.emit(meeting)
+        
+        return meeting
+    
+    def remove_part(self, meeting: Meeting, section_index: int, part_index: int) -> Meeting:
+        """Remove a part from a meeting section"""
+        # Check bounds
+        if (0 <= section_index < len(meeting.sections) and 
+            0 <= part_index < len(meeting.sections[section_index].parts)):
+            
+            # Remove the part
+            removed_part = meeting.sections[section_index].parts.pop(part_index)
+            
+            # If this is the current meeting, save and emit update
+            if meeting is self.current_meeting:
+                self.save_meeting(meeting)
+                self.meeting_updated.emit(meeting)
+        
+        return meeting
+    
+    def get_part_indices(self, meeting: Meeting, global_part_index: int) -> Tuple[int, int]:
+        """Convert global part index to section and part indices"""
+        current_index = 0
+        
+        for section_index, section in enumerate(meeting.sections):
+            for part_index, part in enumerate(section.parts):
+                if current_index == global_part_index:
+                    return section_index, part_index
+                current_index += 1
+        
+        # If not found, return invalid indices
+        return -1, -1
+    
+    def edit_part_at_global_index(self, meeting: Meeting, global_part_index: int, 
+                                 updated_part: MeetingPart) -> bool:
+        """Edit a part identified by its global index across all sections"""
+        section_index, part_index = self.get_part_indices(meeting, global_part_index)
+        
+        if section_index >= 0 and part_index >= 0:
+            meeting.sections[section_index].parts[part_index] = updated_part
+            
+            # Emit part updated signal
+            self.part_updated.emit(updated_part, section_index, part_index)
+            
+            # If this is the current meeting, save and emit update
+            if meeting is self.current_meeting:
+                self.save_meeting(meeting)
+                self.meeting_updated.emit(meeting)
+                
+            return True
+            
+        return False
     
     def show_meeting_editor(self, parent=None, meeting: Optional[Meeting] = None):
         """Show the meeting editor dialog"""
@@ -359,5 +435,5 @@ class MeetingController(QObject):
         # Set as current meeting
         self.set_current_meeting(meeting)
         
-        # Emit signal
+        # Emit signal to notify all components
         self.meetings_loaded.emit(self.current_meetings)
