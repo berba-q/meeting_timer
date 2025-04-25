@@ -331,11 +331,103 @@ class MeetingView(QWidget):
             item.setText(0, updated_part.title)
             item.setText(1, f"{updated_part.duration_minutes} min")
             
-            # Save the updated meeting
-            self.meeting_controller.save_meeting(self.meeting)
+            # Update the part using the controller
+            self.meeting_controller.update_part(self.meeting, section_index, part_index, updated_part)
+    
+    def _remove_part(self, item):
+        """Remove the selected part"""
+        if not self.meeting:
+            return
+        
+        # Get section and part indices
+        section_index = item.data(0, Qt.ItemDataRole.UserRole + 1)
+        part_index = item.data(0, Qt.ItemDataRole.UserRole + 2)
+        
+        # Confirm removal
+        from PyQt6.QtWidgets import QMessageBox
+        confirm = QMessageBox.question(
+            self, 
+            "Confirm Remove Part", 
+            "Are you sure you want to remove this part?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if confirm == QMessageBox.StandardButton.Yes:
+            # Remove the part using the controller
+            self.meeting_controller.remove_part(self.meeting, section_index, part_index)
             
-            # Update the current meeting in the controller
-            self.meeting_controller.set_current_meeting(self.meeting)
+            # Update the display
+            self._update_display()
+    
+    def _move_part_up(self, item):
+        """Move the selected part up in its section"""
+        if not self.meeting:
+            return
+        
+        # Get section and part indices
+        section_index = item.data(0, Qt.ItemDataRole.UserRole + 1)
+        part_index = item.data(0, Qt.ItemDataRole.UserRole + 2)
+        
+        # Check if we can move up
+        if part_index <= 0:
+            return
+        
+        # Get the parts
+        section = self.meeting.sections[section_index]
+        parts = section.parts
+        
+        # Swap the parts
+        parts[part_index], parts[part_index-1] = parts[part_index-1], parts[part_index]
+        
+        # Save the updated meeting
+        self.meeting_controller.save_meeting(self.meeting)
+        
+        # Update the display
+        self._update_display()
+        
+        # Re-select the moved part
+        self._select_part(section_index, part_index-1)
+    
+    def _move_part_down(self, item):
+        """Move the selected part down in its section"""
+        if not self.meeting:
+            return
+        
+        # Get section and part indices
+        section_index = item.data(0, Qt.ItemDataRole.UserRole + 1)
+        part_index = item.data(0, Qt.ItemDataRole.UserRole + 2)
+        
+        # Check if we can move down
+        section = self.meeting.sections[section_index]
+        if part_index >= len(section.parts) - 1:
+            return
+        
+        # Swap the parts
+        parts = section.parts
+        parts[part_index], parts[part_index+1] = parts[part_index+1], parts[part_index]
+        
+        # Save the updated meeting
+        self.meeting_controller.save_meeting(self.meeting)
+        
+        # Update the display
+        self._update_display()
+        
+        # Re-select the moved part
+        self._select_part(section_index, part_index+1)
+    
+    def _select_part(self, section_index, part_index):
+        """Select a part in the tree"""
+        # Get the section item
+        if section_index < self.parts_tree.topLevelItemCount():
+            section_item = self.parts_tree.topLevelItem(section_index)
+            
+            # Get the part item
+            if part_index < section_item.childCount():
+                part_item = section_item.child(part_index)
+                
+                # Select the part
+                self.parts_tree.setCurrentItem(part_item)
+                self.parts_tree.scrollToItem(part_item)
     
     def _get_global_part_index(self, section_index, part_index):
         """Convert section and part indices to global part index"""
