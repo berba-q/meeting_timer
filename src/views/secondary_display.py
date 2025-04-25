@@ -50,6 +50,25 @@ class SecondaryDisplay(QMainWindow):
         palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
         self.setPalette(palette)
         
+        # Style the secondary display with high contrast regardless of theme
+        self.setStyleSheet("""
+            QMainWindow, QWidget {
+                background-color: #000000;
+                color: #ffffff;
+            }
+            
+            QLabel {
+                color: #ffffff;
+                font-weight: bold;
+            }
+            
+            QFrame {
+                background-color: rgba(50, 50, 50, 150);
+                border: 1px solid #ffffff;
+                border-radius: 15px;
+            }
+        """)
+        
         # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -63,25 +82,34 @@ class SecondaryDisplay(QMainWindow):
         self.timer_view = TimerView(self.timer_controller)
         self.timer_view.setMinimumHeight(400)
         
+        # Override any theme styling for the timer view to ensure visibility
+        self.timer_view.setStyleSheet("""
+            background-color: #000000;
+            border: 2px solid #333333;
+            border-radius: 15px;
+        """)
+        
         # Scale up the timer font
         if hasattr(self.timer_view, 'timer_label'):
             font = self.timer_view.timer_label.font()
             font.setPointSize(160)  # Much larger for better visibility
             self.timer_view.timer_label.setFont(font)
+            self.timer_view.timer_label.setStyleSheet("color: #ffffff; font-weight: bold;")
         
-        # Make part label larger
+        # Make part label larger and ensure visibility
         font = QFont()
         font.setPointSize(28)
         font.setBold(True)
         self.timer_view.part_label.setFont(font)
-        self.timer_view.part_label.setStyleSheet("color: white; font-weight: bold;")
+        self.timer_view.part_label.setStyleSheet("color: #ffffff; font-weight: bold;")
         
         # Part information panel
         self.part_frame = QFrame()
         self.part_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self.part_frame.setStyleSheet("""
             QFrame {
-                background-color: rgba(255, 255, 255, 30);
+                background-color: rgba(50, 50, 50, 180);
+                border: 2px solid #ffffff;
                 border-radius: 15px;
                 padding: 20px;
             }
@@ -93,13 +121,13 @@ class SecondaryDisplay(QMainWindow):
         # Current part title - large and prominent
         self.current_part_label = QLabel("Current Part")
         self.current_part_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.current_part_label.setStyleSheet("color: white; font-size: 36px; font-weight: bold;")
+        self.current_part_label.setStyleSheet("color: #ffffff; font-size: 36px; font-weight: bold;")
         self.current_part_label.setWordWrap(True)
         
         # Presenter name
         self.presenter_label = QLabel("")
         self.presenter_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.presenter_label.setStyleSheet("color: white; font-size: 28px;")
+        self.presenter_label.setStyleSheet("color: #ffffff; font-size: 28px;")
         
         part_layout.addWidget(self.current_part_label)
         part_layout.addWidget(self.presenter_label)
@@ -150,6 +178,9 @@ class SecondaryDisplay(QMainWindow):
         else:
             self.presenter_label.setText("")
             self.presenter_label.setVisible(False)
+        
+        # Update timer view to ensure visibility
+        self._update_timer_display()
     
     def _adjust_font_size(self, label, base_size, text):
         """Adjust font size based on text length to ensure readability"""
@@ -175,9 +206,9 @@ class SecondaryDisplay(QMainWindow):
         self.presenter_label.setText("Chairman")
         self.presenter_label.setVisible(True)
         
-        # Update timer label style for transition mode
+        # Update timer label style for transition mode with high visibility
         if hasattr(self.timer_view, 'timer_label'):
-            self.timer_view.timer_label.setStyleSheet("color: purple; font-weight: bold;")
+            self.timer_view.timer_label.setStyleSheet("color: #bb86fc; font-weight: bold;")  # Purple with good contrast
     
     def _meeting_overtime(self, total_overtime_seconds):
         """Handle meeting overtime notification"""
@@ -186,12 +217,13 @@ class SecondaryDisplay(QMainWindow):
             if not self.overtime_label:
                 self.overtime_label = QLabel()
                 self.overtime_label.setStyleSheet("""
-                    color: white; 
+                    color: #ffffff; 
                     background-color: rgba(255, 0, 0, 0.8);
                     border-radius: 10px;
                     padding: 10px 20px;
                     font-size: 24px;
                     font-weight: bold;
+                    border: 1px solid #ffffff;
                 """)
                 self.overtime_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.status_frame.layout().addWidget(self.overtime_label)
@@ -243,34 +275,37 @@ class SecondaryDisplay(QMainWindow):
             # Running over time
             self.end_time_label.setText(f"Predicted End: {predicted_time_str} (+{diff_minutes} min)")
             self.end_time_label.setStyleSheet("""
-                color: white; 
+                color: #ffffff; 
                 background-color: rgba(255, 0, 0, 0.7);
                 border-radius: 10px;
                 padding: 10px 20px;
                 font-size: 24px;
                 font-weight: bold;
+                border: 1px solid #ffffff;
             """)
         elif diff_minutes < 0:
             # Running under time
             self.end_time_label.setText(f"Predicted End: {predicted_time_str} ({diff_minutes} min)")
             self.end_time_label.setStyleSheet("""
-                color: white; 
+                color: #ffffff; 
                 background-color: rgba(0, 128, 0, 0.7);
                 border-radius: 10px;
                 padding: 10px 20px;
                 font-size: 24px;
                 font-weight: bold;
+                border: 1px solid #ffffff;
             """)
         else:
             # On time
             self.end_time_label.setText(f"Predicted End: {predicted_time_str} (on time)")
             self.end_time_label.setStyleSheet("""
-                color: white; 
+                color: #ffffff; 
                 background-color: rgba(0, 0, 0, 0.7);
                 border-radius: 10px;
                 padding: 10px 20px;
                 font-size: 24px;
                 font-weight: bold;
+                border: 1px solid #ffffff;
             """)
         
         # Make the label visible
@@ -289,6 +324,26 @@ class SecondaryDisplay(QMainWindow):
         self.current_part_label.setText("Meeting Completed")
         self.presenter_label.setText("")
         self.presenter_label.setVisible(False)
+    
+    def _update_timer_display(self):
+        """Update timer display to ensure visibility regardless of state"""
+        if hasattr(self.timer_view, 'timer_label'):
+            state = self.timer_controller.timer.state
+            
+            # Set high-contrast styles based on timer state
+            if state.name == "OVERTIME":
+                self.timer_view.timer_label.setStyleSheet("color: #ff4d4d; font-weight: bold;")  # Bright red
+            elif state.name == "RUNNING":
+                if self.timer_controller.timer.remaining_seconds <= 60:
+                    self.timer_view.timer_label.setStyleSheet("color: #ffaa00; font-weight: bold;")  # Bright orange for warning
+                else:
+                    self.timer_view.timer_label.setStyleSheet("color: #00cc00; font-weight: bold;")  # Bright green
+            elif state.name == "PAUSED":
+                self.timer_view.timer_label.setStyleSheet("color: #3399ff; font-weight: bold;")  # Bright blue
+            elif state.name == "TRANSITION":
+                self.timer_view.timer_label.setStyleSheet("color: #bb86fc; font-weight: bold;")  # Bright purple
+            else:  # STOPPED, COUNTDOWN, etc.
+                self.timer_view.timer_label.setStyleSheet("color: #ffffff; font-weight: bold;")  # White
     
     def show(self):
         """Override show to always show in fullscreen"""
