@@ -4,12 +4,13 @@ Main application window for the JW Meeting Timer.
 import os
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QComboBox, QTabWidget, QAction, QMessageBox,
+    QLabel, QComboBox, QTabWidget, QMessageBox,
     QSplitter, QFrame, QToolBar, QStatusBar, QMenuBar,
     QApplication, QSizePolicy
 )
+from PyQt6.QtGui import QIcon, QAction, QFont
 from PyQt6.QtCore import Qt, QSize, pyqtSlot
-from PyQt6.QtGui import QIcon, QFont, QAction
+
 
 from src.controllers.meeting_controller import MeetingController
 from src.controllers.timer_controller import TimerController
@@ -222,6 +223,12 @@ class MainWindow(QMainWindow):
         self.meeting_selector.currentIndexChanged.connect(self._meeting_selected)
         tool_bar.addWidget(QLabel("Current Meeting:"))
         tool_bar.addWidget(self.meeting_selector)
+        
+        # Settings button
+        settings_button = QPushButton("")
+        settings_button.setIcon(get_icon("settings"))
+        settings_button.clicked.connect(self._open_settings)
+        tool_bar.addWidget(settings_button)
     
     def _create_central_widget(self):
         """Create the central widget with timer and meeting views"""
