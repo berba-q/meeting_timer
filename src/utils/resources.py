@@ -62,7 +62,7 @@ def get_pixmap(icon_name: str) -> QPixmap:
     """
     # Add extension if not provided
     if not icon_name.endswith(('.png', '.ico', '.svg', '.jpg')):
-        icon_name = f"{icon_name}.png"
+        icon_name = f"{icon_name}.svg"
     
     icon_path = get_resource_path(f"assets/icons/{icon_name}")
     
