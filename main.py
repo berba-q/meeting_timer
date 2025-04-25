@@ -3,8 +3,17 @@ JW Meeting Timer - A cross-platform timer application for managing meeting sched
 """
 import sys
 import os
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QLabel, QComboBox, QTabWidget, QMessageBox,
+    QSplitter, QFrame, QToolBar, QStatusBar, QMenuBar,
+    QApplication, QSizePolicy
+)
+from PyQt6.QtGui import QAction
+#from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.controllers.meeting_controller import MeetingController
 from src.views.main_window import MainWindow
 from src.utils.resources import get_icon, apply_stylesheet
