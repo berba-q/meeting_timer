@@ -94,7 +94,7 @@ class SecondaryDisplay(QMainWindow):
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.timer_label.setStyleSheet("""
             color: #ffffff;
-            font-size: 300px;
+            font-size: 400px;
             font-weight: bold;
             font-family: 'Courier New', monospace;
         """)
@@ -119,13 +119,13 @@ class SecondaryDisplay(QMainWindow):
         # Next part label - combined "Next Part: [title]"
         self.next_part_label = QLabel("Next Part: ")
         self.next_part_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.next_part_label.setStyleSheet("color: #ffffff; font-size: 40px; font-weight: bold;")
+        self.next_part_label.setStyleSheet("color: #ffffff; font-size: 60px; font-weight: bold;")
         self.next_part_label.setWordWrap(True)
         
         # Predicted end time
         self.end_time_label = QLabel("Predicted End: ")
         self.end_time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.end_time_label.setStyleSheet("color: #ffffff; font-size: 30px; font-weight: bold;")
+        self.end_time_label.setStyleSheet("color: #ffffff; font-size: 60px; font-weight: bold;")
         
         info_layout.addWidget(self.next_part_label)
         info_layout.addWidget(self.end_time_label)
@@ -166,7 +166,7 @@ class SecondaryDisplay(QMainWindow):
         self.timer_label.setText(time_str)
         self.timer_label.setStyleSheet(f"""
             color: {color};
-            font-size: 300px;
+            font-size: 400px;
             font-weight: bold;
             font-family: 'Courier New', monospace;
         """)
@@ -177,7 +177,7 @@ class SecondaryDisplay(QMainWindow):
             # Blue color for paused state
             self.timer_label.setStyleSheet("""
                 color: #3399ff; 
-                font-size: 300px;
+                font-size: 400px;
                 font-weight: bold;
                 font-family: 'Courier New', monospace;
             """)
@@ -185,7 +185,7 @@ class SecondaryDisplay(QMainWindow):
             # Purple color for transition state
             self.timer_label.setStyleSheet("""
                 color: #bb86fc; 
-                font-size: 300px;
+                font-size: 400px;
                 font-weight: bold;
                 font-family: 'Courier New', monospace;
             """)
@@ -238,52 +238,82 @@ class SecondaryDisplay(QMainWindow):
             self.next_part_label.setText("Next Part: Meeting conclusion")
     
     def _update_predicted_end_time(self, original_end_time, predicted_end_time):
-        """Update the predicted end time display"""
+        """Update the predicted end time display with improved precision"""
         # Format the times
         original_time_str = original_end_time.strftime("%H:%M")
         predicted_time_str = predicted_end_time.strftime("%H:%M")
         
         # Calculate the difference
         time_diff = predicted_end_time - original_end_time
-        diff_minutes = int(time_diff.total_seconds() / 60)
+        diff_seconds = int(time_diff.total_seconds())
         
         # Get the exact overtime seconds from the timer controller
         overtime_seconds = 0
         if hasattr(self.timer_controller, '_total_overtime_seconds'):
             overtime_seconds = self.timer_controller._total_overtime_seconds
-            # Convert to minutes for display, rounding up as needed
-            overtime_minutes = (overtime_seconds + 59) // 60  # Round up
             
             # Ensure display matches exactly what's in the main UI
-            if diff_minutes != overtime_minutes and self.timer_controller.timer.state == TimerState.OVERTIME:
+            if self.timer_controller.timer.state == TimerState.OVERTIME:
                 # Use the exact value from the timer
-                diff_minutes = overtime_minutes
+                diff_seconds = overtime_seconds
         
-        # Set the text and color based on whether we're running over or under
-        if diff_minutes > 0:
-            # Running over time
-            self.end_time_label.setText(f"Predicted End: {predicted_time_str} (+{diff_minutes} min)")
+        # Format the display text with appropriate precision
+        if diff_seconds > 0:
+            # Show precise time for small overruns, minutes for larger ones
+            if diff_seconds < 60:
+                # Less than a minute - show seconds
+                time_text = f"Predicted End: {predicted_time_str} (+{diff_seconds}s)"
+            else:
+                # Minutes and seconds format
+                minutes = diff_seconds // 60
+                seconds = diff_seconds % 60
+                if seconds == 0:
+                    # Even minutes
+                    time_text = f"Predicted End: {predicted_time_str} (+{minutes}m)"
+                else:
+                    # Minutes and seconds
+                    time_text = f"Predicted End: {predicted_time_str} (+{minutes}m {seconds}s)"
+            
+            # Red color for overtime
             self.end_time_label.setStyleSheet("""
                 color: #ff4d4d; 
-                font-size: 30px;
+                font-size: 60px;
                 font-weight: bold;
             """)
-        elif diff_minutes < 0:
-            # Running under time
-            self.end_time_label.setText(f"Predicted End: {predicted_time_str} ({diff_minutes} min)")
+        elif diff_seconds < 0:
+            # Running under time (negative diff)
+            abs_diff = abs(diff_seconds)
+            if abs_diff < 60:
+                # Less than a minute - show seconds
+                time_text = f"Predicted End: {predicted_time_str} (-{abs_diff}s)"
+            else:
+                # Minutes and seconds format
+                minutes = abs_diff // 60
+                seconds = abs_diff % 60
+                if seconds == 0:
+                    # Even minutes
+                    time_text = f"Predicted End: {predicted_time_str} (-{minutes}m)"
+                else:
+                    # Minutes and seconds
+                    time_text = f"Predicted End: {predicted_time_str} (-{minutes}m {seconds}s)"
+            
+            # Green color for under time
             self.end_time_label.setStyleSheet("""
                 color: #4caf50; 
-                font-size: 30px;
+                font-size: 60px;
                 font-weight: bold;
             """)
         else:
             # On time
-            self.end_time_label.setText(f"Predicted End: {predicted_time_str} (on time)")
+            time_text = f"Predicted End: {predicted_time_str} (on time)"
             self.end_time_label.setStyleSheet("""
                 color: #ffffff; 
-                font-size: 30px;
+                font-size: 60px;
                 font-weight: bold;
             """)
+    
+        # Set the text
+        self.end_time_label.setText(time_text)
     
     def _meeting_ended(self):
         """Handle meeting end"""

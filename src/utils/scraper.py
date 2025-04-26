@@ -468,89 +468,88 @@ class MeetingScraper:
         return sections
     
     def _parse_weekend_meeting(self, soup: BeautifulSoup) -> List[MeetingSection]:
-        """Parse weekend meeting structure"""
+        """Parse weekend meeting structure with improved song and title handling"""
         # Create the two main sections
         public_talk_section = MeetingSection(title="Public Talk", parts=[])
         watchtower_section = MeetingSection(title="Watchtower Study", parts=[])
         
-        # Look for Watchtower title in the page structure, not by specific text
+        # Extract songs more thoroughly - look for all song mentions in the document
+        songs = []
+        for el in soup.find_all(['strong', 'span', 'a', 'p', 'h3']):
+            el_text = el.get_text().strip()
+            if "SONG" in el_text.upper() or "Song" in el_text:
+                song_num = self._extract_song_number(el_text)
+                if song_num:
+                    songs.append((song_num, el_text))
+        
+        # Look for Watchtower title with multiple strategies
         watchtower_title = ""
         
-        # First try to find it in h1 tags
+        # Try to find it in h1 with strong tag first (most common format)
         for h1 in soup.find_all('h1'):
-            # Check if it has a strong tag
             strong_tags = h1.find_all('strong')
             if strong_tags:
                 watchtower_title = strong_tags[0].get_text().strip()
                 break
         
-        # If not found, try other common places
+        # If not found, try other approaches
         if not watchtower_title:
-            # Look in any h1 tag
-            for h1 in soup.find_all('h1'):
-                if h1.get_text().strip():
-                    watchtower_title = h1.get_text().strip()
+            # Look in any strong tag with substantial content
+            for strong in soup.find_all('strong'):
+                text = strong.get_text().strip()
+                if len(text) > 15 and "—" in text:  # Common title pattern with em dash
+                    watchtower_title = text
                     break
             
-            # Try h3 with a strong tag
+            # Try finding links to Watchtower articles
             if not watchtower_title:
-                for h3 in soup.find_all('h3'):
-                    strong_tags = h3.find_all('strong')
-                    if strong_tags and len(strong_tags[0].get_text().strip()) > 10:
-                        watchtower_title = strong_tags[0].get_text().strip()
+                for a in soup.find_all('a'):
+                    if '/w/' in a.get('href', '') and len(a.get_text().strip()) > 15:
+                        watchtower_title = a.get_text().strip()
                         break
-            
-            # Try the study article header
-            if not watchtower_title:
-                study_article = soup.find(string=re.compile(r'STUDY ARTICLE \d+'))
-                if study_article:
-                    parent = study_article.parent
-                    if parent:
-                        next_elem = parent.find_next(['h1', 'h3', 'strong'])
-                        if next_elem:
-                            watchtower_title = next_elem.get_text().strip()
         
-        # Search for any songs
-        songs = []
-        for el in soup.find_all(['strong', 'span', 'a', 'p']):
-            el_text = el.get_text().strip()
-            if "SONG" in el_text.upper():
-                song_num = self._extract_song_number(el_text)
-                if song_num:
-                    songs.append((song_num, el_text))
+        # Add Opening Song and Prayer to Public Talk section
+        # Check if we have songs detected
+        if songs:
+            opening_song_num = songs[0][0]
+            public_talk_section.parts.append(
+                MeetingPart(title=f"Song {opening_song_num} and Prayer", duration_minutes=3)
+            )
+        else:
+            # If no specific song found, add a generic placeholder
+            public_talk_section.parts.append(
+                MeetingPart(title="Opening Song and Prayer", duration_minutes=3)
+            )
         
-        # Find public talk title
+        # Add Public Talk
         public_talk_title = "Public Talk"
         for h3 in soup.find_all('h3'):
             h3_text = h3.get_text().strip()
             if "Public Talk" in h3_text:
-                # Extract duration if present
-                duration_match = re.search(r'\((\d+)\s*min', h3_text)
-                if duration_match:
-                    # This is likely the correct h3, check next p for the title
-                    next_p = h3.find_next('p')
-                    if next_p:
-                        public_talk_title = next_p.get_text().strip()
-                        break
+                # Try to find the talk title in the next paragraph
+                next_p = h3.find_next('p')
+                if next_p:
+                    public_talk_title = next_p.get_text().strip()
+                    break
         
-        # Add Opening Prayer to Public Talk section
-        public_talk_section.parts.append(
-            MeetingPart(title="Opening Prayer", duration_minutes=1)
-        )
-        
-        # Add Public Talk
         public_talk_section.parts.append(
             MeetingPart(title=public_talk_title, duration_minutes=30)
         )
         
-        # Add opening song to Watchtower Study section if songs are available
-        if songs:
-            opening_song_num = songs[0][0]
+        # Handle songs for Watchtower section properly
+        # Opening song for Watchtower Study (usually the second song in the meeting)
+        if len(songs) >= 2:
+            middle_song_num = songs[1][0]
             watchtower_section.parts.append(
-                MeetingPart(title=f"Song {opening_song_num}", duration_minutes=3)
+                MeetingPart(title=f"Song {middle_song_num}", duration_minutes=3)
+            )
+        else:
+            # If we don't have enough songs, add a generic placeholder
+            watchtower_section.parts.append(
+                MeetingPart(title="Song", duration_minutes=3)
             )
         
-        # Add Watchtower Study
+        # Add Watchtower Study with proper title
         if not watchtower_title:
             watchtower_title = "Watchtower Study"
         
@@ -559,16 +558,15 @@ class MeetingScraper:
         )
         
         # Add Concluding Song and Prayer
-        closing_song_num = ""
-        if len(songs) >= 2:
-            closing_song_num = songs[1][0]
+        if len(songs) >= 3:
+            closing_song_num = songs[2][0]
             watchtower_section.parts.append(
-                MeetingPart(title=f"Song {closing_song_num} and Concluding Prayer", duration_minutes=4)
+                MeetingPart(title=f"Song {closing_song_num} and Concluding Prayer", duration_minutes=3)
             )
         else:
-            # Don't use a fallback song, let the user enter it manually
+            # No specific closing song found
             watchtower_section.parts.append(
-                MeetingPart(title="Concluding Prayer", duration_minutes=1)
+                MeetingPart(title="Concluding Song and Prayer", duration_minutes=3)
             )
         
         # Return both sections
