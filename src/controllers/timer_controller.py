@@ -3,10 +3,18 @@ Controller for managing timer functionality in the JW Meeting Timer application.
 """
 from datetime import datetime, timedelta
 from typing import List, Optional
+from enum import Enum
+from PyQt6.QtCore import QTimer
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from src.models.meeting import Meeting, MeetingPart, MeetingType
 from src.models.timer import Timer, TimerState
+
+class TransitionType(Enum):
+    """Types of chairman transitions"""
+    MIDWEEK = "Chairman counsel and transition"
+    WEEKEND = "Chairman introduction"
+    GENERIC = "Chairman transition"
 
 
 class TimerController(QObject):
@@ -137,8 +145,14 @@ class TimerController(QObject):
         self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time)
     
     def next_part(self):
-        """Move to the next part"""
+        """Move to the next part, allowing transitions to be skipped"""
         if not self.current_meeting or not self.parts_list:
+            return
+        
+        # If we're in a transition, cancel it and move immediately to the next part
+        if self._in_transition and hasattr(self, '_transition_timer'):
+            self._transition_timer.stop()
+            self._complete_transition()
             return
         
         # Mark current part as completed
@@ -146,8 +160,7 @@ class TimerController(QObject):
             self.parts_list[self.current_part_index].is_completed = True
             self.part_completed.emit(self.current_part_index)
         
-        # Check if we need to add a chairman transition
-        # Transitions happen between sections, not between parts within the same section
+        # Add a chairman transition after every part
         if self._should_add_chairman_transition():
             self._start_chairman_transition()
             
@@ -155,7 +168,7 @@ class TimerController(QObject):
             self._update_predicted_end_time()
             return
         
-        # Move to next part
+        # If no transition needed, move to next part directly
         self.current_part_index += 1
         
         # Check if we're at the end
@@ -174,37 +187,22 @@ class TimerController(QObject):
         
         # Update predicted end time
         self._update_predicted_end_time()
+
     
     def _should_add_chairman_transition(self):
         """Check if we should add a chairman transition between parts"""
         if not self.current_meeting or not self.parts_list:
             return False
             
+        # Don't add transition if we're at the last part
         if self.current_part_index < 0 or self.current_part_index >= len(self.parts_list) - 1:
             return False
-            
-        # Get the current part and the next part
-        current_part_index = self.current_part_index
-        next_part_index = current_part_index + 1
         
-        # Find which section each part belongs to
-        current_section_index = -1
-        next_section_index = -1
-        
-        part_count = 0
-        for section_index, section in enumerate(self.current_meeting.sections):
-            for _ in section.parts:
-                if part_count == current_part_index:
-                    current_section_index = section_index
-                if part_count == next_part_index:
-                    next_section_index = section_index
-                part_count += 1
-        
-        # Add transition if parts are in different sections
-        return current_section_index != next_section_index and current_section_index != -1 and next_section_index != -1
+        # Always add transition between all parts
+        return True
     
     def _start_chairman_transition(self):
-        """Start a 1-minute chairman transition period"""
+        """Start a 1-minute chairman transition period with meeting-specific text"""
         # Create a transition for 1 minute (60 seconds)
         transition_seconds = 60
         
@@ -215,14 +213,52 @@ class TimerController(QObject):
         # Start the timer
         self.timer.start(transition_seconds)
         
-        # Emit a signal that we're in transition mode - FIXED VERSION
-        # Make sure we're providing the argument expected by the signal
-        transition_msg = "Chairman transition"
-        self.transition_started.emit(transition_msg)
+        # Determine transition text based on meeting type
+        transition_type = TransitionType.GENERIC
+        if self.current_meeting:
+            if self.current_meeting.meeting_type == MeetingType.MIDWEEK:
+                transition_type = TransitionType.MIDWEEK
+            elif self.current_meeting.meeting_type == MeetingType.WEEKEND:
+                transition_type = TransitionType.WEEKEND
+        
+        # Emit a signal with the appropriate transition message
+        self.transition_started.emit(transition_type.value)
         
         # Store that we're in transition mode and which part is next
         self._in_transition = True
         self._next_part_after_transition = self.current_part_index + 1
+        
+        # Create a timer to automatically move to the next part after transition
+        self._transition_timer = QTimer(self)
+        self._transition_timer.setSingleShot(True)
+        self._transition_timer.timeout.connect(self._complete_transition)
+        self._transition_timer.start(transition_seconds * 1000)  # Convert to milliseconds
+        
+    def _complete_transition(self):
+        """Automatically move to the next part after the chairman transition"""
+        if self._in_transition:
+            self._in_transition = False
+            
+            # Move to the next part
+            self.current_part_index = self._next_part_after_transition
+            
+            # Check if we're at the end
+            if self.current_part_index >= len(self.parts_list):
+                self.stop_meeting()
+                return
+            
+            # Get next part
+            current_part = self.parts_list[self.current_part_index]
+            
+            # Start timer for next part
+            self.timer.start(current_part.duration_seconds)
+            
+            # Emit signal
+            self.part_changed.emit(current_part, self.current_part_index)
+            
+            # Update predicted end time
+            self._update_predicted_end_time()
+
     
     def previous_part(self):
         """Move to the previous part"""
@@ -250,6 +286,11 @@ class TimerController(QObject):
     
     def stop_meeting(self):
         """Stop the current meeting"""
+        # Cancel any active transition timer
+        if hasattr(self, '_transition_timer') and self._transition_timer.isActive():
+            self._transition_timer.stop()
+        
+        self._in_transition = False
         self.timer.stop()
         self.current_part_index = -1
         self.meeting_ended.emit()
@@ -342,36 +383,12 @@ class TimerController(QObject):
         """Handle timer time updates to track meeting progress"""
         # Check if we're in overtime
         if self.timer.state == TimerState.OVERTIME:
-            # Update total overtime count
-            part_overtime = abs(seconds)
-            self._total_overtime_seconds += 1  # Increment by one second
+            # Use the exact value from the timer instead of incrementing
+            current_overtime = abs(seconds)  # Get absolute value of the negative seconds
+            self._total_overtime_seconds = current_overtime
             
             # Emit signal about total meeting overtime
             self.meeting_overtime.emit(self._total_overtime_seconds)
-            
-            # Update predicted end time
-            self._update_predicted_end_time()
-        
-        # Check if transition is complete
-        if self._in_transition and seconds == 0:
-            self._in_transition = False
-            
-            # Move to the next part
-            self.current_part_index = self._next_part_after_transition
-            
-            # Check if we're at the end
-            if self.current_part_index >= len(self.parts_list):
-                self.stop_meeting()
-                return
-            
-            # Get next part
-            current_part = self.parts_list[self.current_part_index]
-            
-            # Start timer for next part
-            self.timer.start(current_part.duration_seconds)
-            
-            # Emit signal
-            self.part_changed.emit(current_part, self.current_part_index)
             
             # Update predicted end time
             self._update_predicted_end_time()
