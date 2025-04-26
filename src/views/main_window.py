@@ -502,7 +502,7 @@ class MainWindow(QMainWindow):
         if self.secondary_display:
             self._apply_secondary_display_theme()
     
-    def _apply_secondary_display_styling(self):
+    def _apply_secondary_display_theme(self):
         """Apply high-contrast styling to the secondary display regardless of theme"""
         if not self.secondary_display:
             return
