@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTime
 
+from src.utils.screen_handler import ScreenHandler
 from src.controllers.settings_controller import SettingsController
 from src.models.settings import DayOfWeek, TimerDisplayMode, MeetingSourceMode
 
@@ -183,13 +184,14 @@ class SettingsDialog(QDialog):
         screen_layout = QFormLayout(screen_group)
         
         # Get available screens
-        self.available_screens = self.settings_controller.get_all_screens()
+        self.available_screens = ScreenHandler.get_all_screens()
         
         # Primary screen selection
         self.primary_screen_combo = QComboBox()
         for screen in self.available_screens:
+            primary_text = " (Primary)" if screen['primary'] else ""
             self.primary_screen_combo.addItem(
-                f"{screen['name']} ({screen['width']}x{screen['height']})", 
+                f"{screen['name']} ({screen['width']}x{screen['height']}){primary_text}", 
                 screen['index']
             )
         
@@ -217,6 +219,29 @@ class SettingsDialog(QDialog):
         layout.addWidget(timing_group)
         layout.addWidget(screen_group)
         layout.addStretch()
+    
+    def _populate_secondary_screen_combo(self):
+        """Populate secondary screen combo box, excluding the primary screen"""
+        self.secondary_screen_combo.clear()
+        
+        primary_index = self.primary_screen_combo.currentData()
+        screens = ScreenHandler.get_all_screens()
+        
+        for screen in screens:
+            if screen['index'] != primary_index:
+                self.secondary_screen_combo.addItem(
+                    f"{screen['name']} ({screen['width']}x{screen['height']})", 
+                    screen['index']
+                )
+        
+        # If no other screens available, add the primary as the only option
+        if self.secondary_screen_combo.count() == 0:
+            for screen in screens:
+                if screen['index'] == primary_index:
+                    self.secondary_screen_combo.addItem(
+                        f"{screen['name']} ({screen['width']}x{screen['height']}) (Same as Primary)", 
+                        screen['index']
+                    )
     
     def _setup_meeting_source_tab(self):
         """Setup meeting source settings tab"""

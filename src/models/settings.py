@@ -55,7 +55,9 @@ class DisplaySettings:
     """Settings for timer display"""
     display_mode: TimerDisplayMode = TimerDisplayMode.DIGITAL
     primary_screen_index: int = 0
+    primary_screen_name: str = ""
     secondary_screen_index: Optional[int] = None
+    secondary_screen_name: str = ""
     use_secondary_screen: bool = False
     show_predicted_end_time: bool = True
     theme: str = "light"  # 'light' or 'dark'
@@ -65,7 +67,9 @@ class DisplaySettings:
         return {
             'display_mode': self.display_mode.value,
             'primary_screen_index': self.primary_screen_index,
+            'primary_screen_name': self.primary_screen_name,
             'secondary_screen_index': self.secondary_screen_index,
+            'secondary_screen_name': self.secondary_screen_name,
             'use_secondary_screen': self.use_secondary_screen,
             'show_predicted_end_time': self.show_predicted_end_time,
             'theme': self.theme
@@ -76,11 +80,13 @@ class DisplaySettings:
         """Create from dictionary"""
         return cls(
             display_mode=TimerDisplayMode(data['display_mode']),
-            primary_screen_index=data['primary_screen_index'],
-            secondary_screen_index=data['secondary_screen_index'],
-            use_secondary_screen=data['use_secondary_screen'],
-            show_predicted_end_time=data.get('show_predicted_end_time', True),  # Default to True for backward compatibility
-            theme=data.get('theme', 'light')  # Default to light theme for backward compatibility
+            primary_screen_index=data.get('primary_screen_index', 0),
+            primary_screen_name=data.get('primary_screen_name', ""),
+            secondary_screen_index=data.get('secondary_screen_index'),
+            secondary_screen_name=data.get('secondary_screen_name', ""),
+            use_secondary_screen=data.get('use_secondary_screen', False),
+            show_predicted_end_time=data.get('show_predicted_end_time', True),
+            theme=data.get('theme', 'light')
         )
 
 

@@ -6,6 +6,7 @@ from typing import List, Dict
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QScreen
 
+from src.utils.screen_handler import ScreenHandler
 from src.models.settings import (
     SettingsManager, AppSettings, MeetingSettings, 
     DisplaySettings, DayOfWeek, TimerDisplayMode, 
@@ -22,10 +23,15 @@ class SettingsController(QObject):
     display_mode_changed = pyqtSignal(TimerDisplayMode)
     theme_changed = pyqtSignal(str)
     meeting_source_mode_changed = pyqtSignal(MeetingSourceMode)
+    primary_screen_changed = pyqtSignal(int)  # Emits the new primary screen index
+    secondary_screen_changed = pyqtSignal(int, bool)  # Emits (screen_index, enabled)
     
     def __init__(self, settings_manager: SettingsManager):
         super().__init__()
         self.settings_manager = settings_manager
+        
+        # Initialize correct screen indices if not already set
+        self._initialize_screen_settings()
     
     def get_settings(self) -> AppSettings:
         """Get current settings"""
@@ -92,16 +98,37 @@ class SettingsController(QObject):
     
     def set_primary_screen(self, screen_index: int):
         """Set primary screen index"""
-        self.settings_manager.settings.display.primary_screen_index = screen_index
-        self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        if screen_index != self.settings_manager.settings.display.primary_screen_index:
+            # Check if this was previously the secondary screen
+            if screen_index == self.settings_manager.settings.display.secondary_screen_index:
+                # Swap screens
+                old_primary = self.settings_manager.settings.display.primary_screen_index
+                self.settings_manager.settings.display.secondary_screen_index = old_primary
+            
+            # Set new primary
+            self.settings_manager.settings.display.primary_screen_index = screen_index
+            self.settings_manager.save_settings()
+            self.primary_screen_changed.emit(screen_index)
+            self.settings_changed.emit()
     
     def set_secondary_screen(self, screen_index: int):
         """Set secondary screen index"""
-        self.settings_manager.settings.display.secondary_screen_index = screen_index
-        self.settings_manager.settings.display.use_secondary_screen = (screen_index is not None)
-        self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        if screen_index != self.settings_manager.settings.display.secondary_screen_index:
+            # Check if this was previously the primary screen
+            if screen_index == self.settings_manager.settings.display.primary_screen_index:
+                # Swap screens
+                old_secondary = self.settings_manager.settings.display.secondary_screen_index
+                self.settings_manager.settings.display.primary_screen_index = old_secondary
+            
+            # Set new secondary
+            self.settings_manager.settings.display.secondary_screen_index = screen_index
+            
+            # If enabling or changing secondary screen, make sure it's enabled
+            self.settings_manager.settings.display.use_secondary_screen = True
+            
+            self.settings_manager.save_settings()
+            self.secondary_screen_changed.emit(screen_index, True)
+            self.settings_changed.emit()
     
     def toggle_secondary_screen(self, enabled: bool):
         """Enable/disable secondary screen"""
@@ -136,22 +163,32 @@ class SettingsController(QObject):
         self.settings_manager.save_settings()
         self.settings_changed.emit()
     
-    def get_all_screens(self) -> List[Dict]:
+    def get_all_screens(self):
         """Get information about all available screens"""
-        from PyQt6.QtWidgets import QApplication
+        return ScreenHandler.get_all_screens()
+    
+    def _initialize_screen_settings(self):
+        """Initialize screen settings with correct values if not already set"""
+        settings = self.settings_manager.settings
+        screens = ScreenHandler.get_all_screens()
         
-        screens = []
-        app = QApplication.instance()
-        primary_screen = app.primaryScreen()
+        # Set primary screen to system primary if not set
+        if settings.display.primary_screen_index is None:
+            settings.display.primary_screen_index = ScreenHandler.get_primary_screen_index()
         
-        for i, screen in enumerate(QApplication.screens()):
-            geometry = screen.geometry()
-            screens.append({
-                'index': i,
-                'name': screen.name(),
-                'width': geometry.width(),
-                'height': geometry.height(),
-                'primary': (screen == primary_screen)  # Compare to primary screen
-            })
+        # Set secondary screen to first non-primary screen if not set
+        if settings.display.secondary_screen_index is None:
+            primary_index = settings.display.primary_screen_index
+            # Look for a screen that's not the primary
+            for screen in screens:
+                if screen['index'] != primary_index:
+                    settings.display.secondary_screen_index = screen['index']
+                    break
+            
+            # If no secondary screen found, use same as primary (will be disabled)
+            if settings.display.secondary_screen_index is None and screens:
+                settings.display.secondary_screen_index = primary_index
+                settings.display.use_secondary_screen = False
         
-        return screens
+        # Save updated settings
+        self.settings_manager.save_settings()

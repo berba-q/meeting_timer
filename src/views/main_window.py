@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QIcon, QAction, QFont
 from PyQt6.QtCore import Qt, QSize, pyqtSlot
 
-
+from src.utils.screen_handler import ScreenHandler
 from src.controllers.meeting_controller import MeetingController
 from src.controllers.timer_controller import TimerController
 from src.controllers.settings_controller import SettingsController
@@ -56,6 +56,37 @@ class MainWindow(QMainWindow):
         
         # Load meetings
         self.meeting_controller.load_meetings()
+        
+    def _show_secondary_display(self):
+        """Show the secondary display on the configured screen"""
+        # Create secondary window if it doesn't exist
+        if not self.secondary_display:
+            from src.views.secondary_display import SecondaryDisplay
+            self.secondary_display = SecondaryDisplay(self.timer_controller)
+            
+            # Apply styling to ensure visibility
+            self._apply_secondary_display_theme()
+        
+        # Position on the correct screen
+        self._position_secondary_display()
+        
+        # Show the window
+        self.secondary_display.show()
+        self.secondary_display.activateWindow()  # Make sure it's active
+        
+        # Update status bar indicator
+        self.secondary_display_label.setText("Secondary Display: Active")
+        
+        # Update toggle action state
+        self.toggle_secondary_action.setChecked(True)
+        
+    def showEvent(self, event):
+        """Override show event to initialize screens when window is shown"""
+        super().showEvent(event)
+        
+        # This is the right time to initialize screens, after the window is fully created
+        # and about to become visible
+        self._initialize_screens()
     
     def _create_menu_bar(self):
         """Create the application menu bar"""
@@ -660,6 +691,56 @@ class MainWindow(QMainWindow):
         dialog = SettingsDialog(self.settings_controller, self)
         dialog.exec()
     
+    def _initialize_screens(self):
+        """Initialize screen handling during application startup"""
+        # Get the current settings
+        settings = self.settings_controller.get_settings()
+        
+        # Position main window on the primary screen
+        self._position_main_window()
+        
+        # Show secondary display if enabled in settings
+        if settings.display.use_secondary_screen:
+            # Delay the creation of secondary display slightly to ensure
+            # the main window is fully displayed first
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, self._show_secondary_display)
+    
+    def _position_main_window(self):
+        """Position the main window on the primary screen from settings"""
+        settings = self.settings_controller.get_settings()
+        #primary_index = settings.display.primary_screen_index
+        
+        # Get the screen by index
+        screen = ScreenHandler.get_configured_screen(settings, is_primary=True)
+        if screen:
+            # Center the window on the selected primary screen
+            geometry = screen.availableGeometry()
+            self.setGeometry(
+                geometry.x() + (geometry.width() - self.width()) // 2,
+                geometry.y() + (geometry.height() - self.height()) // 2,
+                self.width(),
+                self.height()
+            )
+            
+    def _position_secondary_display(self):
+        """Position the secondary display on the correct screen"""
+        if not self.secondary_display:
+            return
+        
+        settings = self.settings_controller.get_settings()
+        #secondary_index = settings.display.secondary_screen_index
+        
+        # Get the screen for the secondary display
+        screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
+        if screen:
+            # Get the geometry of the secondary screen
+            geometry = screen.geometry()
+            
+            # Set the geometry of the secondary display
+            self.secondary_display.setGeometry(geometry)
+            self.secondary_display.showFullScreen()
+    
     def _toggle_secondary_display(self):
         """Toggle the secondary display window"""
         settings = self.settings_controller.get_settings()
@@ -678,7 +759,7 @@ class MainWindow(QMainWindow):
                 self.secondary_display = SecondaryDisplay(self.timer_controller)
             
             # Apply proper styling to ensure visibility
-            self._apply_secondary_display_styling()
+            self._apply_secondary_display_theme()
             
             # Show and position on the correct screen
             self.secondary_display.show()
