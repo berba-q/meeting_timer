@@ -59,6 +59,8 @@ class MainWindow(QMainWindow):
         
     def _show_secondary_display(self):
         """Show the secondary display on the configured screen"""
+        settings = self.settings_controller.get_settings()
+        
         # Create secondary window if it doesn't exist
         if not self.secondary_display:
             from src.views.secondary_display import SecondaryDisplay
@@ -67,12 +69,13 @@ class MainWindow(QMainWindow):
             # Apply styling to ensure visibility
             self._apply_secondary_display_theme()
         
-        # Position on the correct screen
-        self._position_secondary_display()
-        
-        # Show the window
-        self.secondary_display.show()
-        self.secondary_display.activateWindow()  # Make sure it's active
+        # Use our ScreenHandler to position the window on the correct screen
+        screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
+        if screen:
+            # Set the geometry of the secondary display
+            self.secondary_display.setGeometry(screen.geometry())
+            self.secondary_display.showFullScreen()
+            self.secondary_display.activateWindow()
         
         # Update status bar indicator
         self.secondary_display_label.setText("Secondary Display: Active")
@@ -455,7 +458,7 @@ class MainWindow(QMainWindow):
         
         # Update secondary display if available
         if self.secondary_display:
-            self.secondary_display.current_part_label.setText(transition_msg)
+            self.secondary_display.next_part_label.setText(transition_msg)
     
     def _get_global_part_index(self, section_index, part_index):
         """Helper method to get global part index from section and part indices"""
@@ -483,8 +486,18 @@ class MainWindow(QMainWindow):
     def _display_mode_changed(self, mode):
         """Handle display mode change"""
         self.timer_view.set_display_mode(mode)
+        
+        # Check if secondary display exists before trying to update it
         if self.secondary_display:
-            self.secondary_display.timer_view.set_display_mode(mode)
+            # Check what attributes are available
+            if hasattr(self.secondary_display, 'timer_view'):
+                # Old implementation with timer_view
+                self.secondary_display.timer_view.set_display_mode(mode)
+            else:
+                # New implementation with direct timer label
+                # No need to change display mode as it's always digital
+                pass
+                
         self._update_display_mode_label()
     
     def _update_display_mode_label(self):
