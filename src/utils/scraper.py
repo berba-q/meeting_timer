@@ -521,7 +521,7 @@ class MeetingScraper:
                 title_text = strong_tag.get_text().strip()
                 if title_text and len(title_text) > 10:  # Reasonable title length
                     watchtower_title = title_text
-                    print(f"Found title in first h1/strong: {watchtower_title}")
+                    #print(f"Found title in first h1/strong: {watchtower_title}")
                     break
         
         # Method 2: Look for a heading with proper structure if above fails
@@ -538,7 +538,7 @@ class MeetingScraper:
                         title_text = strong_tag.get_text().strip()
                         if title_text and len(title_text) > 10:
                             watchtower_title = title_text
-                            print(f"Found title in {tag}/strong: {watchtower_title}")
+                            #print(f"Found title in {tag}/strong: {watchtower_title}")
                             break
         
         # Method 3: As a fallback, look for article title class
@@ -548,7 +548,7 @@ class MeetingScraper:
                 text = element.get_text().strip()
                 if text and len(text) > 10:
                     watchtower_title = text
-                    print(f"Found title in article title class: {watchtower_title}")
+                    #print(f"Found title in article title class: {watchtower_title}")
                     break
         
         # Extract songs directly from the Watchtower article page
@@ -567,7 +567,7 @@ class MeetingScraper:
         # Process song elements to find opening and closing songs
         for i, (element, parent) in enumerate(song_elements):
             text = element.strip()
-            print(f"Song element {i}: {text}")
+            #print(f"Song element {i}: {text}")
             
             song_match = re.search(r'SONG\s+(\d+)|Song\s+(\d+)', text, re.IGNORECASE)
             if song_match:
@@ -577,12 +577,12 @@ class MeetingScraper:
                 # First song is typically the opening song
                 if i == 0 and watchtower_opening_song is None:
                     watchtower_opening_song = song_num
-                    print(f"Identified opening Watchtower song: {song_num}")
+                    #print(f"Identified opening Watchtower song: {song_num}")
                 
                 # Last song is typically the closing song
                 if i == len(song_elements) - 1 and watchtower_closing_song is None:
                     watchtower_closing_song = song_num
-                    print(f"Identified closing Watchtower song: {song_num}")
+                    #print(f"Identified closing Watchtower song: {song_num}")
         
         # 1. Add Opening Song and Prayer for Public Talk
         # Note: We don't try to determine this - let the user enter it
