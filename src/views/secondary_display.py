@@ -77,7 +77,18 @@ class SecondaryDisplay(QMainWindow):
         # Main layout with ample margins for readability
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(20)
+        layout.setSpacing(30)
+        
+        # Countdown message display - at the top
+        self.countdown_label = QLabel()
+        self.countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.countdown_label.setStyleSheet("""
+            color: #4a90e2;
+            font-size: 40px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        """)
+        layout.addWidget(self.countdown_label)
         
         # Large digital timer display - very prominent
         self.timer_frame = QFrame()
@@ -142,6 +153,15 @@ class SecondaryDisplay(QMainWindow):
         self.timer_controller.transition_started.connect(self._transition_started)
         self.timer_controller.predicted_end_time_updated.connect(self._update_predicted_end_time)
         self.timer_controller.meeting_ended.connect(self._meeting_ended)
+        self.timer_controller.timer.meeting_countdown_updated.connect(self._update_countdown)
+    
+    def _update_countdown(self, seconds_remaining: int, message: str):
+        """Update the countdown message"""
+        if seconds_remaining > 0:
+            self.countdown_label.setText(message)
+            self.countdown_label.setVisible(True)
+        else:
+            self.countdown_label.setVisible(False)
     
     def _update_time(self, seconds: int):
         """Update the timer display"""

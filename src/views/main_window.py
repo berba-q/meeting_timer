@@ -54,8 +54,40 @@ class MainWindow(QMainWindow):
         # Connect signals
         self._connect_signals()
         
+        # Initialize timer to show current time
+        self._initialize_timer_display()
+        
         # Load meetings
         self.meeting_controller.load_meetings()
+    
+    def _initialize_timer_display(self):
+        """Initialize timer to show current time and meeting countdown"""
+        # Update the meeting selector with available meetings
+        self._update_meeting_selector()
+        
+        # If we have a current meeting, initialize the countdown
+        if self.meeting_controller.current_meeting:
+            meeting = self.meeting_controller.current_meeting
+            self.timer_controller.set_meeting(meeting)
+            self.meeting_view.set_meeting(meeting)
+    
+    def _update_meeting_selector(self):
+        """Update the meeting selector dropdown with available meetings"""
+        self.meeting_selector.clear()
+        
+        meetings = self.meeting_controller.current_meetings
+        if not meetings:
+            self.meeting_selector.addItem("No meetings available")
+            return
+        
+        # Add each meeting to the selector
+        for meeting_type, meeting in meetings.items():
+            date_str = meeting.date.strftime("%Y-%m-%d")
+            self.meeting_selector.addItem(f"{meeting.title} ({date_str})", meeting)
+        
+        # Select the first item
+        if self.meeting_selector.count() > 0:
+            self.meeting_selector.setCurrentIndex(0)
         
     def _show_secondary_display(self):
         """Show the secondary display on the configured screen"""
@@ -371,6 +403,9 @@ class MainWindow(QMainWindow):
             self.timer_controller.set_meeting(meeting)
             self.meeting_view.set_meeting(meeting)
             
+            # Initialize the meeting countdown
+            self.timer_controller.initialize_meeting_countdown()
+            
             # Update status bar
             self.current_part_label.setText(f"Meeting: {meeting.title}")
     
@@ -662,14 +697,37 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Failed to load meeting: {str(e)}")
     
     def _update_meetings(self):
-        """Update meetings from web"""
+        """Update meetings from web with enhanced weekend meeting handling"""
         # Check meeting source mode
         mode = self.settings_controller.get_settings().meeting_source.mode
         if mode == MeetingSourceMode.WEB_SCRAPING:
-            # Use web scraping
-            self.meeting_controller.update_meetings_from_web()
+            # Show a progress dialog
+            from PyQt6.QtWidgets import QProgressDialog
+            progress = QProgressDialog("Updating meetings from wol.jw.org...", "Cancel", 0, 0, self)
+            progress.setWindowTitle("Updating Meetings")
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.show()
+            
+            try:
+                # Use web scraping
+                meetings = self.meeting_controller.update_meetings_from_web()
+                
+                # Process weekend meeting to ensure songs are properly displayed
+                if MeetingType.WEEKEND in meetings:
+                    weekend_meeting = meetings[MeetingType.WEEKEND]
+                    self._process_weekend_meeting_songs(weekend_meeting)
+                
+                progress.close()
+                
+                # Show a success message
+                QMessageBox.information(self, "Update Complete", 
+                                       "Meetings have been successfully updated.")
+            except Exception as e:
+                progress.close()
+                QMessageBox.warning(self, "Update Failed", 
+                                  f"Failed to update meetings: {str(e)}")
         else:
-            # Show options dialog
+            # Show options dialog as before
             from PyQt6.QtWidgets import QMenu
             
             menu = QMenu(self)
@@ -686,6 +744,29 @@ class MainWindow(QMainWindow):
             
             # Position menu below the update button
             menu.exec(self.sender().mapToGlobal(self.sender().rect().bottomLeft()))
+            
+    def _process_weekend_meeting_songs(self, meeting: Meeting):
+        """Process weekend meeting to ensure songs are properly displayed"""
+        # Flag to track if we need to prompt the user
+        missing_songs = False
+        
+        for section in meeting.sections:
+            for part in section.parts:
+                if "song" in part.title.lower() and "song" == part.title.strip().lower():
+                    # Found a generic song without a number
+                    missing_songs = True
+        
+        # If there are missing songs, prompt the user
+        if missing_songs:
+            reply = QMessageBox.question(
+                self, "Update Weekend Songs", 
+                "Some weekend meeting songs need to be added manually. Would you like to edit them now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                # Show the meeting editor
+                self.meeting_controller.show_meeting_editor(self, meeting)
     
     def _edit_current_meeting(self):
         """Edit the currently selected meeting"""

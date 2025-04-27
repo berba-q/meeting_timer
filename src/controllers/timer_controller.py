@@ -55,6 +55,41 @@ class TimerController(QObject):
         # Connect timer signals
         self.timer.state_changed.connect(self._handle_timer_state_change)
         self.timer.time_updated.connect(self._handle_time_update)
+        
+    def _initialize_current_time_display(self):
+        """Initialize the timer to display current time"""
+        # Update the display to show current time
+        self.timer._update_current_time()
+    
+    def set_meeting(self, meeting: Meeting):
+        """Set the current meeting and initialize countdown"""
+        self.current_meeting = meeting
+        self.current_part_index = -1
+        self.parts_list = meeting.get_all_parts()
+        
+        # Initialize countdown to meeting start time
+        self._initialize_meeting_countdown()
+        
+    def _initialize_meeting_countdown(self):
+        """Initialize countdown to meeting start time"""
+        if not self.current_meeting:
+            return
+        
+        # Get meeting date and time
+        meeting_date = self.current_meeting.date
+        meeting_time = self.current_meeting.start_time
+        
+        # Create target datetime
+        target_datetime = datetime.combine(meeting_date, meeting_time)
+        
+        # Only set countdown if meeting is in the future
+        now = datetime.now()
+        if target_datetime > now:
+            # Set countdown target
+            self.timer.set_meeting_target_time(target_datetime)
+        else:
+            # Meeting time has passed, clear any countdown
+            self.timer._target_meeting_time = None
     
     def set_meeting(self, meeting: Meeting):
         """Set the current meeting"""
@@ -196,6 +231,15 @@ class TimerController(QObject):
             
         # Don't add transition if we're at the last part
         if self.current_part_index < 0 or self.current_part_index >= len(self.parts_list) - 1:
+            return False
+        
+        # Get the current part and the next part
+        current_part = self.parts_list[self.current_part_index]
+        next_part = self.parts_list[self.current_part_index + 1] if self.current_part_index + 1 < len(self.parts_list) else None
+        
+        if (self.current_meeting.meeting_type == MeetingType.WEEKEND and
+                "Watchtower" in current_part.title and
+                ("Song" in next_part.title or "Prayer" in next_part.title)):
             return False
         
         # Always add transition between all parts

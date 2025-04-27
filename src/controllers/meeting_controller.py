@@ -60,6 +60,14 @@ class MeetingController(QObject):
         else:
             # Load from local files or templates based on mode
             self._load_local_meetings()
+        
+        # Process weekend meeting songs if present
+        if MeetingType.WEEKEND in self.current_meetings:
+            weekend_meeting = self.current_meetings[MeetingType.WEEKEND]
+            self.process_weekend_meeting_songs(weekend_meeting)
+            
+            # Save processed meeting
+            self.save_meeting(weekend_meeting)
     
     def update_meetings_from_web(self):
         """Update meetings from the web"""
@@ -96,6 +104,61 @@ class MeetingController(QObject):
             
             # If update fails, try loading from local files
             self._load_local_meetings()
+    
+    def process_weekend_meeting_songs(self, meeting: Meeting):
+        """
+        Process weekend meeting songs to ensure they're properly displayed
+        - Formats song titles consistently
+        - Highlights missing song numbers
+        - Returns True if songs need manual entry
+        """
+        if meeting.meeting_type != MeetingType.WEEKEND:
+            return False
+        
+        needs_manual_update = False
+        
+        for section in meeting.sections:
+            for part in section.parts:
+                part_title_lower = part.title.lower()
+                
+                if "song" in part_title_lower:
+                    # Check if there's a song number
+                    import re
+                    song_num_match = re.search(r'song\s+(\d+)', part_title_lower)
+                    
+                    if not song_num_match:
+                        # No song number found
+                        needs_manual_update = True
+                        
+                        # Format the title to indicate missing song number
+                        if "song" == part_title_lower.strip():
+                            # Very generic title, enhance it based on position
+                            if "public" in section.title.lower():
+                                if "prayer" in part_title_lower:
+                                    part.title = "Opening Song and Prayer"
+                                else:
+                                    part.title = "Opening Song"
+                            elif "watchtower" in section.title.lower():
+                                if "concluding" in part_title_lower or "prayer" in part_title_lower:
+                                    part.title = "Concluding Song and Prayer"
+                                else:
+                                    part.title = "Song"
+                    else:
+                        # Song number found, ensure consistent formatting
+                        song_num = song_num_match.group(1)
+                        
+                        # Format based on whether it includes prayer
+                        if "prayer" in part_title_lower:
+                            if "opening" in part_title_lower or "public" in section.title.lower():
+                                part.title = f"Song {song_num} and Opening Prayer"
+                            elif "concluding" in part_title_lower or "watchtower" in section.title.lower():
+                                part.title = f"Song {song_num} and Concluding Prayer"
+                            else:
+                                part.title = f"Song {song_num} and Prayer"
+                        else:
+                            part.title = f"Song {song_num}"
+        
+        return needs_manual_update
     
     def _clear_weekend_songs(self, meeting: Meeting):
         """Clear song information from weekend meeting to be manually entered"""

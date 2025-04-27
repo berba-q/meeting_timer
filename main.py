@@ -13,6 +13,8 @@ from PyQt6.QtGui import QAction
 #from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from pathlib import Path
+
+from src.models.meeting import MeetingType
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.controllers.meeting_controller import MeetingController
 from src.views.main_window import MainWindow
@@ -36,6 +38,18 @@ def main():
     
     # Create and show main window
     main_window = MainWindow(controller)
+    
+    # Load meetings
+    controller.load_meetings()
+    
+    # Set initial meeting if available
+    for meeting_type in [MeetingType.WEEKEND, MeetingType.MIDWEEK]:
+        if meeting_type in controller.current_meetings:
+            # Set the first available meeting as current
+            main_window.timer_controller.set_meeting(controller.current_meetings[meeting_type])
+            main_window.meeting_view.set_meeting(controller.current_meetings[meeting_type])
+            break
+    
     main_window.show()
     
     # Start application event loop

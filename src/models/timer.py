@@ -30,6 +30,8 @@ class Timer(QObject):
     # Signals
     time_updated = pyqtSignal(int)  # Emits remaining seconds
     state_changed = pyqtSignal(TimerState)
+    current_time_updated = pyqtSignal(str)  # signal for current time updates
+    meeting_countdown_updated = pyqtSignal(int, str)  # Seconds remaining, formatted message
     
     def __init__(self):
         super().__init__()
@@ -40,6 +42,16 @@ class Timer(QObject):
         self._start_time = None
         self._elapsed_time = 0
         self._state = TimerState.STOPPED
+        
+        # Current time and countdown properties
+        self._target_meeting_time = None
+        self._current_time_timer = QTimer(self)
+        self._current_time_timer.setInterval(1000)  # Update every second
+        self._current_time_timer.timeout.connect(self._update_current_time)
+        self._current_time_timer.start()
+        
+        # Initial current time update
+        self._update_current_time()
         
         # Qt timer for updates
         self._timer = QTimer(self)
@@ -72,6 +84,38 @@ class Timer(QObject):
         if self._total_seconds == 0:
             return 0
         return (self.elapsed_seconds / self._total_seconds) * 100
+    
+    def _update_current_time(self):
+        """Update and emit the current time"""
+        current_time = datetime.now().strftime("%H:%M:%S")
+        self.current_time_updated.emit(current_time)
+        
+        # If we have a target meeting time, update the countdown
+        if self._target_meeting_time:
+            now = datetime.now()
+            time_diff = self._target_meeting_time - now
+            seconds_remaining = int(time_diff.total_seconds())
+            
+            if seconds_remaining > 0:
+                # Format a nice countdown message
+                hours, remainder = divmod(seconds_remaining, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                
+                if hours > 0:
+                    countdown_msg = f"Meeting starts in {hours}h {minutes}m {seconds}s"
+                else:
+                    countdown_msg = f"Meeting starts in {minutes}m {seconds}s"
+                    
+                self.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
+            else:
+                # Meeting time has passed
+                self.meeting_countdown_updated.emit(0, "Meeting time has arrived")
+                
+    def set_meeting_target_time(self, target_datetime: datetime):
+        """Set the target meeting time for countdown display"""
+        self._target_meeting_time = target_datetime
+        # Force an immediate update of the countdown
+        self._update_current_time()
     
     def start(self, duration_seconds: int):
         """Start the timer with a given duration"""
