@@ -166,8 +166,14 @@ class MeetingView(QWidget):
             # Add parts as children
             for part_index, part in enumerate(section.parts):
                 part_item = QTreeWidgetItem(section_item)
+                # check if songs are part of the meeting
+                is_song_part = "song" in part.title.lower()
                 part_item.setText(0, part.title)
                 part_item.setText(1, f"{part.duration_minutes} min")
+                
+                # If it's a song part, make it visually distinct
+                if is_song_part:
+                    part_item.setForeground(0, QBrush(QColor(74, 144, 226)))  # Blue color for songs
                 
                 # Store additional data for context menu
                 global_part_index = self._get_global_part_index(section_index, part_index)
