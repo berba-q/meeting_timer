@@ -404,7 +404,7 @@ class MainWindow(QMainWindow):
             self.meeting_view.set_meeting(meeting)
             
             # Initialize the meeting countdown
-            self.timer_controller.initialize_meeting_countdown()
+            self.timer_controller._initialize_meeting_countdown()
             
             # Update status bar
             self.current_part_label.setText(f"Meeting: {meeting.title}")

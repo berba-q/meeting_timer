@@ -1,6 +1,7 @@
 """
 Timer view component for displaying the timer in both digital and analog formats.
 """
+from datetime import datetime
 import math
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -25,6 +26,8 @@ class TimerView(QWidget):
         self.remaining_seconds = 0
         self.timer_state = TimerState.STOPPED
         self.part_title = ""
+        self.current_time = datetime.now().strftime("%H:%M:%S")  # Initialize with current time
+        self.countdown_message = ""
         
         # Setup UI
         self._setup_ui()
@@ -42,6 +45,11 @@ class TimerView(QWidget):
         self.timer_panel.setMinimumHeight(200)
         self.timer_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
+        # Countdown message label
+        self.countdown_label = QLabel()
+        self.countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.countdown_label.setStyleSheet("font-size: 16px; color: #4a90e2; font-weight: bold;")
+        
         # Current part label
         self.part_label = QLabel()
         self.part_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -49,6 +57,7 @@ class TimerView(QWidget):
         
         layout.addWidget(self.timer_panel)
         layout.addWidget(self.part_label)
+        layout.addWidget(self.countdown_label)
         
         # Set the digital display as default
         self._create_digital_display()
@@ -58,6 +67,8 @@ class TimerView(QWidget):
         self.timer_controller.timer.time_updated.connect(self._update_time)
         self.timer_controller.timer.state_changed.connect(self._update_state)
         self.timer_controller.part_changed.connect(self._update_part)
+        self.timer_controller.timer.current_time_updated.connect(self._update_current_time)
+        self.timer_controller.timer.meeting_countdown_updated.connect(self._update_countdown)
     
     def set_display_mode(self, mode: TimerDisplayMode):
         """Set the timer display mode"""
@@ -94,6 +105,22 @@ class TimerView(QWidget):
         
         layout.addWidget(self.timer_label)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    
+    def _update_current_time(self, time_str: str):
+        """Update the displayed current time when in stopped state"""
+        self.current_time = time_str
+        
+        # Only update display if we're in stopped state
+        if self.timer_state == TimerState.STOPPED:
+            self.timer_label.setText(time_str)
+    
+    def _update_countdown(self, seconds_remaining: int, message: str):
+        """Update the countdown message"""
+        self.countdown_message = message
+        self.countdown_label.setText(message)
+        
+        # Make the label visible or invisible as needed
+        self.countdown_label.setVisible(seconds_remaining > 0)
     
     def _create_analog_display(self):
         """Create analog timer display"""
