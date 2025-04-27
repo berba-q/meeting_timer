@@ -49,37 +49,73 @@ class MeetingScraper:
             
             # Look for specific indicators in the text or href
             is_midweek = any(term in link_text for term in ['life', 'ministry', 'treasures', 'apply yourself'])
-            is_weekend = any(term in link_text for term in ['watchtower', 'study article', 'public talk', 'jehovah'])
+            is_weekend = any(term in link_text for term in ['watchtower', 'study article', 'public talk'])
             
             # Additional check for href patterns
             if '/lf/' in href or '/mwb/' in href:
                 is_midweek = True
-            if '/w/' in href or '/wp/' in href or '/d/' in href:
-                is_weekend = True
                 
             # If this link matches a meeting type and we haven't found one yet
             if is_midweek and MeetingType.MIDWEEK not in meeting_links:
                 meeting_links[MeetingType.MIDWEEK] = href
+                
+            #========   WEEKEND MEETING   ========
             
-            if is_weekend and MeetingType.WEEKEND not in meeting_links:
-                meeting_links[MeetingType.WEEKEND] = href
+        weekend_found = False
         
-        # If we couldn't find the links directly, check for strong tags that might contain article titles
-        if MeetingType.WEEKEND not in meeting_links:
-            # Look for Watchtower study title in a strong tag
-            watchtower_titles = soup.find_all('strong')
-            for title_elem in watchtower_titles:
-                title_text = title_elem.get_text().strip()
-                # If this looks like a Watchtower title
-                if len(title_text) > 10 and "—" in title_text:
-                    # Look for a parent link
-                    parent_link = title_elem.find_parent('a')
+        # Method 1: Look in groupTOC class elements (based on the screenshot)
+        toc_elements = soup.find_all(class_='groupTOC')
+        for toc in toc_elements:
+            links = toc.find_all('a', href=True)
+            for link in links:
+                href = link.get('href')
+                strong_tags = link.find_all('strong')
+                
+                # Check if this link has a strong tag with substantial text
+                if strong_tags and len(strong_tags[0].get_text().strip()) > 10:
+                    if not href.startswith('http'):
+                        href = f"{self.BASE_URL}{href}"
+                    
+                    meeting_links[MeetingType.WEEKEND] = href
+                    weekend_found = True
+                    break
+            if weekend_found:
+                break
+        
+        # Method 2: Look for strong tags containing Watchtower titles anywhere
+        if not weekend_found:
+            for strong in soup.find_all('strong'):
+                text = strong.get_text().strip()
+                if len(text) > 15 and any(x in text.lower() for x in ["jehovah", "forgiveness", "—", "means"]):
+                    # Found a likely Watchtower title, check if it's in a link
+                    parent_link = strong.find_parent('a')
                     if parent_link and parent_link.has_attr('href'):
                         href = parent_link.get('href')
                         if not href.startswith('http'):
                             href = f"{self.BASE_URL}{href}"
+                        
                         meeting_links[MeetingType.WEEKEND] = href
+                        weekend_found = True
                         break
+            
+        # Method 3: Fall back to original method for weekend if still not found
+        if not weekend_found:
+            for link in all_links:
+                href = link.get('href')
+                link_text = link.get_text().strip().lower()
+                
+                if not href or not link_text:
+                    continue
+                    
+                if not href.startswith('http'):
+                    href = f"{self.BASE_URL}{href}"
+                
+                is_weekend = any(term in link_text for term in ['watchtower', 'study article', 'public talk'])
+                if '/w/' in href or '/wp/' in href or '/d/' in href:
+                    is_weekend = True
+                    
+                if is_weekend and MeetingType.WEEKEND not in meeting_links:
+                    meeting_links[MeetingType.WEEKEND] = href
         
         return meeting_links
     
