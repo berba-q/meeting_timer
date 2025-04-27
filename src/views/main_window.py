@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QIcon, QAction, QFont
 from PyQt6.QtCore import Qt, QSize, pyqtSlot
+from PyQt6.QtWidgets import QDialog
 
 from src.utils.screen_handler import ScreenHandler
 from src.controllers.meeting_controller import MeetingController
@@ -22,6 +23,7 @@ from src.views.timer_view import TimerView
 from src.views.meeting_view import MeetingView
 from src.views.settings_view import SettingsDialog
 from src.views.secondary_display import SecondaryDisplay
+from src.views.weekend_song_editor import WeekendSongEditorDialog
 
 
 class MainWindow(QMainWindow):
@@ -149,6 +151,10 @@ class MainWindow(QMainWindow):
         edit_meeting_action.setShortcut("Ctrl+E")
         edit_meeting_action.triggered.connect(self._edit_current_meeting)
         file_menu.addAction(edit_meeting_action)
+        edit_songs_action = QAction(get_icon("music"), "Edit Weekend &Songs", self)
+        edit_songs_action.setShortcut("Ctrl+Shift+S")
+        edit_songs_action.triggered.connect(self._edit_weekend_meeting_songs)
+        file_menu.addAction(edit_songs_action)
         
         file_menu.addSeparator()
         
@@ -779,6 +785,31 @@ class MainWindow(QMainWindow):
         self.meeting_controller.show_meeting_editor(
             self, self.meeting_controller.current_meeting
         )
+    
+    def _edit_weekend_meeting_songs(self):
+        """Edit weekend meeting songs"""
+        current_meeting = self.meeting_controller.current_meeting
+        
+        # Check if we have a weekend meeting selected
+        if not current_meeting or current_meeting.meeting_type != MeetingType.WEEKEND:
+            QMessageBox.warning(self, "Not a Weekend Meeting", 
+                            "Please select a weekend meeting first.")
+            return
+        
+        # Show the weekend song editor dialog
+        from src.views.weekend_song_editor import WeekendSongEditorDialog
+        dialog = WeekendSongEditorDialog(current_meeting, self)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Save the updated meeting
+            self.meeting_controller.save_meeting(current_meeting)
+            
+            # Update the meeting display
+            self.meeting_view.set_meeting(current_meeting)
+            
+            # Show confirmation message
+            QMessageBox.information(self, "Songs Updated", 
+                                "Weekend meeting songs have been updated.")
     
     def _open_settings(self):
         """Open settings dialog"""
