@@ -3,15 +3,20 @@ Controller for managing meetings in the JW Meeting Timer application.
 """
 import os
 import json
+import re
 from datetime import datetime, time
 from typing import Dict, List, Optional, Tuple
 from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QDialog
 
 from src.models.meeting import Meeting, MeetingType, MeetingSection, MeetingPart
 from src.models.settings import SettingsManager, MeetingSourceMode
 from src.models.meeting_template import MeetingTemplate, TemplateType
 from src.utils.scraper import MeetingScraper
 from src.utils.helpers import safe_json_load, safe_json_save
+from src.views.weekend_song_editor import WeekendSongEditorDialog
 
 
 class MeetingController(QObject):
@@ -81,7 +86,41 @@ class MeetingController(QObject):
             # Handle weekend songs manual entry if enabled
             if self.settings_manager.settings.meeting_source.weekend_songs_manual:
                 if MeetingType.WEEKEND in meetings:
-                    self._clear_weekend_songs(meetings[MeetingType.WEEKEND])
+                    weekend_meeting = meetings[MeetingType.WEEKEND]
+                    needs_song_update = self.process_weekend_meeting_songs(weekend_meeting)
+                    
+                    # If weekend meeting needs manual song entry and we have a parent widget,
+                    # prompt to edit songs now
+                    if needs_song_update:
+        
+                        parent = QApplication.activeWindow()
+                        if parent:
+                            reply = QMessageBox.question(
+                                parent, 
+                                "Update Weekend Songs", 
+                                "Some weekend meeting songs need to be added manually. Would you like to edit them now?",
+                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                            )
+                            
+                            if reply == QMessageBox.StandardButton.Yes:
+                                self._show_weekend_song_editor(weekend_meeting)
+                    
+                    #Check if weekend songs need to be cleared
+                    # First check if all songs have numbers
+                    all_songs_have_numbers = True
+                    for section in weekend_meeting.sections:
+                        for part in section.parts:
+                            part_title_lower = part.title.lower()
+                            if "song" in part_title_lower:
+                                # Check if it has a song number
+                                song_match = re.search(r'song\s+(\d+)', part_title_lower)
+                                if not song_match:
+                                    all_songs_have_numbers = False
+                                    break
+                    # Only clear songs if manual entry is needed AND songs don't already have numbers
+                    if not all_songs_have_numbers:
+                        self._clear_weekend_songs(weekend_meeting)
+                    
             
             # Save scraped meetings as templates if option enabled
             if self.settings_manager.settings.meeting_source.save_scraped_as_template:
@@ -123,7 +162,6 @@ class MeetingController(QObject):
                 
                 if "song" in part_title_lower:
                     # Check if there's a song number
-                    import re
                     song_num_match = re.search(r'song\s+(\d+)', part_title_lower)
                     
                     if not song_num_match:
@@ -160,16 +198,53 @@ class MeetingController(QObject):
         
         return needs_manual_update
     
+    def _show_weekend_song_editor(self, meeting: Meeting):
+        """Show the weekend song editor dialog"""
+        
+        # Get parent window if any
+        parent = QApplication.activeWindow()
+        
+        dialog = WeekendSongEditorDialog(meeting, parent)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Save the updated meeting
+            self.save_meeting(meeting)
+            
+            # If this is the current meeting, emit update signal
+            if meeting is self.current_meeting:
+                self.meeting_updated.emit(meeting)
+    
     def _clear_weekend_songs(self, meeting: Meeting):
-        """Clear song information from weekend meeting to be manually entered"""
+        """
+        Clear song information from weekend meeting to be manually entered
+        but preserve songs that already have numbers
+        """
+        # First check if all songs already have numbers - if so, preserve them
+        all_songs_have_numbers = True
+        
         for section in meeting.sections:
             for part in section.parts:
-                if "song" in part.title.lower() or "song" in section.title.lower():
+                part_title_lower = part.title.lower()
+                if "song" in part_title_lower:
+                    # Check if it has a song number
+                    song_match = re.search(r'song\s+(\d+)', part_title_lower)
+                    if not song_match:
+                        all_songs_have_numbers = False
+                        break
+        
+        # If all songs already have numbers, keep them!
+        if all_songs_have_numbers:
+            return
+        
+        # Otherwise, clear songs as before for manual entry
+        for section in meeting.sections:
+            for part in section.parts:
+                part_title_lower = part.title.lower()
+                if "song" in part_title_lower or "song" in section.title.lower():
                     # Keep the part but clear specific song number
-                    if part.title.lower().startswith("song"):
+                    if part_title_lower.startswith("song"):
                         # Try to preserve the structure (e.g., "Song 123" -> "Song")
                         part.title = "Song"
-                    elif "song" in part.title.lower():
+                    elif "song" in part_title_lower:
                         # If song is mentioned in the middle, preserve the text
                         # E.g., "Opening Song and Prayer" stays the same
                         pass
