@@ -2,7 +2,7 @@
 
 /* General UI */
 QMainWindow, QDialog {
-    font-family: 'Segoe UI', 'Arial', sans-serif;
+    font-family: 'Courier New', 'Arial', sans-serif;
     font-size: 10pt;
 }
 
