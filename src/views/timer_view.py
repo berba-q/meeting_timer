@@ -45,15 +45,16 @@ class TimerView(QWidget):
         self.timer_panel.setMinimumHeight(200)
         self.timer_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
-        # Countdown message label
-        self.countdown_label = QLabel()
-        self.countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.countdown_label.setStyleSheet("font-size: 16px; color: #4a90e2; font-weight: bold;")
-        
         # Current part label
         self.part_label = QLabel()
         self.part_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.part_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        
+        # Countdown message label
+        self.countdown_label = QLabel()
+        self.countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.countdown_label.setStyleSheet("font-size: 16px; color: #4a90e2; font-weight: bold;")
+        self.countdown_label.setVisible(False)
         
         layout.addWidget(self.timer_panel)
         layout.addWidget(self.part_label)
@@ -95,7 +96,7 @@ class TimerView(QWidget):
         layout = QVBoxLayout(self.timer_panel)
         
         # Digital timer label
-        self.timer_label = QLabel("00:00")
+        self.timer_label = QLabel(self.current_time)
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.timer_label.setStyleSheet("""
             font-size: 120px;
@@ -117,10 +118,22 @@ class TimerView(QWidget):
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message"""
         self.countdown_message = message
-        self.countdown_label.setText(message)
         
-        # Make the label visible or invisible as needed
-        self.countdown_label.setVisible(seconds_remaining > 0)
+        # Update part label if we're in stopped state
+        if self.timer_state == TimerState.STOPPED:
+            if seconds_remaining > 0:
+                # Show countdown in part label
+                self.part_label.setText("Meeting Starting Soon")
+                
+                # Show countdown message
+                self.countdown_label.setText(message)
+                self.countdown_label.setVisible(True)
+            else:
+                self.countdown_label.setVisible(False)
+        else:
+            # Hide countdown when timer is running
+            self.countdown_label.setVisible(False)
+        
     
     def _create_analog_display(self):
         """Create analog timer display"""

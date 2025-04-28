@@ -111,6 +111,20 @@ class Timer(QObject):
                 # Meeting time has passed
                 self.meeting_countdown_updated.emit(0, "Meeting time has arrived")
                 
+    def start_current_time_display(self):
+        """Start displaying current time"""
+        # Ensure the timer is in STOPPED state
+        if self._state != TimerState.STOPPED:
+            self._state = TimerState.STOPPED
+            self.state_changed.emit(self._state)
+        
+        # Make sure the current time timer is running
+        if not self._current_time_timer.isActive():
+            self._current_time_timer.start()
+        
+        # Force an immediate update
+        self._update_current_time()
+                
     def set_meeting_target_time(self, target_datetime: datetime):
         """Set the target meeting time for countdown display"""
         self._target_meeting_time = target_datetime

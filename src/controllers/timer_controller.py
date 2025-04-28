@@ -41,6 +41,9 @@ class TimerController(QObject):
         self.current_part_index: int = -1
         self.parts_list: List[MeetingPart] = []
         
+        # Initialize timer to show current time
+        self.timer.start_current_time_display()
+        
         # Transition state
         self._in_transition = False
         self._next_part_after_transition = -1
@@ -90,12 +93,6 @@ class TimerController(QObject):
         else:
             # Meeting time has passed, clear any countdown
             self.timer._target_meeting_time = None
-    
-    def set_meeting(self, meeting: Meeting):
-        """Set the current meeting"""
-        self.current_meeting = meeting
-        self.current_part_index = -1
-        self.parts_list = meeting.get_all_parts()
     
     def start_meeting(self):
         """Start the current meeting"""
