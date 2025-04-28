@@ -11,6 +11,7 @@ from PyQt6.QtGui import QPalette, QColor, QFont
 
 from src.controllers.timer_controller import TimerController
 from src.models.timer import TimerState
+from src.views.timer_view import TimerView
 
 
 class SecondaryDisplay(QMainWindow):
@@ -79,18 +80,12 @@ class SecondaryDisplay(QMainWindow):
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(30)
         
-        # Countdown message display - at the top
-        self.countdown_label = QLabel()
-        self.countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.countdown_label.setStyleSheet("""
-            color: #4a90e2;
-            font-size: 40px;
-            font-weight: bold;
-            margin-bottom: 20px;
-        """)
-        layout.addWidget(self.countdown_label)
-        
         # Large digital timer display - very prominent
+        self.timer_view = TimerView(self.timer_controller)
+        self.timer_view.setMinimumHeight(400)
+        
+                     
+        
         self.timer_frame = QFrame()
         self.timer_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self.timer_frame.setStyleSheet("""
@@ -101,7 +96,7 @@ class SecondaryDisplay(QMainWindow):
         
         timer_layout = QVBoxLayout(self.timer_frame)
         
-        self.timer_label = QLabel("00:00")
+        self.timer_label = QLabel("")
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.timer_label.setStyleSheet("""
             color: #ffffff;
@@ -154,14 +149,42 @@ class SecondaryDisplay(QMainWindow):
         self.timer_controller.predicted_end_time_updated.connect(self._update_predicted_end_time)
         self.timer_controller.meeting_ended.connect(self._meeting_ended)
         self.timer_controller.timer.meeting_countdown_updated.connect(self._update_countdown)
+        self.timer_controller.timer.current_time_updated.connect(self._update_current_time)
+        
+    def _update_current_time(self, time_str: str):
+        """Update the current time display when in stopped state"""
+        if self.timer_controller.timer.state == TimerState.STOPPED:
+            # Update with current time when in stopped state
+            self.timer_label.setText(time_str)
+            
+            # Make sure the time is visible with appropriate styling
+            self.timer_label.setStyleSheet("""
+                color: #ffffff; 
+                font-size: 400px;
+                font-weight: bold;
+                font-family: 'Courier New', monospace;
+            """)
     
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message"""
         if seconds_remaining > 0:
-            self.countdown_label.setText(message)
-            self.countdown_label.setVisible(True)
+            # If meeting not started, update info panel with countdown
+            if self.timer_controller.timer.state == TimerState.STOPPED and self.timer_controller.current_part_index == -1:
+                # Show the countdown message in the next_part_label
+                self.next_part_label.setText(message)
+                self.end_time_label.setText("")
+                
+                # Set style for countdown message
+                self.next_part_label.setStyleSheet("""
+                    color: #4a90e2; 
+                    font-size: 60px;
+                    font-weight: bold;
+                """)
         else:
-            self.countdown_label.setVisible(False)
+            # Reset labels when countdown ends
+            if self.timer_controller.timer.state == TimerState.STOPPED and self.timer_controller.current_part_index == -1:
+                self.next_part_label.setText("")
+                self.end_time_label.setText("")
     
     def _update_time(self, seconds: int):
         """Update the timer display"""
@@ -182,14 +205,16 @@ class SecondaryDisplay(QMainWindow):
             else:
                 color = "#00cc00"  # Green for normal running
         
-        # Update timer display
-        self.timer_label.setText(time_str)
-        self.timer_label.setStyleSheet(f"""
-            color: {color};
-            font-size: 400px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-        """)
+        # Only update timer if not in STOPPED state (otherwise show current time)
+        if self.timer_controller.timer.state != TimerState.STOPPED:
+            # Update timer display
+            self.timer_label.setText(time_str)
+            self.timer_label.setStyleSheet(f"""
+                color: {color};
+                font-size: 400px;
+                font-weight: bold;
+                font-family: 'Courier New', monospace;
+            """)
     
     def _update_timer_state(self, state: TimerState):
         """Update UI based on timer state"""
@@ -214,6 +239,13 @@ class SecondaryDisplay(QMainWindow):
         """Update display when current part changes"""
         # Update next part information
         parts = self.timer_controller.parts_list
+        
+        # Reset styling of next_part_label when part changes
+        self.next_part_label.setStyleSheet("""
+            color: #ffffff; 
+            font-size: 60px;
+            font-weight: bold;
+        """)
         
         # Check if there's a next part
         if index + 1 < len(parts):
@@ -341,14 +373,6 @@ class SecondaryDisplay(QMainWindow):
         self.next_part_label.setText("Meeting Completed")
         self.end_time_label.setText("")
         
-        # Clear the timer
-        self.timer_label.setText("00:00")
-        self.timer_label.setStyleSheet("""
-            color: #ffffff; 
-            font-size: 420px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-        """)
     
     def show(self):
         """Override show to always show in fullscreen"""

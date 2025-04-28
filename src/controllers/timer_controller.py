@@ -55,6 +55,11 @@ class TimerController(QObject):
         self._predicted_end_time = None
         self._remaining_parts_duration = 0
         
+        # Meeting countdown tracking
+        self._countdown_timer = QTimer(self)
+        self._countdown_timer.setInterval(1000)  # Update every second
+        self._countdown_timer.timeout.connect(self._update_meeting_countdown)
+        
         # Connect timer signals
         self.timer.state_changed.connect(self._handle_timer_state_change)
         self.timer.time_updated.connect(self._handle_time_update)
@@ -69,6 +74,10 @@ class TimerController(QObject):
         self.current_meeting = meeting
         self.current_part_index = -1
         self.parts_list = meeting.get_all_parts()
+        
+        # Stop any previous timer and show current time
+        self.timer.stop()
+        self.timer.start_current_time_display()
         
         # Initialize countdown to meeting start time
         self._initialize_meeting_countdown()
@@ -88,11 +97,69 @@ class TimerController(QObject):
         # Only set countdown if meeting is in the future
         now = datetime.now()
         if target_datetime > now:
-            # Set countdown target
+            # Set countdown target - this will trigger countdown updates
             self.timer.set_meeting_target_time(target_datetime)
+            
+            # Make sure we're in stopped state to show current time
+            if self.timer.state != TimerState.STOPPED:
+                self.timer.stop()
+                self.timer.start_current_time_display()
+            
+            # Start the countdown timer if not already running
+            if not self._countdown_timer.isActive():
+                self._countdown_timer.start()
+                
+            # Emit the countdown signal with target time
+            self.countdown_started.emit(target_datetime)
         else:
             # Meeting time has passed, clear any countdown
             self.timer._target_meeting_time = None
+            
+            # Stop the countdown timer if it's running
+            if self._countdown_timer.isActive():
+                self._countdown_timer.stop()
+                
+    def _update_meeting_countdown(self):
+        """Update the meeting countdown display"""
+        if not self.current_meeting:
+            return
+            
+        # Calculate time until meeting
+        meeting_datetime = datetime.combine(
+            self.current_meeting.date, 
+            self.current_meeting.start_time
+        )
+        
+        # Get current time
+        now = datetime.now()
+        
+        # Calculate time difference
+        time_diff = meeting_datetime - now
+        seconds_remaining = int(time_diff.total_seconds())
+        
+        # Format countdown message
+        if seconds_remaining > 0:
+            if seconds_remaining >= 3600:  # More than an hour
+                hours = seconds_remaining // 3600
+                minutes = (seconds_remaining % 3600) // 60
+                countdown_msg = f"Meeting starts in {hours}h {minutes}m"
+            else:  # Less than an hour
+                minutes = seconds_remaining // 60
+                seconds = seconds_remaining % 60
+                countdown_msg = f"Meeting starts in {minutes}m {seconds}s"
+                
+            # Check if we should auto-start the meeting (when countdown reaches 0)
+            if seconds_remaining <= 5 and self.timer.state == TimerState.STOPPED:
+                # Automatically start the meeting when countdown reaches 0
+                QTimer.singleShot(seconds_remaining * 1000, self.start_meeting)
+        else:
+            countdown_msg = "Meeting time has arrived"
+            # Stop the countdown timer
+            self._countdown_timer.stop()
+            
+            # Auto-start the meeting if not already started
+            if self.timer.state == TimerState.STOPPED:
+                self.start_meeting()
     
     def start_meeting(self):
         """Start the current meeting"""
@@ -117,6 +184,10 @@ class TimerController(QObject):
         
         # Start timer for first part
         self.timer.start(current_part.duration_seconds)
+        
+        # Stop the countdown timer if running
+        if self._countdown_timer.isActive():
+            self._countdown_timer.stop()
         
         # Emit signals
         self.part_changed.emit(current_part, self.current_part_index)

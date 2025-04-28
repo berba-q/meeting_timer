@@ -165,6 +165,8 @@ class Timer(QObject):
         self.state_changed.emit(self._state)
         self._remaining_seconds = 0
         self.time_updated.emit(self._remaining_seconds)
+        # Update to show current time when stopped
+        self._update_current_time()
     
     def reset(self):
         """Reset the timer without stopping it"""
@@ -206,6 +208,9 @@ class Timer(QObject):
         """Start a countdown to a specific date/time"""
         self._state = TimerState.COUNTDOWN
         self.state_changed.emit(self._state)
+        
+        # Set the target meeting time
+        self._target_meeting_time = target_datetime
         
         # Calculate initial remaining time
         now = datetime.now()
@@ -256,3 +261,22 @@ class Timer(QObject):
                 self.stop()
                 
             self.time_updated.emit(self._remaining_seconds)
+            
+            # Also update the meeting countdown message
+            if self._target_meeting_time:
+                now_datetime = datetime.now()
+                time_diff = self._target_meeting_time - now_datetime
+                seconds_remaining = int(time_diff.total_seconds())
+                
+                if seconds_remaining > 0:
+                    hours, remainder = divmod(seconds_remaining, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    
+                    if hours > 0:
+                        countdown_msg = f"Meeting starts in {hours}h {minutes}m {seconds}s"
+                    else:
+                        countdown_msg = f"Meeting starts in {minutes}m {seconds}s"
+                        
+                    self.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
+                else:
+                    self.meeting_countdown_updated.emit(0, "Meeting time has arrived")

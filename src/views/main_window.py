@@ -2,6 +2,7 @@
 Main application window for the JW Meeting Timer.
 """
 import os
+from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QComboBox, QTabWidget, QMessageBox,
@@ -67,11 +68,88 @@ class MainWindow(QMainWindow):
         # Update the meeting selector with available meetings
         self._update_meeting_selector()
         
+        # Auto-select the appropriate meeting based on current day
+        self._auto_select_current_meeting()
+        
         # If we have a current meeting, initialize the countdown
         if self.meeting_controller.current_meeting:
             meeting = self.meeting_controller.current_meeting
             self.timer_controller.set_meeting(meeting)
             self.meeting_view.set_meeting(meeting)
+    
+    def _auto_select_current_meeting(self):
+        """Automatically select the appropriate meeting based on the current day"""
+        if not self.meeting_controller.current_meetings:
+            return
+        
+        # Get current date and settings
+        now = datetime.now()
+        current_day = now.weekday()  # 0 = Monday, 6 = Sunday
+        settings = self.settings_controller.get_settings()
+        
+        # Get configured days from settings
+        midweek_day = settings.midweek_meeting.day.value  # Day of week (0-6)
+        weekend_day = settings.weekend_meeting.day.value  # Day of week (0-6)
+        
+        meeting_to_select = None
+        
+        # First check if today is either meeting day
+        if current_day == midweek_day and MeetingType.MIDWEEK in self.meeting_controller.current_meetings:
+            meeting_to_select = self.meeting_controller.current_meetings[MeetingType.MIDWEEK]
+        elif current_day == weekend_day and MeetingType.WEEKEND in self.meeting_controller.current_meetings:
+            meeting_to_select = self.meeting_controller.current_meetings[MeetingType.WEEKEND]
+        else:
+            # If today isn't a meeting day, find the next meeting day
+            days_to_midweek = (midweek_day - current_day) % 7
+            days_to_weekend = (weekend_day - current_day) % 7
+            
+            # Choose the closest upcoming meeting
+            if days_to_midweek < days_to_weekend:
+                if MeetingType.MIDWEEK in self.meeting_controller.current_meetings:
+                    meeting_to_select = self.meeting_controller.current_meetings[MeetingType.MIDWEEK]
+            else:
+                if MeetingType.WEEKEND in self.meeting_controller.current_meetings:
+                    meeting_to_select = self.meeting_controller.current_meetings[MeetingType.WEEKEND]
+        
+        # If we found a meeting to select, update the selector and set current meeting
+        if meeting_to_select:
+            # Find the meeting in the selector
+            for i in range(self.meeting_selector.count()):
+                meeting = self.meeting_selector.itemData(i)
+                if meeting and meeting.meeting_type == meeting_to_select.meeting_type:
+                    self.meeting_selector.setCurrentIndex(i)
+                    break
+            
+            # Set as current meeting
+            self.meeting_controller.set_current_meeting(meeting_to_select)
+            
+    def _update_countdown(self, seconds_remaining: int, message: str):
+        """Update the countdown message in the main window"""
+        # Update status bar with countdown message
+        if seconds_remaining > 0:
+            # Show countdown in status bar
+            self.current_part_label.setText(message)
+            
+            # If the secondary display exists, update it too
+            if self.secondary_display:
+                # Update the end_time_label in the info panel with countdown message
+                self.secondary_display.end_time_label.setText(message)
+                self.secondary_display.end_time_label.setStyleSheet("""
+                    color: #4a90e2; 
+                    font-size: 60px;
+                    font-weight: bold;
+                """)
+        else:
+            # Reset status bar when countdown ends
+            if self.meeting_controller.current_meeting:
+                meeting_title = self.meeting_controller.current_meeting.title
+                self.current_part_label.setText(f"Meeting: {meeting_title}")
+            else:
+                self.current_part_label.setText("No meeting selected")
+            
+            # Clear countdown message on secondary display
+            if self.secondary_display:
+                self.secondary_display.end_time_label.setText("")
     
     def _update_meeting_selector(self):
         """Update the meeting selector dropdown with available meetings"""
@@ -379,6 +457,7 @@ class MainWindow(QMainWindow):
         self.timer_controller.transition_started.connect(self._transition_started)
         self.timer_controller.meeting_overtime.connect(self._meeting_overtime)
         self.timer_controller.predicted_end_time_updated.connect(self._update_predicted_end_time)
+        self.timer_controller.timer.meeting_countdown_updated.connect(self._update_countdown)
         
         # Settings controller signals
         self.settings_controller.settings_changed.connect(self._settings_changed)
