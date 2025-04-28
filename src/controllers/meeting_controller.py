@@ -421,6 +421,9 @@ class MeetingController(QObject):
         """Set the currently active meeting"""
         self.current_meeting = meeting
         self.meeting_updated.emit(meeting)
+        
+        # Print debug info
+        print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
     
     def get_meeting(self, meeting_type: MeetingType) -> Optional[Meeting]:
         """Get a meeting by type"""

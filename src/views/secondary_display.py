@@ -82,9 +82,8 @@ class SecondaryDisplay(QMainWindow):
         
         # Large digital timer display - very prominent
         self.timer_view = TimerView(self.timer_controller)
-        self.timer_view.setMinimumHeight(400)
+        #self.timer_view.setMinimumHeight(400)
         
-                     
         
         self.timer_frame = QFrame()
         self.timer_frame.setFrameShape(QFrame.Shape.StyledPanel)
@@ -100,7 +99,7 @@ class SecondaryDisplay(QMainWindow):
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.timer_label.setStyleSheet("""
             color: #ffffff;
-            font-size: 400px;
+            font-size: 380px;
             font-weight: bold;
             font-family: 'Courier New', monospace;
         """)
@@ -119,22 +118,38 @@ class SecondaryDisplay(QMainWindow):
             }
         """)
         
-        info_layout = QVBoxLayout(self.info_frame)
-        info_layout.setSpacing(10)
+        self.info_layout = QVBoxLayout(self.info_frame)
+        self.info_layout.setSpacing(10)
+        
+        # Create a single label for pre-meeting countdown
+        self.countdown_message_label = QLabel("")
+        self.countdown_message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.countdown_message_label.setStyleSheet("""
+            color: #4a90e2; 
+            font-size: 80px;
+            font-weight: bold;
+        """)
+        self.countdown_message_label.setWordWrap(True)
+        self.info_layout.addWidget(self.countdown_message_label)
         
         # Next part label - combined "Next Part: [title]"
+         # Create but hide the meeting info labels
         self.next_part_label = QLabel("Next Part: ")
         self.next_part_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.next_part_label.setStyleSheet("color: #ffffff; font-size: 60px; font-weight: bold;")
         self.next_part_label.setWordWrap(True)
+        self.next_part_label.setVisible(False)
+        self.info_layout.addWidget(self.next_part_label)
         
         # Predicted end time
         self.end_time_label = QLabel("Predicted End: ")
         self.end_time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.end_time_label.setStyleSheet("color: #ffffff; font-size: 60px; font-weight: bold;")
+        self.end_time_label.setVisible(False)
+        self.info_layout.addWidget(self.end_time_label)
         
-        info_layout.addWidget(self.next_part_label)
-        info_layout.addWidget(self.end_time_label)
+        layout.addWidget(self.next_part_label)
+        layout.addWidget(self.end_time_label)
         
         # Add the main components to the layout
         layout.addWidget(self.timer_frame, 7)  # Timer gets more vertical space (7:2 ratio)
@@ -147,6 +162,7 @@ class SecondaryDisplay(QMainWindow):
         self.timer_controller.part_changed.connect(self._part_changed)
         self.timer_controller.transition_started.connect(self._transition_started)
         self.timer_controller.predicted_end_time_updated.connect(self._update_predicted_end_time)
+        self.timer_controller.meeting_started.connect(self._meeting_started)
         self.timer_controller.meeting_ended.connect(self._meeting_ended)
         self.timer_controller.timer.meeting_countdown_updated.connect(self._update_countdown)
         self.timer_controller.timer.current_time_updated.connect(self._update_current_time)
@@ -160,7 +176,7 @@ class SecondaryDisplay(QMainWindow):
             # Make sure the time is visible with appropriate styling
             self.timer_label.setStyleSheet("""
                 color: #ffffff; 
-                font-size: 400px;
+                font-size: 380px;
                 font-weight: bold;
                 font-family: 'Courier New', monospace;
             """)
@@ -171,8 +187,11 @@ class SecondaryDisplay(QMainWindow):
             # If meeting not started, update info panel with countdown
             if self.timer_controller.timer.state == TimerState.STOPPED and self.timer_controller.current_part_index == -1:
                 # Show the countdown message in the next_part_label
-                self.next_part_label.setText(message)
-                self.end_time_label.setText("")
+                self.countdown_message_label.setText(message)
+                self.countdown_message_label.setVisible(True)
+                self.next_part_label.setVisible(False)
+                self.end_time_label.setVisible(False)
+            
                 
                 # Set style for countdown message
                 self.next_part_label.setStyleSheet("""
@@ -185,6 +204,7 @@ class SecondaryDisplay(QMainWindow):
             if self.timer_controller.timer.state == TimerState.STOPPED and self.timer_controller.current_part_index == -1:
                 self.next_part_label.setText("")
                 self.end_time_label.setText("")
+                
     
     def _update_time(self, seconds: int):
         """Update the timer display"""
@@ -211,7 +231,7 @@ class SecondaryDisplay(QMainWindow):
             self.timer_label.setText(time_str)
             self.timer_label.setStyleSheet(f"""
                 color: {color};
-                font-size: 400px;
+                font-size: 380px;
                 font-weight: bold;
                 font-family: 'Courier New', monospace;
             """)
@@ -222,7 +242,7 @@ class SecondaryDisplay(QMainWindow):
             # Blue color for paused state
             self.timer_label.setStyleSheet("""
                 color: #3399ff; 
-                font-size: 400px;
+                font-size: 380px;
                 font-weight: bold;
                 font-family: 'Courier New', monospace;
             """)
@@ -230,7 +250,7 @@ class SecondaryDisplay(QMainWindow):
             # Purple color for transition state
             self.timer_label.setStyleSheet("""
                 color: #bb86fc; 
-                font-size: 400px;
+                font-size: 380px;
                 font-weight: bold;
                 font-family: 'Courier New', monospace;
             """)
@@ -366,6 +386,13 @@ class SecondaryDisplay(QMainWindow):
     
         # Set the text
         self.end_time_label.setText(time_text)
+        
+    def _meeting_started(self):
+        """Handle meeting start event"""
+        # Hide countdown message and show meeting info labels
+        self.countdown_message_label.setVisible(False)
+        self.next_part_label.setVisible(True)
+        self.end_time_label.setVisible(True)
     
     def _meeting_ended(self):
         """Handle meeting end"""

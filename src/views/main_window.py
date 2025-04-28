@@ -96,8 +96,10 @@ class MainWindow(QMainWindow):
         # First check if today is either meeting day
         if current_day == midweek_day and MeetingType.MIDWEEK in self.meeting_controller.current_meetings:
             meeting_to_select = self.meeting_controller.current_meetings[MeetingType.MIDWEEK]
+            print(f"Auto-selecting midweek meeting for today (day {current_day})")
         elif current_day == weekend_day and MeetingType.WEEKEND in self.meeting_controller.current_meetings:
             meeting_to_select = self.meeting_controller.current_meetings[MeetingType.WEEKEND]
+            print(f"Auto-selecting weekend meeting for today (day {current_day})")
         else:
             # If today isn't a meeting day, find the next meeting day
             days_to_midweek = (midweek_day - current_day) % 7
@@ -107,21 +109,34 @@ class MainWindow(QMainWindow):
             if days_to_midweek < days_to_weekend:
                 if MeetingType.MIDWEEK in self.meeting_controller.current_meetings:
                     meeting_to_select = self.meeting_controller.current_meetings[MeetingType.MIDWEEK]
+                    print(f"Auto-selecting next midweek meeting in {days_to_midweek} days")
             else:
                 if MeetingType.WEEKEND in self.meeting_controller.current_meetings:
                     meeting_to_select = self.meeting_controller.current_meetings[MeetingType.WEEKEND]
+                    print(f"Auto-selecting next weekend meeting in {days_to_weekend} days")
         
         # If we found a meeting to select, update the selector and set current meeting
         if meeting_to_select:
             # Find the meeting in the selector
+            found = False
             for i in range(self.meeting_selector.count()):
                 meeting = self.meeting_selector.itemData(i)
                 if meeting and meeting.meeting_type == meeting_to_select.meeting_type:
+                    print(f"Found meeting in selector at index {i}: {meeting.title}")
+                    # Temporarily disconnect signals to avoid recursive updates
+                    self.meeting_selector.blockSignals(True)
                     self.meeting_selector.setCurrentIndex(i)
+                    self.meeting_selector.blockSignals(False)
+                    found = True
                     break
             
-            # Set as current meeting
-            self.meeting_controller.set_current_meeting(meeting_to_select)
+            if found:
+                # Manually update everything with the selected meeting
+                self.meeting_controller.set_current_meeting(meeting_to_select)
+                self.timer_controller.set_meeting(meeting_to_select) 
+                self.meeting_view.set_meeting(meeting_to_select)
+            else:
+                print("Warning: Selected meeting not found in selector")
             
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message in the main window"""
@@ -132,24 +147,16 @@ class MainWindow(QMainWindow):
             
             # If the secondary display exists, update it too
             if self.secondary_display:
-                # Update the end_time_label in the info panel with countdown message
-                self.secondary_display.end_time_label.setText(message)
-                self.secondary_display.end_time_label.setStyleSheet("""
-                    color: #4a90e2; 
-                    font-size: 60px;
-                    font-weight: bold;
-                """)
+                # Update the countdown message label with the countdown
+                self.secondary_display.countdown_message_label.setText(message)
+                self.secondary_display.countdown_message_label.setVisible(True)
+                self.secondary_display.next_part_label.setVisible(False)
+                self.secondary_display.end_time_label.setVisible(False)
         else:
             # Reset status bar when countdown ends
             if self.meeting_controller.current_meeting:
                 meeting_title = self.meeting_controller.current_meeting.title
                 self.current_part_label.setText(f"Meeting: {meeting_title}")
-            else:
-                self.current_part_label.setText("No meeting selected")
-            
-            # Clear countdown message on secondary display
-            if self.secondary_display:
-                self.secondary_display.end_time_label.setText("")
     
     def _update_meeting_selector(self):
         """Update the meeting selector dropdown with available meetings"""
@@ -484,7 +491,10 @@ class MainWindow(QMainWindow):
         
         meeting = self.meeting_selector.itemData(index)
         if meeting:
+            # Update the current meeting in the controller
             self.meeting_controller.set_current_meeting(meeting)
+            
+            # Make sure the timer controller and meeting view are updated with the selected meeting
             self.timer_controller.set_meeting(meeting)
             self.meeting_view.set_meeting(meeting)
             
@@ -493,6 +503,10 @@ class MainWindow(QMainWindow):
             
             # Update status bar
             self.current_part_label.setText(f"Meeting: {meeting.title}")
+            
+            # Log the selection for debugging
+            print(f"Selected meeting: {meeting.title}, Type: {meeting.meeting_type.value}")
+
     
     def _meeting_updated(self, meeting):
         """Handle meeting update"""
@@ -537,6 +551,13 @@ class MainWindow(QMainWindow):
         self.next_button.setEnabled(True)
         self.decrease_button.setEnabled(True)
         self.increase_button.setEnabled(True)
+        
+        # If secondary display exists, update it too
+        if self.secondary_display:
+            # Hide countdown, show meeting info
+            self.secondary_display.countdown_message_label.setVisible(False)
+            self.secondary_display.next_part_label.setVisible(True)
+            self.secondary_display.end_time_label.setVisible(True)
     
     def _meeting_ended(self):
         """Handle meeting end"""
