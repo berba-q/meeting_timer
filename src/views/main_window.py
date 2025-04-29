@@ -75,7 +75,16 @@ class MainWindow(QMainWindow):
         if self.meeting_controller.current_meeting:
             meeting = self.meeting_controller.current_meeting
             self.timer_controller.set_meeting(meeting)
+            
+            # Force refresh of the meeting view
             self.meeting_view.set_meeting(meeting)
+            
+            # Ensure the status bar shows the correct meeting
+            self.current_part_label.setText(f"Meeting: {meeting.title}")
+            
+            # Debug output
+            print(f"Selected meeting in _initialize_timer_display: {meeting.title}, Type: {meeting.meeting_type.value}")
+            print(f"Sections: {[s.title for s in meeting.sections]}")
     
     def _auto_select_current_meeting(self):
         """Automatically select the appropriate meeting based on the current day"""
@@ -147,16 +156,24 @@ class MainWindow(QMainWindow):
             
             # If the secondary display exists, update it too
             if self.secondary_display:
-                # Update the countdown message label with the countdown
-                self.secondary_display.countdown_message_label.setText(message)
-                self.secondary_display.countdown_message_label.setVisible(True)
-                self.secondary_display.next_part_label.setVisible(False)
-                self.secondary_display.end_time_label.setVisible(False)
+                # Update the info label with just the countdown message
+                self.secondary_display.info_label1.setText(message)
+                self.secondary_display.info_label1.setStyleSheet("""
+                    color: #4a90e2; 
+                    font-size: 80px;
+                    font-weight: bold;
+                """)
+                # Clear the second label during countdown
+                self.secondary_display.info_label2.setText("")
+                # Set flag to track that we're showing countdown
+                self.secondary_display.show_countdown = True
         else:
             # Reset status bar when countdown ends
             if self.meeting_controller.current_meeting:
                 meeting_title = self.meeting_controller.current_meeting.title
                 self.current_part_label.setText(f"Meeting: {meeting_title}")
+            else:
+                self.current_part_label.setText("No meeting selected")
     
     def _update_meeting_selector(self):
         """Update the meeting selector dropdown with available meetings"""
@@ -496,7 +513,12 @@ class MainWindow(QMainWindow):
             
             # Make sure the timer controller and meeting view are updated with the selected meeting
             self.timer_controller.set_meeting(meeting)
+            # Force recreate the parts view by setting it to None then to the meeting
+            self.meeting_view.set_meeting(None)
             self.meeting_view.set_meeting(meeting)
+            
+            # Make sure the timer controller is updated with the selected meeting
+            self.timer_controller.set_meeting(meeting)
             
             # Initialize the meeting countdown
             self.timer_controller._initialize_meeting_countdown()
@@ -555,9 +577,9 @@ class MainWindow(QMainWindow):
         # If secondary display exists, update it too
         if self.secondary_display:
             # Hide countdown, show meeting info
-            self.secondary_display.countdown_message_label.setVisible(False)
-            self.secondary_display.next_part_label.setVisible(True)
-            self.secondary_display.end_time_label.setVisible(True)
+            self.secondary_display.info_label1(False)
+            self.secondary_display.info_label1(True)
+            self.secondary_display.info_label2(True)
     
     def _meeting_ended(self):
         """Handle meeting end"""

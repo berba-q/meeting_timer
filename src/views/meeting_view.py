@@ -129,6 +129,8 @@ class MeetingView(QWidget):
     def set_meeting(self, meeting: Meeting):
         """Set the current meeting to display"""
         self.meeting = meeting
+        # Clear the tree first
+        self.parts_tree.clear()
         self._update_display()
     
     def _update_display(self):
