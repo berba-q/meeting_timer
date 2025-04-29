@@ -12,6 +12,7 @@ from src.models.settings import (
     DisplaySettings, DayOfWeek, TimerDisplayMode, 
     MeetingSourceMode, MeetingSourceSettings
 )
+from src.models.settings import NetworkDisplayMode, NetworkDisplaySettings
 
 
 class SettingsController(QObject):
@@ -25,6 +26,9 @@ class SettingsController(QObject):
     meeting_source_mode_changed = pyqtSignal(MeetingSourceMode)
     primary_screen_changed = pyqtSignal(int)  # Emits the new primary screen index
     secondary_screen_changed = pyqtSignal(int, bool)  # Emits (screen_index, enabled)
+    network_display_mode_changed = pyqtSignal(NetworkDisplayMode)
+    network_display_ports_changed = pyqtSignal(int, int)  # HTTP port, WS port
+    network_display_options_changed = pyqtSignal(bool, bool)  # Auto-start, QR code
     
     def __init__(self, settings_manager: SettingsManager):
         super().__init__()
@@ -189,6 +193,34 @@ class SettingsController(QObject):
             if settings.display.secondary_screen_index is None and screens:
                 settings.display.secondary_screen_index = primary_index
                 settings.display.use_secondary_screen = False
+                
+    def set_network_display_mode(self, mode: NetworkDisplayMode):
+        """Set network display mode"""
+        if mode != self.settings_manager.settings.network_display.mode:
+            self.settings_manager.settings.network_display.mode = mode
+            self.settings_manager.save_settings()
+            self.network_display_mode_changed.emit(mode)
+            self.settings_changed.emit()
+
+    def set_network_display_ports(self, http_port: int, ws_port: int):
+        """Set network display ports"""
+        settings = self.settings_manager.settings.network_display
+        if http_port != settings.http_port or ws_port != settings.ws_port:
+            settings.http_port = http_port
+            settings.ws_port = ws_port
+            self.settings_manager.save_settings()
+            self.network_display_ports_changed.emit(http_port, ws_port)
+            self.settings_changed.emit()
+
+    def set_network_display_options(self, auto_start: bool, qr_code_enabled: bool):
+        """Set network display options"""
+        settings = self.settings_manager.settings.network_display
+        if auto_start != settings.auto_start or qr_code_enabled != settings.qr_code_enabled:
+            settings.auto_start = auto_start
+            settings.qr_code_enabled = qr_code_enabled
+            self.settings_manager.save_settings()
+            self.network_display_options_changed.emit(auto_start, qr_code_enabled)
+            self.settings_changed.emit()
         
         # Save updated settings
         self.settings_manager.save_settings()

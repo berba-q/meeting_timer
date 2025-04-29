@@ -3,6 +3,7 @@ JW Meeting Timer - A cross-platform timer application for managing meeting sched
 """
 import sys
 import os
+#import qrcode
 from datetime import datetime
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,

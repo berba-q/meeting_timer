@@ -3,6 +3,8 @@ Settings dialog for the JW Meeting Timer application.
 """
 import os
 from datetime import time
+import qrcode
+from io import BytesIO
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QComboBox, QCheckBox, QTimeEdit, QPushButton,
@@ -10,6 +12,11 @@ from PyQt6.QtWidgets import (
     QRadioButton, QButtonGroup
 )
 from PyQt6.QtCore import Qt, QTime
+from PyQt6.QtGui import QPixmap, QImage
+
+
+from src.models.settings import NetworkDisplayMode
+from src.utils.qr_code_utility import generate_qr_code
 
 from src.utils.screen_handler import ScreenHandler
 from src.controllers.settings_controller import SettingsController
@@ -57,17 +64,20 @@ class SettingsDialog(QDialog):
         self.meetings_tab = QWidget()
         self.display_tab = QWidget()
         self.meeting_source_tab = QWidget()  # New tab for meeting source options
+        self.network_display_tab = QWidget()  # Setup network display tab
         
         self._setup_general_tab()
         self._setup_meetings_tab()
         self._setup_display_tab()
         self._setup_meeting_source_tab()  # Setup new tab
+        self._setup_network_display_tab()  # Setup network display tab
         
         # Add tabs to tab widget
         self.tab_widget.addTab(self.general_tab, "General")
         self.tab_widget.addTab(self.meetings_tab, "Meetings")
         self.tab_widget.addTab(self.display_tab, "Display")
         self.tab_widget.addTab(self.meeting_source_tab, "Meeting Source")
+        self.tab_widget.addTab(self.network_display_tab, "Network Display")
         
         # Add tab widget to layout
         layout.addWidget(self.tab_widget)
@@ -384,6 +394,21 @@ class SettingsDialog(QDialog):
         
         # Update visibility based on current settings
         self._update_source_options_visibility()
+        
+        
+        # Network display settings
+        if hasattr(self, 'network_mode_radios'):
+            network_mode = settings.network_display.mode
+            if network_mode in self.network_mode_radios:
+                self.network_mode_radios[network_mode].setChecked(True)
+            
+            self.http_port_spin.setValue(settings.network_display.http_port)
+            self.ws_port_spin.setValue(settings.network_display.ws_port)
+            self.auto_start_check.setChecked(settings.network_display.auto_start)
+            self.qr_code_check.setChecked(settings.network_display.qr_code_enabled)
+
+        # Update UI state based on current settings
+        self._update_network_display_ui_state()
     
     def _apply_settings(self):
         """Apply settings changes"""
@@ -434,6 +459,146 @@ class SettingsDialog(QDialog):
         self.settings_controller.set_auto_update_meetings(self.auto_update_check.isChecked())
         self.settings_controller.set_save_scraped_as_template(self.save_scraped_check.isChecked())
         self.settings_controller.set_weekend_songs_manual(self.weekend_songs_manual_check.isChecked())
+        
+        # Network display settings
+        for mode, radio in self.network_mode_radios.items():
+            if radio.isChecked():
+                self.settings_controller.set_network_display_mode(mode)
+                break
+
+        self.settings_controller.set_network_display_ports(
+            self.http_port_spin.value(),
+            self.ws_port_spin.value()
+        )
+
+        self.settings_controller.set_network_display_options(
+            self.auto_start_check.isChecked(),
+            self.qr_code_check.isChecked()
+        )
+        
+    def _setup_network_display_tab(self):
+        """Setup network display tab in the settings dialog"""
+        layout = QVBoxLayout(self.network_display_tab)
+        
+        # Network Display Mode group
+        mode_group = QGroupBox("Network Display Mode")
+        mode_layout = QVBoxLayout(mode_group)
+        
+        # Create radio buttons for each mode
+        self.network_mode_radios = {}
+        self.network_mode_group = QButtonGroup(self)
+        
+        # Disabled mode
+        self.disabled_radio = QRadioButton("Disabled (No network display)")
+        self.network_mode_radios[NetworkDisplayMode.DISABLED] = self.disabled_radio
+        self.network_mode_group.addButton(self.disabled_radio)
+        mode_layout.addWidget(self.disabled_radio)
+        
+        # WebSocket only mode
+        self.ws_only_radio = QRadioButton("WebSocket Only (Use your own web page)")
+        self.network_mode_radios[NetworkDisplayMode.WEB_SOCKET_ONLY] = self.ws_only_radio
+        self.network_mode_group.addButton(self.ws_only_radio)
+        mode_layout.addWidget(self.ws_only_radio)
+        
+        # HTTP and WebSocket mode
+        self.http_ws_radio = QRadioButton("HTTP and WebSocket (Complete solution)")
+        self.network_mode_radios[NetworkDisplayMode.HTTP_AND_WS] = self.http_ws_radio
+        self.network_mode_group.addButton(self.http_ws_radio)
+        mode_layout.addWidget(self.http_ws_radio)
+        
+        # Add description about each mode
+        mode_desc = QLabel(
+            "Disabled: No network display is provided.\n\n"
+            "WebSocket Only: Broadcasts timer data over WebSocket only. "
+            "Use this if you have your own HTML/JS client.\n\n"
+            "HTTP and WebSocket: Provides both a WebSocket server for the data "
+            "and an HTTP server to serve the display page to clients."
+        )
+        mode_desc.setWordWrap(True)
+        mode_layout.addWidget(mode_desc)
+        
+        # Ports group
+        ports_group = QGroupBox("Network Ports")
+        ports_layout = QFormLayout(ports_group)
+        
+        # HTTP port
+        self.http_port_spin = QSpinBox()
+        self.http_port_spin.setRange(1024, 65535)  # Common non-privileged port range
+        self.http_port_spin.setValue(8080)
+        self.http_port_spin.setToolTip("Port for the HTTP server (client web page)")
+        ports_layout.addRow("HTTP Port:", self.http_port_spin)
+        
+        # WebSocket port
+        self.ws_port_spin = QSpinBox()
+        self.ws_port_spin.setRange(1024, 65535)
+        self.ws_port_spin.setValue(8765)
+        self.ws_port_spin.setToolTip("Port for the WebSocket server (timer data)")
+        ports_layout.addRow("WebSocket Port:", self.ws_port_spin)
+        
+        # Options group
+        options_group = QGroupBox("Network Options")
+        options_layout = QVBoxLayout(options_group)
+        
+        # Auto-start option
+        self.auto_start_check = QCheckBox("Auto-start network display when application launches")
+        self.auto_start_check.setToolTip("Automatically start the network display when the application starts")
+        options_layout.addWidget(self.auto_start_check)
+        
+        # QR code option
+        self.qr_code_check = QCheckBox("Show QR code for easy connection")
+        self.qr_code_check.setToolTip("Display a QR code in the main window for easy connection from mobile devices")
+        options_layout.addWidget(self.qr_code_check)
+        
+        # Connection help
+        help_group = QGroupBox("Connection Help")
+        help_layout = QVBoxLayout(help_group)
+        
+        help_label = QLabel(
+            "To connect to the network display:\n\n"
+            "1. Make sure all devices are on the same network (LAN/WiFi)\n"
+            "2. Start the network display from the main window\n"
+            "3. On client devices, open a web browser and enter the URL shown\n"
+            "4. For easy connection from mobile devices, scan the QR code"
+        )
+        help_label.setWordWrap(True)
+        help_layout.addWidget(help_label)
+        
+        # QR code preview (will be populated when network display is active)
+        self.qr_placeholder = QLabel("QR Code will be shown here when network display is active")
+        self.qr_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.qr_placeholder.setMinimumHeight(150)
+        help_layout.addWidget(self.qr_placeholder)
+        
+        # Add groups to layout
+        layout.addWidget(mode_group)
+        layout.addWidget(ports_group)
+        layout.addWidget(options_group)
+        layout.addWidget(help_group)
+        layout.addStretch()
+        
+        # Connect signals to update UI state
+        for mode, radio in self.network_mode_radios.items():
+            radio.toggled.connect(self._update_network_display_ui_state)
+    
+    def _update_network_display_ui_state(self):
+        """Update enabled state of network display UI elements based on selected mode"""
+        # Determine which mode is selected
+        selected_mode = None
+        for mode, radio in self.network_mode_radios.items():
+            if radio.isChecked():
+                selected_mode = mode
+                break
+        
+        # Enable/disable port settings based on mode
+        enabled = (selected_mode != NetworkDisplayMode.DISABLED)
+        self.ws_port_spin.setEnabled(enabled)
+        
+        # HTTP port only needed for HTTP_AND_WS mode
+        self.http_port_spin.setEnabled(selected_mode == NetworkDisplayMode.HTTP_AND_WS)
+        
+        # Options are only relevant if network display is enabled
+        self.auto_start_check.setEnabled(enabled)
+        self.qr_code_check.setEnabled(enabled)
     
     def _reset_settings(self):
         """Reset settings to defaults"""

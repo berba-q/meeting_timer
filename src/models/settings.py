@@ -26,7 +26,45 @@ class MeetingSourceMode(Enum):
     WEB_SCRAPING = 0  # Automatically scrape from web
     MANUAL_ENTRY = 1  # Manually enter meeting parts
     TEMPLATE_BASED = 2  # Use templates with manual adjustments
+    
+class NetworkDisplayMode(Enum):
+    """Modes for network display"""
+    DISABLED = 0
+    WEB_SOCKET_ONLY = 1
+    HTTP_AND_WS = 2
 
+@dataclass
+class NetworkDisplaySettings:
+    """Network display settings"""
+    mode: NetworkDisplayMode = NetworkDisplayMode.DISABLED
+    http_port: int = 8080
+    ws_port: int = 8765
+    auto_start: bool = False
+    qr_code_enabled: bool = True  # Enable QR code for easy mobile connection
+    
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage"""
+        return {
+            'mode': self.mode.value,
+            'http_port': self.http_port,
+            'ws_port': self.ws_port,
+            'auto_start': self.auto_start,
+            'qr_code_enabled': self.qr_code_enabled,
+            'network_display': self.network_display.to_dict()
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'NetworkDisplaySettings':
+        """Create from dictionary"""
+        return cls(
+            mode=NetworkDisplayMode(data.get('mode', NetworkDisplayMode.DISABLED.value)),
+            http_port=data.get('http_port', 8080),
+            ws_port=data.get('ws_port', 8765),
+            auto_start=data.get('auto_start', False),
+            qr_code_enabled=data.get('qr_code_enabled', True),
+            network_display=NetworkDisplaySettings.from_dict(data.get('network_display', {}))
+        )
 
 @dataclass
 class MeetingSettings:
@@ -130,6 +168,7 @@ class AppSettings:
     display: DisplaySettings = field(default_factory=DisplaySettings)
     meeting_source: MeetingSourceSettings = field(default_factory=MeetingSourceSettings)
     recent_meetings: List[str] = field(default_factory=list)  # List of meeting file paths
+    network_display: NetworkDisplaySettings = field(default_factory=NetworkDisplaySettings)
     
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
@@ -153,7 +192,6 @@ class AppSettings:
             meeting_source=MeetingSourceSettings.from_dict(data.get('meeting_source', {})),
             recent_meetings=data.get('recent_meetings', [])
         )
-
 
 class SettingsManager:
     """Manages loading and saving application settings"""

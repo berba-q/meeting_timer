@@ -5,12 +5,12 @@ import os
 from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QComboBox, QTabWidget, QMessageBox,
+    QLabel, QComboBox, QTabWidget, QMessageBox, QDockWidget,
     QSplitter, QFrame, QToolBar, QStatusBar, QMenuBar,
     QApplication, QSizePolicy
 )
 from PyQt6.QtGui import QIcon, QAction, QFont
-from PyQt6.QtCore import Qt, QSize, pyqtSlot
+from PyQt6.QtCore import Qt, QSize, pyqtSlot, QTimer, QEvent
 from PyQt6.QtWidgets import QDialog
 
 from src.utils.screen_handler import ScreenHandler
@@ -25,6 +25,9 @@ from src.views.meeting_view import MeetingView
 from src.views.settings_view import SettingsDialog
 from src.views.secondary_display import SecondaryDisplay
 from src.views.weekend_song_editor import WeekendSongEditorDialog
+from src.utils.network_display_manager import NetworkDisplayManager
+from src.views.network_status_widget import NetworkStatusWidget, NetworkInfoDialog
+from src.models.settings import NetworkDisplayMode
 
 
 class MainWindow(QMainWindow):
@@ -40,6 +43,23 @@ class MainWindow(QMainWindow):
         
         # Secondary display window
         self.secondary_display = None
+        
+        # Initialize network display manager
+        self.network_display_manager = NetworkDisplayManager(self.timer_controller, self.settings_controller.settings_manager)
+
+        # Create network status widget
+        self.network_status_widget = NetworkStatusWidget(self.network_display_manager)
+
+        # Create network status dock widget
+        self.network_dock = QDockWidget("Network Display", self)
+        self.network_dock.setWidget(self.network_status_widget)
+        self.network_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
+        self.network_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.network_dock)
+
+        # Hide dock by default unless network display is enabled
+        if self.settings_controller.get_settings().network_display.mode == NetworkDisplayMode.DISABLED:
+            self.network_dock.hide()
         
         # Setup UI
         self.setWindowTitle("JW Meeting Timer")
@@ -226,6 +246,12 @@ class MainWindow(QMainWindow):
         # This is the right time to initialize screens, after the window is fully created
         # and about to become visible
         self._initialize_screens()
+        
+        # Auto-start network display if enabled in settings
+        if self.settings_controller.get_settings().network_display.auto_start:
+            mode = self.settings_controller.get_settings().network_display.mode
+            if mode != NetworkDisplayMode.DISABLED:
+                QTimer.singleShot(1000, self._auto_start_network_display)
     
     def _create_menu_bar(self):
         """Create the application menu bar"""
@@ -268,6 +294,29 @@ class MainWindow(QMainWindow):
         
         file_menu.addSeparator()
         
+        # View menu
+        view_menu = menu_bar.addMenu("&View")
+        
+        # Network display actions
+        self.network_menu = view_menu.addMenu("&Network Display")
+
+        # Toggle network dock widget
+        toggle_network_dock_action = QAction("Show Network Panel", self)
+        toggle_network_dock_action.setCheckable(True)
+        toggle_network_dock_action.setChecked(self.network_dock.isVisible())
+        toggle_network_dock_action.triggered.connect(lambda checked: self.network_dock.setVisible(checked))
+        self.network_menu.addAction(toggle_network_dock_action)
+
+        # Start/stop network display
+        self.toggle_network_action = QAction("Start Network Display", self)
+        self.toggle_network_action.triggered.connect(self._toggle_network_display)
+        self.network_menu.addAction(self.toggle_network_action)
+
+        # Show network info
+        network_info_action = QAction("Network Display Info...", self)
+        network_info_action.triggered.connect(self._show_network_info)
+        self.network_menu.addAction(network_info_action)
+        
         # Settings
         settings_action = QAction(get_icon("settings"), "&Settings", self)
         settings_action.setShortcut("Ctrl+,")
@@ -282,8 +331,6 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
-        # View menu
-        view_menu = menu_bar.addMenu("&View")
         
         # Toggle secondary display
         self.toggle_secondary_action = QAction("Toggle &Secondary Display", self)
@@ -403,6 +450,52 @@ class MainWindow(QMainWindow):
         settings_button.setIcon(get_icon("settings"))
         settings_button.clicked.connect(self._open_settings)
         tool_bar.addWidget(settings_button)
+        
+    def _toggle_network_display(self):
+        """Toggle network display on/off"""
+        if self.network_display_manager.broadcaster.is_broadcasting:
+            # Stop network display
+            self.network_display_manager.stop_network_display()
+            self.toggle_network_action.setText("Start Network Display")
+        else:
+            # Start network display with current settings
+            mode = self.settings_controller.get_settings().network_display.mode
+            http_port = self.settings_controller.get_settings().network_display.http_port
+            ws_port = self.settings_controller.get_settings().network_display.ws_port
+            
+            # Show the network dock if it's not visible
+            if not self.network_dock.isVisible():
+                self.network_dock.show()
+            
+            # Start network display
+            if mode != NetworkDisplayMode.DISABLED:
+                self.network_display_manager.start_network_display(mode, http_port, ws_port)
+                self.toggle_network_action.setText("Stop Network Display")
+            else:
+                # Show message if network display is disabled in settings
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self,
+                    "Network Display Disabled",
+                    "Network display is disabled in settings. Please enable it in Settings > Network Display."
+                )
+    
+    def _show_network_info(self):
+        """Show network display information dialog"""
+        from src.views.network_status_widget import NetworkInfoDialog
+        dialog = NetworkInfoDialog(self.network_display_manager, self)
+        dialog.exec()
+        
+    def _auto_start_network_display(self):
+        """Auto-start network display with current settings"""
+        mode = self.settings_controller.get_settings().network_display.mode
+        http_port = self.settings_controller.get_settings().network_display.http_port
+        ws_port = self.settings_controller.get_settings().network_display.ws_port
+        
+        # Start network display
+        if mode != NetworkDisplayMode.DISABLED:
+            self.network_display_manager.start_network_display(mode, http_port, ws_port)
+            self.toggle_network_action.setText("Stop Network Display")
     
     def _create_central_widget(self):
         """Create the central widget with timer and meeting views"""
@@ -487,7 +580,27 @@ class MainWindow(QMainWindow):
         self.settings_controller.settings_changed.connect(self._settings_changed)
         self.settings_controller.display_mode_changed.connect(self._display_mode_changed)
         self.settings_controller.theme_changed.connect(self._theme_changed)
+        
+        # Connect network display manager signals
+        self.network_display_manager.display_started.connect(self._network_display_started)
+        self.network_display_manager.display_stopped.connect(self._network_display_stopped)
     
+    def _network_display_started(self, url):
+        """Handle network display started"""
+        # Update menu action text
+        self.toggle_network_action.setText("Stop Network Display")
+        
+        # Update status bar
+        self.statusBar().showMessage(f"Network display started at {url}", 5000)
+
+    def _network_display_stopped(self):
+        """Handle network display stopped"""
+        # Update menu action text
+        self.toggle_network_action.setText("Start Network Display")
+        
+        # Update status bar
+        self.statusBar().showMessage("Network display stopped", 5000)
+
     def _meetings_loaded(self, meetings):
         """Handle loaded meetings"""
         # Update meeting selector
