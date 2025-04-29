@@ -96,6 +96,9 @@ class MainWindow(QMainWindow):
             meeting = self.meeting_controller.current_meeting
             self.timer_controller.set_meeting(meeting)
             
+            # initialize countdown
+            self.timer_controller._initialize_meeting_countdown()
+            
             # Force refresh of the meeting view
             self.meeting_view.set_meeting(meeting)
             
