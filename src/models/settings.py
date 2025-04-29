@@ -50,8 +50,7 @@ class NetworkDisplaySettings:
             'http_port': self.http_port,
             'ws_port': self.ws_port,
             'auto_start': self.auto_start,
-            'qr_code_enabled': self.qr_code_enabled,
-            'network_display': self.network_display.to_dict()
+            'qr_code_enabled': self.qr_code_enabled
         }
     
     @classmethod
@@ -62,8 +61,7 @@ class NetworkDisplaySettings:
             http_port=data.get('http_port', 8080),
             ws_port=data.get('ws_port', 8765),
             auto_start=data.get('auto_start', False),
-            qr_code_enabled=data.get('qr_code_enabled', True),
-            network_display=NetworkDisplaySettings.from_dict(data.get('network_display', {}))
+            qr_code_enabled=data.get('qr_code_enabled', True)
         )
 
 @dataclass
@@ -178,7 +176,8 @@ class AppSettings:
             'weekend_meeting': self.weekend_meeting.to_dict(),
             'display': self.display.to_dict(),
             'meeting_source': self.meeting_source.to_dict(),
-            'recent_meetings': self.recent_meetings
+            'recent_meetings': self.recent_meetings,
+            'network_display': self.network_display.to_dict()
         }
     
     @classmethod
@@ -190,7 +189,8 @@ class AppSettings:
             weekend_meeting=MeetingSettings.from_dict(data.get('weekend_meeting', {})),
             display=DisplaySettings.from_dict(data.get('display', {})),
             meeting_source=MeetingSourceSettings.from_dict(data.get('meeting_source', {})),
-            recent_meetings=data.get('recent_meetings', [])
+            recent_meetings=data.get('recent_meetings', []),
+            network_display=NetworkDisplaySettings.from_dict(data.get('network_display', {}))
         )
 
 class SettingsManager:

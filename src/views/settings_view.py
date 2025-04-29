@@ -52,8 +52,8 @@ class SettingsDialog(QDialog):
     def _setup_ui(self):
         """Setup the UI components"""
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(500)
+        self.setMinimumWidth(540)
+        self.setMinimumHeight(600)
         
         layout = QVBoxLayout(self)
         
@@ -78,6 +78,7 @@ class SettingsDialog(QDialog):
         self.tab_widget.addTab(self.meetings_tab, "Meetings")
         self.tab_widget.addTab(self.display_tab, "Display")
         self.tab_widget.addTab(self.meeting_source_tab, "Meeting Source")
+        self.tab_widget.addTab(self.network_display_tab, "Network Display")
         
         
         # Add tab widget to layout with ScrollArea support
