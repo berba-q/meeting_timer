@@ -917,9 +917,19 @@ class MainWindow(QMainWindow):
             }
         """)
         
-        # Ensure timer display is properly styled
-        if hasattr(self.secondary_display, 'timer_view') and hasattr(self.secondary_display.timer_view, 'timer_label'):
-            self.secondary_display.timer_view.timer_label.setStyleSheet("color: #ffffff; font-weight: bold;")
+        # Check if the attribute exists before trying to access it
+        if hasattr(self.secondary_display, 'timer_view'):
+            if hasattr(self.secondary_display.timer_view, 'timer_label'):
+                self.secondary_display.timer_view.timer_label.setStyleSheet("color: #ffffff; font-weight: bold;")
+        
+        # Check for direct timer_label attribute in newer implementation
+        if hasattr(self.secondary_display, 'timer_label'):
+            self.secondary_display.timer_label.setStyleSheet("""
+                color: #ffffff;
+                font-size: 380px;
+                font-weight: bold;
+                font-family: 'Courier New', monospace;
+            """)
     
     def _start_meeting(self):
         """Start the current meeting"""
