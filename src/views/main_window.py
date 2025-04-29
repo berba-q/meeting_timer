@@ -535,9 +535,34 @@ class MainWindow(QMainWindow):
         self.meeting_view.set_meeting(meeting)
     
     def _part_changed(self, part, index):
-        """Handle part change"""
+        """Handle part change notification from timer controller"""
+        # Update status bar
         self.current_part_label.setText(f"Current part: {part.title} ({part.duration_minutes} min)")
+        
+        # Highlight the current part in the meeting view
         self.meeting_view.highlight_part(index)
+        
+        # Update secondary display if available
+        if self.secondary_display:
+            # Check if there's a next part
+            parts = self.timer_controller.parts_list
+            if index + 1 < len(parts):
+                next_part = parts[index + 1]
+                # Update info_label1 with next part info
+                self.secondary_display.info_label1.setText(f"Next Part: {next_part.title}")
+                self.secondary_display.info_label1.setStyleSheet("""
+                    color: #ffffff; 
+                    font-size: 60px;
+                    font-weight: bold;
+                """)
+            else:
+                # No next part (this is the last part)
+                self.secondary_display.info_label1.setText("Last Part")
+                self.secondary_display.info_label1.setStyleSheet("""
+                    color: #ffffff; 
+                    font-size: 60px;
+                    font-weight: bold;
+                """)
         
     def _part_updated(self, part, section_index, part_index):
         """Handle a part being updated"""
@@ -555,7 +580,7 @@ class MainWindow(QMainWindow):
                     self.timer_controller.part_changed.emit(part, global_part_index)
     
     def _meeting_started(self):
-        """Handle meeting start"""
+        """Handle meeting start event in the main window"""
         from src.utils.resources import get_icon
         
         self.start_button.setText("Stop Meeting")
@@ -564,9 +589,7 @@ class MainWindow(QMainWindow):
         self.start_button.setStyleSheet("")  # Force style refresh
         self.start_button.clicked.disconnect()
         self.start_button.clicked.connect(self._stop_meeting)
-    
-    
-        
+
         # Enable controls
         self.pause_resume_button.setEnabled(True)
         self.prev_button.setEnabled(True)
@@ -574,12 +597,27 @@ class MainWindow(QMainWindow):
         self.decrease_button.setEnabled(True)
         self.increase_button.setEnabled(True)
         
-        # If secondary display exists, update it too
+        # If secondary display exists, update it to show meeting info
         if self.secondary_display:
-            # Hide countdown, show meeting info
-            self.secondary_display.info_label1(False)
-            self.secondary_display.info_label1(True)
-            self.secondary_display.info_label2(True)
+            # Hide countdown, show part info
+            self.secondary_display.show_countdown = False
+            
+            # Set part information
+            parts = self.timer_controller.parts_list
+            if len(parts) > 1:
+                # Show current and next part info
+                self.secondary_display.info_label1.setText(f"Next Part: {parts[1].title}")
+                self.secondary_display.info_label1.setStyleSheet("""
+                    color: #ffffff; 
+                    font-size: 60px;
+                    font-weight: bold;
+                """)
+            else:
+                # Only one part in the meeting
+                self.secondary_display.info_label1.setText("Last Part")
+                
+            # Ensure both labels are visible
+            self.secondary_display.info_label2.setVisible(True)
     
     def _meeting_ended(self):
         """Handle meeting end"""
@@ -610,6 +648,20 @@ class MainWindow(QMainWindow):
         
         # Reset predicted end time
         self.predicted_end_time_label.setVisible(False)
+        
+        # Update secondary display
+        if self.secondary_display:
+            # Show meeting completed message
+            self.secondary_display.info_label1.setText("Meeting Completed")
+            self.secondary_display.info_label1.setStyleSheet("""
+                color: #ffffff; 
+                font-size: 60px;
+                font-weight: bold;
+            """)
+            # Clear predicted end time
+            self.secondary_display.info_label2.setText("")
+            # Reset countdown flag
+            self.secondary_display.show_countdown = False
     
     def _transition_started(self, transition_msg):
         """Handle chairman transition period"""
@@ -621,7 +673,13 @@ class MainWindow(QMainWindow):
         
         # Update secondary display if available
         if self.secondary_display:
-            self.secondary_display.next_part_label.setText(transition_msg)
+            # Use info_label1 instead of next_part_label in the new design
+            self.secondary_display.info_label1.setText(transition_msg)
+            self.secondary_display.info_label1.setStyleSheet("""
+                color: #bb86fc; /* Purple for transitions */
+                font-size: 60px;
+                font-weight: bold;
+            """)
     
     def _get_global_part_index(self, section_index, part_index):
         """Helper method to get global part index from section and part indices"""

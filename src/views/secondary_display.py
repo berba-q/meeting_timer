@@ -394,6 +394,13 @@ class SecondaryDisplay(QMainWindow):
                 font-size: 60px;
                 font-weight: bold;
             """)
+            
+            # Show the info labels for meeting info
+            self.info_label2.setVisible(True)
+        else:
+            # No next part (only one part in the meeting)
+            self.info_label1.setText("Last Part")
+            self.info_label2.setVisible(True)
     
     def _meeting_ended(self):
         """Handle meeting end"""
