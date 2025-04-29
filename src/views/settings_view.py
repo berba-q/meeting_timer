@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QComboBox, QCheckBox, QTimeEdit, QPushButton,
     QGroupBox, QFormLayout, QSpinBox, QDialogButtonBox,
-    QRadioButton, QButtonGroup
+    QRadioButton, QButtonGroup, QScrollArea, QLineEdit
 )
 from PyQt6.QtCore import Qt, QTime
 from PyQt6.QtGui import QPixmap, QImage
@@ -53,6 +53,7 @@ class SettingsDialog(QDialog):
         """Setup the UI components"""
         self.setWindowTitle("Settings")
         self.setMinimumWidth(500)
+        self.setMinimumHeight(500)
         
         layout = QVBoxLayout(self)
         
@@ -77,7 +78,16 @@ class SettingsDialog(QDialog):
         self.tab_widget.addTab(self.meetings_tab, "Meetings")
         self.tab_widget.addTab(self.display_tab, "Display")
         self.tab_widget.addTab(self.meeting_source_tab, "Meeting Source")
-        self.tab_widget.addTab(self.network_display_tab, "Network Display")
+        
+        
+        # Add tab widget to layout with ScrollArea support
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(self.tab_widget)
+        
+        # Set scroll policy to make scrollbars appear only when needed
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
         # Add tab widget to layout
         layout.addWidget(self.tab_widget)
@@ -96,6 +106,9 @@ class SettingsDialog(QDialog):
         button_box.button(QDialogButtonBox.StandardButton.Reset).clicked.connect(self._reset_settings)
         
         layout.addWidget(button_box)
+        
+        # Enforce reasonable size
+        self.resize(600, 600)
     
     def _setup_general_tab(self):
         """Setup general settings tab"""

@@ -124,14 +124,15 @@ class MainWindow(QMainWindow):
         weekend_day = settings.weekend_meeting.day.value  # Day of week (0-6)
         
         meeting_to_select = None
+        selection_reason = ""
         
         # First check if today is either meeting day
         if current_day == midweek_day and MeetingType.MIDWEEK in self.meeting_controller.current_meetings:
             meeting_to_select = self.meeting_controller.current_meetings[MeetingType.MIDWEEK]
-            print(f"Auto-selecting midweek meeting for today (day {current_day})")
+            selection_reason = f"Today is the midweek meeting day (day {current_day})"
         elif current_day == weekend_day and MeetingType.WEEKEND in self.meeting_controller.current_meetings:
             meeting_to_select = self.meeting_controller.current_meetings[MeetingType.WEEKEND]
-            print(f"Auto-selecting weekend meeting for today (day {current_day})")
+            selection_reason = f"Today is the weekend meeting day (day {current_day})"
         else:
             # If today isn't a meeting day, find the next meeting day
             days_to_midweek = (midweek_day - current_day) % 7
@@ -141,34 +142,58 @@ class MainWindow(QMainWindow):
             if days_to_midweek < days_to_weekend:
                 if MeetingType.MIDWEEK in self.meeting_controller.current_meetings:
                     meeting_to_select = self.meeting_controller.current_meetings[MeetingType.MIDWEEK]
-                    print(f"Auto-selecting next midweek meeting in {days_to_midweek} days")
+                    selection_reason = f"Midweek meeting is next (in {days_to_midweek} days)"
             else:
                 if MeetingType.WEEKEND in self.meeting_controller.current_meetings:
                     meeting_to_select = self.meeting_controller.current_meetings[MeetingType.WEEKEND]
-                    print(f"Auto-selecting next weekend meeting in {days_to_weekend} days")
+                    selection_reason = f"Weekend meeting is next (in {days_to_weekend} days)"
         
         # If we found a meeting to select, update the selector and set current meeting
         if meeting_to_select:
+            print(f"Auto-selecting meeting: {selection_reason}")
+            
             # Find the meeting in the selector
-            found = False
+            found_index = -1
             for i in range(self.meeting_selector.count()):
                 meeting = self.meeting_selector.itemData(i)
                 if meeting and meeting.meeting_type == meeting_to_select.meeting_type:
-                    print(f"Found meeting in selector at index {i}: {meeting.title}")
-                    # Temporarily disconnect signals to avoid recursive updates
-                    self.meeting_selector.blockSignals(True)
-                    self.meeting_selector.setCurrentIndex(i)
-                    self.meeting_selector.blockSignals(False)
-                    found = True
+                    found_index = i
                     break
             
-            if found:
-                # Manually update everything with the selected meeting
-                self.meeting_controller.set_current_meeting(meeting_to_select)
-                self.timer_controller.set_meeting(meeting_to_select) 
-                self.meeting_view.set_meeting(meeting_to_select)
+            if found_index >= 0:
+                # Temporarily block signals to avoid recursive updates
+                self.meeting_selector.blockSignals(True)
+                self.meeting_selector.setCurrentIndex(found_index)
+                self.meeting_selector.blockSignals(False)
+                
+                # Update controllers and views
+                self._set_current_meeting(meeting_to_select)
             else:
                 print("Warning: Selected meeting not found in selector")
+        else:
+            print("No appropriate meeting found to auto-select")
+            
+    def _set_current_meeting(self, meeting):
+        """Set the current meeting in all components safely"""
+        if not meeting:
+            return
+        
+        # Update the meeting controller
+        self.meeting_controller.set_current_meeting(meeting)
+        
+        # Update the timer controller with the selected meeting
+        self.timer_controller.set_meeting(meeting)
+        
+        # Update the meeting view
+        self.meeting_view.set_meeting(meeting)
+        
+        # Update status bar
+        self.current_part_label.setText(f"Meeting: {meeting.title}")
+        
+        # Initialize meeting countdown
+        self.timer_controller._initialize_meeting_countdown()
+        
+        print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
             
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message in the main window"""
@@ -618,32 +643,13 @@ class MainWindow(QMainWindow):
             self.meeting_selector.addItem(f"{meeting.title} ({date_str})", meeting)
     
     def _meeting_selected(self, index):
-        """Handle meeting selection change"""
+        """Handle meeting selection from the dropdown"""
         if index < 0 or self.meeting_selector.count() == 0:
             return
         
         meeting = self.meeting_selector.itemData(index)
         if meeting:
-            # Update the current meeting in the controller
-            self.meeting_controller.set_current_meeting(meeting)
-            
-            # Make sure the timer controller and meeting view are updated with the selected meeting
-            self.timer_controller.set_meeting(meeting)
-            # Force recreate the parts view by setting it to None then to the meeting
-            self.meeting_view.set_meeting(None)
-            self.meeting_view.set_meeting(meeting)
-            
-            # Make sure the timer controller is updated with the selected meeting
-            self.timer_controller.set_meeting(meeting)
-            
-            # Initialize the meeting countdown
-            self.timer_controller._initialize_meeting_countdown()
-            
-            # Update status bar
-            self.current_part_label.setText(f"Meeting: {meeting.title}")
-            
-            # Log the selection for debugging
-            print(f"Selected meeting: {meeting.title}, Type: {meeting.meeting_type.value}")
+            self._set_current_meeting(meeting)
 
     
     def _meeting_updated(self, meeting):
