@@ -1,6 +1,6 @@
 """
 Update checker for JW Meeting Timer application.
-Checks for updates against a GitHub repository.
+Thread-safe implementation that checks for updates against a GitHub repository.
 """
 import os
 import sys
@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QProgressBar, QMessageBox
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QTimer
 
 # Current version - this should match __version__ in src/__init__.py
 CURRENT_VERSION = "1.0.0"
@@ -25,16 +25,20 @@ CURRENT_VERSION = "1.0.0"
 # URL to check for updates
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/berba-q/meeting_timer/main/version.json"
 
-class UpdateWorker(QObject):
-    """Worker thread for checking updates"""
+class UpdateChecker(QObject):
+    """Thread-safe update checker"""
     
-    # Signals
+    # Signals for update status
     update_available = pyqtSignal(dict)
     no_update_available = pyqtSignal()
     error_occurred = pyqtSignal(str)
     
+    def __init__(self, parent=None, silent=False):
+        super().__init__(parent)
+        self.silent = silent
+        
     def check_for_updates(self):
-        """Check for updates from the repository"""
+        """Check for updates - called from a worker thread"""
         try:
             # Add a random query parameter to avoid caching
             cache_buster = f"?t={int(time.time())}"
@@ -50,9 +54,8 @@ class UpdateWorker(QObject):
                     self.update_available.emit(version_info)
                 else:
                     self.no_update_available.emit()
-                
         except Exception as e:
-            self.error_occurred.emit(f"Error checking for updates: {str(e)}")
+            self.error_occurred.emit(str(e))
     
     def _is_newer_version(self, remote_version: str) -> bool:
         """Compare version strings to determine if remote is newer"""
@@ -76,6 +79,7 @@ class UpdateDialog(QDialog):
         super().__init__(parent)
         self.version_info = version_info
         self.downloaded_file = None
+        self.download_thread = None
         
         # Setup UI
         self._setup_ui()
@@ -239,7 +243,8 @@ class UpdateDialog(QDialog):
                 subprocess.Popen([self.downloaded_file])
                 
             # Application will exit to complete installation
-            self.parent().close()
+            if self.parent():
+                self.parent().close()
             
         except Exception as e:
             QMessageBox.warning(self, "Install Failed", f"Failed to install update: {str(e)}")
@@ -335,118 +340,117 @@ class DownloadWorker(QObject):
             self.error_occurred.emit(f"Download failed: {str(e)}")
 
 
-def check_for_updates(parent=None, silent=False) -> Tuple[bool, Optional[Dict[str, Any]]]:
+def check_for_updates(parent=None, silent=False):
     """
-    Check for updates and show dialog if updates are available.
+    Thread-safe check for updates
     
     Args:
         parent: Parent widget for dialogs
         silent: If True, don't show dialogs for errors or "no updates"
         
     Returns:
-        Tuple of (update_available, version_info)
+        Thread object (you don't need to wait for it)
     """
-    # Create a dialog to show during check
-    if not silent:
+    # Create a checking dialog if not silent
+    checking_dialog = None
+    if not silent and parent:
         checking_dialog = QMessageBox(parent)
         checking_dialog.setWindowTitle("Checking for Updates")
         checking_dialog.setText("Checking for updates...")
-        checking_dialog.setIcon(QMessageBox.Icon.Information)
         checking_dialog.setStandardButtons(QMessageBox.StandardButton.NoButton)
         checking_dialog.show()
     
     # Create worker and thread
-    update_thread = QThread()
-    update_worker = UpdateWorker()
-    update_worker.moveToThread(update_thread)
-    
-    # Store result
-    result = [False, None]
+    thread = QThread(parent)
+    checker = UpdateChecker(None, silent)  # No parent for the checker
+    checker.moveToThread(thread)
     
     # Handle update available
     def on_update_available(version_info):
-        # Store result
-        result[0] = True
-        result[1] = version_info
-        
-        # Close checking dialog
-        if not silent:
+        # Close checking dialog if it exists
+        if checking_dialog:
             checking_dialog.accept()
         
         # Check if we should skip this version
         try:
             # Get the settings manager
             settings_file = os.path.join(os.path.expanduser("~"), ".jwmeetingtimer", "settings.json")
-            settings_manager = SettingsManager(settings_file)
-            
-            # Check for skipped version
-            if hasattr(settings_manager.settings, 'skipped_version'):
-                skipped_version = settings_manager.settings.skipped_version
-                if skipped_version == version_info.get('version', ''):
-                    # Skip this version
-                    return
+            if os.path.exists(settings_file):
+                from src.models.settings import SettingsManager
+                settings_manager = SettingsManager(settings_file)
+                
+                # Check for skipped version
+                if hasattr(settings_manager.settings, 'skipped_version'):
+                    skipped_version = settings_manager.settings.skipped_version
+                    if skipped_version == version_info.get('version', ''):
+                        # Skip this version
+                        cleanup()
+                        return
         except Exception as e:
             print(f"Failed to check skipped version: {e}")
         
-        # Show update dialog
-        if not silent:
+        # Show update dialog if not silent
+        if not silent and parent:
             update_dialog = UpdateDialog(version_info, parent)
             update_dialog.exec()
+        
+        # Clean up thread
+        cleanup()
     
     # Handle no update available
     def on_no_update():
-        # Store result
-        result[0] = False
-        
         # Close checking dialog
-        if not silent:
+        if checking_dialog:
             checking_dialog.accept()
             
-            # Show message
+        # Show message if not silent
+        if not silent and parent:
             QMessageBox.information(
                 parent,
                 "No Updates Available",
                 f"You are using the latest version ({CURRENT_VERSION})."
             )
+        
+        # Clean up thread
+        cleanup()
     
     # Handle error
     def on_error(error_message):
-        # Store result
-        result[0] = False
-        
         # Close checking dialog
-        if not silent:
+        if checking_dialog:
             checking_dialog.accept()
             
-            # Show error message
+        # Show error message if not silent
+        if not silent and parent:
             QMessageBox.warning(
                 parent,
                 "Update Check Failed",
                 f"Failed to check for updates:\n{error_message}"
             )
+        
+        # Clean up thread
+        cleanup()
     
-    # Connect signals
-    update_thread.started.connect(update_worker.check_for_updates)
-    update_worker.update_available.connect(on_update_available)
-    update_worker.no_update_available.connect(on_no_update)
-    update_worker.error_occurred.connect(on_error)
-    
-    # Ensure thread and worker are properly cleaned up
+    # Clean up thread and worker
     def cleanup():
-        update_thread.quit()
-        update_thread.wait()
+        checker.deleteLater()
+        thread.quit()
+        thread.wait()
     
-    update_worker.update_available.connect(cleanup)
-    update_worker.no_update_available.connect(cleanup)
-    update_worker.error_occurred.connect(cleanup)
+    # Connect signals (using QueuedConnection to ensure they run on main thread)
+    thread.started.connect(checker.check_for_updates)
+    checker.update_available.connect(on_update_available, type=Qt.ConnectionType.QueuedConnection)
+    checker.no_update_available.connect(on_no_update, type=Qt.ConnectionType.QueuedConnection)
+    checker.error_occurred.connect(on_error, type=Qt.ConnectionType.QueuedConnection)
+    
+    # Make sure thread is cleaned up when it finishes
+    thread.finished.connect(thread.deleteLater)
     
     # Start thread
-    update_thread.start()
+    thread.start()
     
-    # Wait for thread to finish
-    update_thread.wait()
-    
-    return result[0], result[1]
+    # Return thread so it doesn't get garbage collected
+    return thread
 
 
 if __name__ == "__main__":
@@ -455,9 +459,22 @@ if __name__ == "__main__":
     
     app = QApplication(sys.argv)
     
-    has_update, info = check_for_updates()
-    print(f"Update available: {has_update}")
-    if info:
-        print(f"Version: {info.get('version')}")
+    # Create a simple window
+    window = QDialog()
+    window.setWindowTitle("Update Checker Test")
+    window.resize(300, 100)
+    
+    layout = QVBoxLayout(window)
+    label = QLabel("Testing update checker...")
+    layout.addWidget(label)
+    
+    button = QPushButton("Check for Updates")
+    button.clicked.connect(lambda: check_for_updates(window, False))
+    layout.addWidget(button)
+    
+    window.show()
+    
+    # Run the update check after 1 second
+    QTimer.singleShot(1000, lambda: check_for_updates(window, False))
     
     sys.exit(app.exec())

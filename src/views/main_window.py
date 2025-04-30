@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QApplication, QSizePolicy
 )
 from PyQt6.QtGui import QIcon, QAction, QFont
-from PyQt6.QtCore import Qt, QSize, pyqtSlot, QTimer, QEvent
+from PyQt6.QtCore import Qt, QSize, pyqtSlot, QTimer, QEvent, QThread, pyqtSignal, QObject
 from PyQt6.QtWidgets import QDialog
 
 from src.utils.screen_handler import ScreenHandler
@@ -30,6 +30,31 @@ from src.views.network_status_widget import NetworkStatusWidget, NetworkInfoDial
 from src.models.settings import NetworkDisplayMode
 from src.utils.update_checker import check_for_updates
 
+
+class UpdateCheckWorker(QObject):
+    """Worker class for running update checks in a separate thread"""
+    finished = pyqtSignal()
+    
+    def __init__(self, silent=False):
+        super().__init__()
+        self.silent = silent
+    
+    def run(self):
+        """Run the update check"""
+        try:
+            # Get the main window reference
+            from PyQt6.QtWidgets import QApplication
+            main_window = QApplication.activeWindow()
+            
+            # Import the update checker
+            from src.utils.update_checker import check_for_updates
+            
+            # Run check on this thread
+            check_for_updates(main_window, self.silent)
+        except Exception as e:
+            print(f"Error checking for updates: {e}")
+        finally:
+            self.finished.emit()
 
 class MainWindow(QMainWindow):
     """Main application window"""
@@ -86,17 +111,33 @@ class MainWindow(QMainWindow):
     
     def _check_for_updates(self, silent=False):
         """Check for application updates"""
-        has_update, info = check_for_updates(self, silent)
-        if has_update:
-            # Update was handled by the update checker dialog
-            pass
-        elif not silent:
-            # No update available and not silent mode
-            QMessageBox.information(
-                self,
-                "No Updates Available",
-                f"You are using the latest version of JW Meeting Timer."
-            )
+        from src.utils.update_checker import check_for_updates
+        
+        # Store the thread reference so it doesn't get garbage collected
+        self.update_thread = check_for_updates(self, silent)
+        
+    
+    def _show_update_dialog(self, version_info):
+        """Show the update dialog (called from the main thread)"""
+        from src.utils.update_checker import UpdateDialog
+        dialog = UpdateDialog(version_info, self)
+        dialog.exec()
+    
+    def _show_no_update_message(self):
+        """Show no update available message"""
+        QMessageBox.information(
+            self,
+            "No Updates Available",
+            "You are using the latest version of JW Meeting Timer."
+        )
+    
+    def _show_update_error(self, error_message):
+        """Show update error message"""
+        QMessageBox.warning(
+            self,
+            "Update Check Failed",
+            f"Failed to check for updates:\n{error_message}"
+        )
     
     def _initialize_timer_display(self):
         """Initialize timer to show current time and meeting countdown"""
@@ -297,7 +338,7 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(1000, self._auto_start_network_display)
         
         # check for updates after a short delay
-        #QTimer.singleShot(2000, lambda: self._check_for_updates(True))
+        QTimer.singleShot(3000, lambda: self._check_for_updates(False))
     
     def _create_menu_bar(self):
         """Create the application menu bar"""
@@ -335,7 +376,7 @@ class MainWindow(QMainWindow):
         # Update meetings from web
         update_meetings_action = QAction(get_icon("increase"), "&Update Meetings from Web", self)
         update_meetings_action.setShortcut("F5")
-        update_meetings_action.triggered.connect(self._update_meetings)
+        update_meetings_action.triggered.connect(lambda: self._check_for_updates(False))
         file_menu.addAction(update_meetings_action)
         
         file_menu.addSeparator()
