@@ -5,10 +5,24 @@ import os
 import threading
 import socket
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+from functools import partial
 from typing import Dict, Optional
 from PyQt6.QtCore import QObject, pyqtSignal
 import traceback
 import time
+
+class RobustHTTPServer(HTTPServer):
+    """HTTP Server that's more tolerant of dropped connections"""
+    
+    def handle_error(self, request, client_address):
+        """Handle errors gracefully without stacktraces"""
+        print(f"Error handling request from {client_address}")
+    
+    def server_bind(self):
+        """Set socket options for address reuse"""
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        HTTPServer.server_bind(self)
 
 class CustomHandler(SimpleHTTPRequestHandler):
     """Custom HTTP request handler that serves the HTML page and handles socket errors gracefully"""
@@ -22,21 +36,31 @@ class CustomHandler(SimpleHTTPRequestHandler):
         
         try:
             super().__init__(*args, **kwargs)
-        except (ConnectionResetError, ConnectionAbortedError, socket.timeout, OSError) as e:
-            print(f"Connection error in CustomHandler: {e}")
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, socket.timeout, OSError) as e:
+            print(f"Connection error in CustomHandler initialization: {e}")
             # Don't reraise, let the handler gracefully terminate
     
     def handle(self):
         """Override handle method to catch socket errors"""
         try:
             super().handle()
-        except (ConnectionResetError, ConnectionAbortedError, socket.timeout, OSError) as e:
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, socket.timeout, OSError) as e:
             print(f"Socket error during request handling: {e}")
             # Don't reraise, let the handler gracefully terminate
+    
+    def handle_one_request(self):
+        """Override to catch socket errors at the request level"""
+        try:
+            return super().handle_one_request()
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, socket.timeout, OSError) as e:
+            print(f"Socket error during individual request: {e}")
+            self.close_connection = True
+            return
     
     def do_GET(self):
         """Handle GET requests"""
         try:
+            print(f"GET request path: {self.path}")
             if self.path == '/' or self.path == '/index.html':
                 self.send_response(200)
                 self.send_header('Content-type', 'text/html')
@@ -56,6 +80,7 @@ class CustomHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(b'Not Found')
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, socket.timeout, OSError) as e:
             print(f"Error serving GET request: {e}")
+            self.close_connection = True
             # Don't reraise, just log the error
     
     def log_message(self, format, *args):
@@ -286,6 +311,7 @@ class NetworkHTTPServer(QObject):
     def start_server(self, port: Optional[int] = None, ws_port: Optional[int] = None):
         """Start the HTTP server"""
         print(f"Attempting to start HTTP server on {self.host_ip}:{self.port}")
+        server_address = ('0.0.0.0', self.port)
         if self.is_running:
             print("Server is already running, not starting again")
             return
@@ -314,19 +340,28 @@ class NetworkHTTPServer(QObject):
                     ws_port=self.ws_port,
                     **kwargs
                 )
-            except Exception as e:
-                print(f"Error creating handler: {e}")
+            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, socket.timeout, OSError) as e:
+                print(f"Socket error during handler creation: {e}")
                 traceback.print_exc()
-                # Return a minimal handler if creation fails
-                return SimpleHTTPRequestHandler(*args, **kwargs)
+                # Return a dummy handler that does nothing
+                class DummyHandler(SimpleHTTPRequestHandler):
+                    def handle(self): pass
+                    def handle_one_request(self): pass
+                return DummyHandler(*args, **kwargs)
+            
+        handler_class = partial(CustomHandler, html_content=self.html_content, ws_port=self.ws_port)
+        self.server = RobustHTTPServer(server_address, handler_class)
         
         def run_server():
             try:
                 print(f"Binding server to {self.host_ip}:{self.port}")
-                server_address = (self.host_ip, self.port)
+                server_address = ('0.0.0.0', self.port)
                 
-                self.server = HTTPServer(server_address, handler_factory)
-                self.server.timeout = 1  # Set timeout to 1 second
+                self.server = RobustHTTPServer(server_address, handler_class)
+                self.server.timeout = 10  # Set timeout to 10 seconds
+                
+                # Set an explicit timeout on the socket
+                self.server.socket.settimeout(5)
                 
                 # Flag as running before emitting signal
                 self.is_running = True

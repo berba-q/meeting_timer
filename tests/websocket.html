@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="timer">--:--</div>
+    
+    <script>
+        const socket = new WebSocket('ws://10.50.17.110');
+        
+        socket.addEventListener('open', function (event) {
+            document.getElementById('status').textContent = 'Connected!';
+        });
+        
+        socket.addEventListener('message', function (event) {
+            const data = JSON.parse(event.data);
+            document.getElementById('timer').textContent = data.time;
+        });
+        
+        socket.addEventListener('close', function (event) {
+            document.getElementById('status').textContent = 'Disconnected';
+        });
+    </script>
+</body>
+</html>

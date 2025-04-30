@@ -99,7 +99,7 @@ class NetworkBroadcaster(QObject):
             # Create server with ping/pong enabled for better connection management
             self.server = await websockets.serve(
                 self._handler, 
-                self.host_ip, 
+                "0.0.0.0",  # Listen on all interfaces
                 self.port,
                 ping_interval=30,  # Send ping every 30 seconds
                 ping_timeout=10     # Wait 10 seconds for pong response
