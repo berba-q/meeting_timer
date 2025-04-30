@@ -28,6 +28,7 @@ from src.views.weekend_song_editor import WeekendSongEditorDialog
 from src.utils.network_display_manager import NetworkDisplayManager
 from src.views.network_status_widget import NetworkStatusWidget, NetworkInfoDialog
 from src.models.settings import NetworkDisplayMode
+from src.utils.update_checker import check_for_updates
 
 
 class MainWindow(QMainWindow):
@@ -82,6 +83,20 @@ class MainWindow(QMainWindow):
         
         # Load meetings
         self.meeting_controller.load_meetings()
+    
+    def _check_for_updates(self, silent=False):
+        """Check for application updates"""
+        has_update, info = check_for_updates(self, silent)
+        if has_update:
+            # Update was handled by the update checker dialog
+            pass
+        elif not silent:
+            # No update available and not silent mode
+            QMessageBox.information(
+                self,
+                "No Updates Available",
+                f"You are using the latest version of JW Meeting Timer."
+            )
     
     def _initialize_timer_display(self):
         """Initialize timer to show current time and meeting countdown"""
@@ -280,6 +295,9 @@ class MainWindow(QMainWindow):
             mode = self.settings_controller.get_settings().network_display.mode
             if mode != NetworkDisplayMode.DISABLED:
                 QTimer.singleShot(1000, self._auto_start_network_display)
+        
+        # check for updates after a short delay
+        #QTimer.singleShot(2000, lambda: self._check_for_updates(True))
     
     def _create_menu_bar(self):
         """Create the application menu bar"""
@@ -405,6 +423,13 @@ class MainWindow(QMainWindow):
         about_action = QAction("&About", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
+        
+        help_menu.addSeparator()
+        
+        # Check for updates
+        check_updates_action = QAction("&Check for Updates", self)
+        check_updates_action.triggered.connect(lambda: self._check_for_updates(False))
+        help_menu.addAction(check_updates_action)
     
     def _create_tool_bar(self):
         """Create the main toolbar"""
