@@ -1,0 +1,33 @@
+name: Bug Report
+description: Report a reproducible bug or crash
+title: "[Bug]: "
+labels: [ bug ]
+body:
+- type: textarea
+  attributes:
+    label: What happened?
+    description: Describe the bug and what you expected to happen
+  validations:
+    required: true
+
+- type: input
+  attributes:
+    label: App version
+    placeholder: "e.g. v1.01"
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Steps to reproduce
+    placeholder: |
+      1. Launch app
+      2. Click on Timer
+      3. Observe crash
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Additional context
+    description: Screenshots, logs, or notes
