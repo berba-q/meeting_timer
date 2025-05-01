@@ -153,7 +153,7 @@ class TimerController(QObject):
                 # Automatically start the meeting when countdown reaches 0
                 QTimer.singleShot(seconds_remaining * 1000, self.start_meeting)
         else:
-            countdown_msg = "Meeting time has arrived"
+            countdown_msg = "Meeting starts now!"
             # Stop the countdown timer
             self._countdown_timer.stop()
             
