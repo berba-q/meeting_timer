@@ -2,9 +2,10 @@
 This module provides functionality to broadcast timer data over the network.
 """
 import json
+import functools
 import asyncio
 import threading
-import websockets
+from websockets.legacy.server import serve, WebSocketServerProtocol
 import socket
 import time
 import traceback
@@ -31,7 +32,7 @@ class NetworkBroadcaster(QObject):
         self.thread = None
         
         # Connection tracking
-        self.connected_clients: Set[websockets.WebSocketServerProtocol] = set()
+        self.connected_clients: Set[WebSocketServerProtocol] = set()
         self.host_ip = self._get_local_ip()
         self.port = 8765  # Default WebSocket port
         self.is_broadcasting = False
@@ -71,19 +72,24 @@ class NetworkBroadcaster(QObject):
         
         # Send current state immediately upon connection
         try:
-            await websocket.send(json.dumps(self.current_state))
-        except Exception as e:
-            print(f"Error sending initial state to client {client_id}: {e}")
+            serialized = json.dumps(self.current_state)
+            print(f"Sending to client {client_id}: {serialized}")
+            await websocket.send(serialized)
+        except (TypeError, ValueError) as e:
+            print(f"[ERROR] Failed to serialize and send current_state to {client_id}: {e}")
+            print(f"[DEBUG] current_state was: {self.current_state}")
+            traceback.print_exc()
         
         try:
             # Keep connection open until client disconnects
             async for message in websocket:
                 # We don't expect messages from clients, but could handle commands here
                 pass
-        except websockets.exceptions.ConnectionClosed:
-            print(f"Client connection closed: {client_id}")
         except Exception as e:
-            print(f"Error in WebSocket handler for {client_id}: {e}")
+            if isinstance(e, ConnectionResetError) or isinstance(e, websockets.exceptions.ConnectionClosed):
+                print(f"Client connection closed: {client_id}")
+            else:
+                print(f"Error in WebSocket handler for {client_id}: {e}")
         finally:
             # Remove disconnected client
             self.connected_clients.remove(websocket)
@@ -97,12 +103,12 @@ class NetworkBroadcaster(QObject):
             print(f"Starting WebSocket server on {self.host_ip}:{self.port}")
             
             # Create server with ping/pong enabled for better connection management
-            self.server = await websockets.serve(
-                self._handler, 
-                "0.0.0.0",  # Listen on all interfaces
+            self.server = await serve(
+                self._handler,
+                "0.0.0.0",
                 self.port,
-                ping_interval=30,  # Send ping every 30 seconds
-                ping_timeout=10     # Wait 10 seconds for pong response
+                ping_interval=30,
+                ping_timeout=10
             )
             
             # Emit signal that broadcast has started
@@ -150,7 +156,13 @@ class NetworkBroadcaster(QObject):
             try:
                 asyncio.set_event_loop(self.event_loop)
                 self.server_task = self.event_loop.create_task(self._server_main())
-                self.event_loop.run_until_complete(self.server_task)
+                try:
+                    self.event_loop.run_until_complete(self.server_task)
+                except RuntimeError as e:
+                    if "Event loop stopped before Future completed" in str(e):
+                        print("[INFO] Event loop stopped cleanly before Future completed.")
+                    else:
+                        raise
             except Exception as e:
                 print(f"Error in WebSocket server thread: {e}")
                 traceback.print_exc()
@@ -185,8 +197,12 @@ class NetworkBroadcaster(QObject):
         
         # Close server and clean up
         if self.server:
+            async def shutdown_server():
+                self.server.close()
+                await self.server.wait_closed()
+
             if self.event_loop and self.event_loop.is_running():
-                self.event_loop.call_soon_threadsafe(lambda: self.server.close())
+                asyncio.run_coroutine_threadsafe(shutdown_server(), self.event_loop)
             
         # Stop the event loop
         if self.event_loop and self.event_loop.is_running():

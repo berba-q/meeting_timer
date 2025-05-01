@@ -290,6 +290,7 @@
             
             // Listen for messages
             socket.addEventListener('message', function(event) {
+                console.log("WebSocket message received:", event.data); 
                 try {
                     const data = JSON.parse(event.data);
                     updateDisplay(data);
