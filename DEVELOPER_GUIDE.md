@@ -27,8 +27,8 @@ src/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/jw-meeting-timer.git
-cd jw-meeting-timer
+git clone https://github.com/berba-q/meeting_timer.git
+cd meeting_timer
 ```
 
 2. Create and activate a virtual environment:
