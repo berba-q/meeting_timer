@@ -33,4 +33,4 @@ We use **Conventional Commits** to automatically generate changelogs and improve
 
 ### Example:
 ```bash
-git commit -m "feat: add splash screen with rotating witty messages"
+git commit -m "feat: add splash screen"
