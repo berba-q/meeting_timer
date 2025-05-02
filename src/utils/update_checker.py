@@ -475,6 +475,6 @@ if __name__ == "__main__":
     window.show()
     
     # Run the update check after 1 second
-    QTimer.singleShot(1000, lambda: check_for_updates(window, False))
+    #QTimer.singleShot(1000, lambda: check_for_updates(window, False))
     
     sys.exit(app.exec())
