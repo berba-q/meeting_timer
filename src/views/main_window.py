@@ -65,7 +65,7 @@ class MainWindow(QMainWindow):
         # Initialize controllers
         self.meeting_controller = meeting_controller
         self.settings_controller = SettingsController(self.meeting_controller.settings_manager)
-        self.timer_controller = TimerController()
+        self.timer_controller = TimerController(self.meeting_controller.settings_manager)
         
         # Secondary display window
         self.secondary_display = None
@@ -152,9 +152,6 @@ class MainWindow(QMainWindow):
             meeting = self.meeting_controller.current_meeting
             self.timer_controller.set_meeting(meeting)
             
-            # initialize countdown
-            self.timer_controller._initialize_meeting_countdown()
-            
             # Force refresh of the meeting view
             self.meeting_view.set_meeting(meeting)
             
@@ -162,8 +159,8 @@ class MainWindow(QMainWindow):
             self.current_part_label.setText(f"Meeting: {meeting.title}")
             
             # Debug output
-            print(f"Selected meeting in _initialize_timer_display: {meeting.title}, Type: {meeting.meeting_type.value}")
-            print(f"Sections: {[s.title for s in meeting.sections]}")
+            #print(f"Selected meeting in _initialize_timer_display: {meeting.title}, Type: {meeting.meeting_type.value}")
+            #print(f"Sections: {[s.title for s in meeting.sections]}")
     
     def _auto_select_current_meeting(self):
         """Automatically select the appropriate meeting based on the current day"""
@@ -252,6 +249,7 @@ class MainWindow(QMainWindow):
         print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
             
     def _update_countdown(self, seconds_remaining: int, message: str):
+        print(f"[DEBUG]Updating countdown: {seconds_remaining} seconds remaining")
         """Update the countdown message in the main window"""
         # Update status bar with countdown message
         if seconds_remaining > 0:
@@ -305,7 +303,10 @@ class MainWindow(QMainWindow):
         if not self.secondary_display:
             from src.views.secondary_display import SecondaryDisplay
             self.secondary_display = SecondaryDisplay(self.timer_controller)
-            
+            # Connect countdown updated signal to secondary display
+            self.timer_controller.timer.meeting_countdown_updated.connect(
+                self.secondary_display._update_countdown
+            )
             # Apply styling to ensure visibility
             self._apply_secondary_display_theme()
         
@@ -338,7 +339,7 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(1000, self._auto_start_network_display)
         
         # check for updates after a short delay
-        QTimer.singleShot(3000, lambda: self._check_for_updates(False))
+        #QTimer.singleShot(3000, lambda: self._check_for_updates(False))
     
     def _create_menu_bar(self):
         """Create the application menu bar"""
@@ -754,18 +755,18 @@ class MainWindow(QMainWindow):
         
     def _part_updated(self, part, section_index, part_index):
         """Handle a part being updated"""
-        # Update the timer controller if needed
-        if self.timer_controller.current_part_index != -1:
-            # Check if the updated part is the current part
-            global_part_index = self._get_global_part_index(section_index, part_index)
-            if global_part_index == self.timer_controller.current_part_index:
-                # Update the timer with the new duration if it has changed
-                current_part = self.timer_controller.parts_list[global_part_index]
-                if current_part.duration_minutes != part.duration_minutes:
-                    # Adjust the timer duration
-                    # This requires additional logic to handle currently running timers
-                    # For now, just update the display
-                    self.timer_controller.part_changed.emit(part, global_part_index)
+        global_index = self._get_global_part_index(section_index, part_index)
+
+        # Replace the part in the timer's active list
+        if 0 <= global_index < len(self.timer_controller.parts_list):
+            self.timer_controller.parts_list[global_index] = part
+
+            # If this is the current part and the timer is running, update its duration
+            if global_index == self.timer_controller.current_part_index:
+                self.timer_controller.apply_current_part_update()
+
+        # Emit part_changed to refresh display
+        self.timer_controller.part_changed.emit(part, global_index)
     
     def _meeting_started(self):
         """Handle meeting start event in the main window"""
@@ -1156,13 +1157,28 @@ class MainWindow(QMainWindow):
         """Edit the currently selected meeting"""
         if not self.meeting_controller.current_meeting:
             QMessageBox.warning(self, "No Meeting Selected", 
-                            "Please select a meeting to edit.")
+                                "Please select a meeting to edit.")
             return
+
+        from src.views.meeting_editor_dialog import MeetingEditorDialog
+
+        dialog = MeetingEditorDialog(self, self.meeting_controller.current_meeting)
+        dialog.meeting_updated.connect(self._on_meeting_updated)
+        dialog.exec()
         
-        # Show the meeting editor dialog with the current meeting
+        # Pass the _on_meeting_updated method so changes reflect live
         self.meeting_controller.show_meeting_editor(
-            self, self.meeting_controller.current_meeting
+        self,
+        self.meeting_controller.current_meeting,
+        self._on_meeting_updated
         )
+
+
+    def _on_meeting_updated(self, updated_meeting: Meeting):
+        """Apply updated meeting edits immediately"""
+        self.meeting_controller.set_current_meeting(updated_meeting)
+        self.timer_controller.set_meeting(updated_meeting)
+        self._initialize_timer_display()
     
     def _edit_weekend_meeting_songs(self):
         """Edit weekend meeting songs"""

@@ -550,15 +550,22 @@ class MeetingController(QObject):
             
         return False
     
-    def show_meeting_editor(self, parent=None, meeting: Optional[Meeting] = None):
-        """Show the meeting editor dialog"""
+    def show_meeting_editor(self, parent=None, meeting: Optional[Meeting] = None, on_meeting_updated=None):
+        """Show the meeting editor dialog
+        :param parent: Parent widget
+        :param meeting: Meeting instance to edit
+        :param on_meeting_updated: Optional callback to connect to meeting_updated signal
+        """
         from src.views.meeting_editor_dialog import MeetingEditorDialog
-        
+
         dialog = MeetingEditorDialog(parent, meeting)
-        
+
         # Connect the signal from the dialog
-        dialog.meeting_updated.connect(self._handle_meeting_updated)
-        
+        if on_meeting_updated:
+            dialog.meeting_updated.connect(on_meeting_updated)
+        else:
+            dialog.meeting_updated.connect(self._handle_meeting_updated)
+
         # Show the dialog
         dialog.exec()
     

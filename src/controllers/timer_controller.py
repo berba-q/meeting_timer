@@ -7,6 +7,7 @@ from enum import Enum
 from PyQt6.QtCore import QTimer
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from src.controllers.settings_controller import SettingsController
 from src.models.meeting import Meeting, MeetingPart, MeetingType
 from src.models.timer import Timer, TimerState
 
@@ -30,8 +31,11 @@ class TimerController(QObject):
     meeting_overtime = pyqtSignal(int)  # total overtime in seconds
     predicted_end_time_updated = pyqtSignal(datetime, datetime)  # original and predicted end times
     
-    def __init__(self):
+    def __init__(self, settings_manager):
         super().__init__()
+        
+        # Initialize settings controller
+        self.settings_controller = SettingsController(settings_manager)
         
         # Timer model
         self.timer = Timer()
@@ -89,10 +93,18 @@ class TimerController(QObject):
         
         # Get meeting date and time
         meeting_date = self.current_meeting.date
-        meeting_time = self.current_meeting.start_time
+        # Use correct start time from settings based on meeting type
+        settings = self.settings_controller.get_settings()
+        if self.current_meeting.meeting_type == MeetingType.MIDWEEK:
+            meeting_time = settings.midweek_meeting.time
+        else:
+            meeting_time = settings.weekend_meeting.time
         
         # Create target datetime
         target_datetime = datetime.combine(meeting_date, meeting_time)
+        print("[DEBUG] Target meeting time:", target_datetime)
+        print("[DEBUG] Now:", datetime.now())
+        print("[DEBUG] Should start countdown?", target_datetime > datetime.now())
         
         # Only set countdown if meeting is in the future
         now = datetime.now()
@@ -121,6 +133,7 @@ class TimerController(QObject):
                 
     def _update_meeting_countdown(self):
         """Update the meeting countdown display"""
+        print("[DEBUG] TimerController._update_meeting_countdown() was called")
         if not self.current_meeting:
             return
             
@@ -147,19 +160,15 @@ class TimerController(QObject):
                 minutes = seconds_remaining // 60
                 seconds = seconds_remaining % 60
                 countdown_msg = f"Meeting starts in {minutes}m {seconds}s"
-                
-            # Check if we should auto-start the meeting (when countdown reaches 0)
-            if seconds_remaining <= 5 and self.timer.state == TimerState.STOPPED:
-                # Automatically start the meeting when countdown reaches 0
-                QTimer.singleShot(seconds_remaining * 1000, self.start_meeting)
+            # Emit the updated countdown signal
+            self.timer.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
+            # Removed auto-start logic: meeting must be started manually
         else:
             countdown_msg = "Meeting starts now!"
+            self.timer.meeting_countdown_updated.emit(0, countdown_msg)
             # Stop the countdown timer
             self._countdown_timer.stop()
-            
-            # Auto-start the meeting if not already started
-            if self.timer.state == TimerState.STOPPED:
-                self.start_meeting()
+            # Removed auto-start logic: meeting must be started manually
     
     def start_meeting(self):
         """Start the current meeting"""
@@ -472,9 +481,7 @@ class TimerController(QObject):
         
         elif state == TimerState.STOPPED:
             # Timer was stopped, check if we need to advance
-            if state == TimerState.COUNTDOWN:
-                # Countdown finished, start the meeting
-                self.start_meeting()
+            pass
         
         elif state == TimerState.TRANSITION:
             # In transition mode
@@ -504,3 +511,8 @@ class TimerController(QObject):
             
             # Update predicted end time
             self._update_predicted_end_time()
+    def apply_current_part_update(self):
+        """Apply updated duration to the currently running part without restarting timer"""
+        if 0 <= self.current_part_index < len(self.parts_list):
+            current_part = self.parts_list[self.current_part_index]
+            self.timer.set_duration(current_part.duration_minutes)
