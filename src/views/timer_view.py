@@ -49,12 +49,16 @@ class TimerView(QWidget):
         self.part_label = QLabel()
         self.part_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.part_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.part_label.setWordWrap(True)
+        self.part_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         
         # Countdown message label
         self.countdown_label = QLabel()
         self.countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.countdown_label.setStyleSheet("font-size: 16px; color: #4a90e2; font-weight: bold;")
         self.countdown_label.setVisible(False)
+        self.countdown_label.setWordWrap(True)
+        self.countdown_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         
         layout.addWidget(self.timer_panel)
         layout.addWidget(self.part_label)
@@ -103,6 +107,9 @@ class TimerView(QWidget):
             font-weight: bold;
             font-family: 'Courier New', monospace;
         """)
+        self.timer_label.setMinimumSize(0, 0)
+        self.timer_label.setWordWrap(True)
+        self.timer_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         layout.addWidget(self.timer_label)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -215,6 +222,31 @@ class TimerView(QWidget):
         """Update the analog timer display"""
         if hasattr(self, 'analog_clock'):
             self.analog_clock.set_time(self.remaining_seconds, self.timer_state)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        width = self.width()
+
+        # Resize timer label font
+        if hasattr(self, "timer_label"):
+            timer_font_size = max(24, min(160, width // 8))
+            timer_font = self.timer_label.font()
+            timer_font.setPointSize(timer_font_size)
+            self.timer_label.setFont(timer_font)
+
+        # Resize part label font
+        if hasattr(self, "part_label"):
+            part_font_size = max(12, min(36, width // 30))
+            part_font = self.part_label.font()
+            part_font.setPointSize(part_font_size)
+            self.part_label.setFont(part_font)
+
+        # Resize countdown label font
+        if hasattr(self, "countdown_label"):
+            countdown_font_size = max(12, min(32, width // 32))
+            countdown_font = self.countdown_label.font()
+            countdown_font.setPointSize(countdown_font_size)
+            self.countdown_label.setFont(countdown_font)
 
 
 class AnalogClockWidget(QWidget):
@@ -381,3 +413,12 @@ class AnalogClockWidget(QWidget):
             Qt.AlignmentFlag.AlignCenter,
             time_text
         )
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "timer_label"):
+            width = self.timer_label.width()
+            # Calculate font size dynamically (you can tweak the scaling factor)
+            font_size = max(24, min(160, width // 8))
+            font = self.timer_label.font()
+            font.setPointSize(font_size)
+            self.timer_label.setFont(font)

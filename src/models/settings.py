@@ -97,6 +97,7 @@ class DisplaySettings:
     use_secondary_screen: bool = False
     show_predicted_end_time: bool = True
     theme: str = "light"  # 'light' or 'dark'
+    show_tools_dock: bool = False
     
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""

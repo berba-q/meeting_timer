@@ -76,20 +76,24 @@ class MainWindow(QMainWindow):
         # Create network status widget
         self.network_status_widget = NetworkStatusWidget(self.network_display_manager)
 
-        # Create network status dock widget
-        self.network_dock = QDockWidget("Network Display", self)
-        self.network_dock.setWidget(self.network_status_widget)
-        self.network_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
-        self.network_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.network_dock)
+        # Create tab widget for docked tools
+        self.dock_tabs = QTabWidget()
+        self.dock_tabs.setTabPosition(QTabWidget.TabPosition.North)
+        self.dock_tabs.addTab(self.network_status_widget, "Network")
 
-        # Hide dock by default unless network display is enabled
-        if self.settings_controller.get_settings().network_display.mode == NetworkDisplayMode.DISABLED:
-            self.network_dock.hide()
+        # Wrap in tools dock
+        self.tools_dock = QDockWidget("Tools", self)
+        self.tools_dock.setWidget(self.dock_tabs)
+        self.tools_dock.setMinimumSize(200, 200)
+        self.tools_dock.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.tools_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
+        self.tools_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea)
+
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.tools_dock)
         
         # Setup UI
         self.setWindowTitle("JW Meeting Timer")
-        self.setMinimumSize(1000, 700)
+        self.setMinimumSize(600, 400)
         
         # Apply current theme
         self._apply_current_theme()
@@ -105,6 +109,12 @@ class MainWindow(QMainWindow):
         
         # Initialize timer to show current time
         self._initialize_timer_display()
+        
+        # Restore dock visibility state
+        if self.settings_controller.get_settings().display.show_tools_dock:
+            self.tools_dock.show()
+        else:
+            self.tools_dock.hide()
         
         # Load meetings
         self.meeting_controller.load_meetings()
@@ -391,8 +401,8 @@ class MainWindow(QMainWindow):
         # Toggle network dock widget
         toggle_network_dock_action = QAction("Show Network Panel", self)
         toggle_network_dock_action.setCheckable(True)
-        toggle_network_dock_action.setChecked(self.network_dock.isVisible())
-        toggle_network_dock_action.triggered.connect(lambda checked: self.network_dock.setVisible(checked))
+        toggle_network_dock_action.setChecked(self.tools_dock.isVisible())
+        toggle_network_dock_action.triggered.connect(lambda checked: self.tools_dock.setVisible(checked))
         self.network_menu.addAction(toggle_network_dock_action)
 
         # Start/stop network display
@@ -599,17 +609,23 @@ class MainWindow(QMainWindow):
         
         # Main layout
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(4)
         
         # Splitter for timer and parts
         splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.setChildrenCollapsible(False)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
         
         # Timer view
         self.timer_view = TimerView(self.timer_controller)
+        self.timer_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         splitter.addWidget(self.timer_view)
         
         # Meeting view
         self.meeting_view = MeetingView(self.meeting_controller, self.timer_controller)
+        self.meeting_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         splitter.addWidget(self.meeting_view)
         
         # Set initial sizes
@@ -624,6 +640,7 @@ class MainWindow(QMainWindow):
         
         # Current part label
         self.current_part_label = QLabel("No meeting selected")
+        self.current_part_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         status_bar.addWidget(self.current_part_label)
         
         # Spacer
@@ -1386,6 +1403,11 @@ class MainWindow(QMainWindow):
         # Close secondary display if it exists
         if self.secondary_display:
             self.secondary_display.close()
+
+        # Save dock visibility state
+        settings = self.settings_controller.get_settings()
+        settings.display.show_tools_dock = self.tools_dock.isVisible()
+        self.settings_controller.save_settings()
         
         # Accept the event to close the main window
         event.accept()
