@@ -1,10 +1,12 @@
 """
 This module provides functionality to broadcast timer data over the network.
 """
+from datetime import datetime
 import json
 import functools
 import asyncio
 import threading
+import websockets
 from websockets.legacy.server import serve, WebSocketServerProtocol
 import socket
 import time
@@ -39,13 +41,15 @@ class NetworkBroadcaster(QObject):
         self._stop_event = threading.Event()
         
         # Current state
+        current_time = datetime.now().strftime("%H:%M:%S")
         self.current_state = {
-            "time": "00:00",
+            "time": current_time,
             "state": "stopped",
             "part": "",
             "nextPart": "",
             "endTime": "",
-            "overtime": 0
+            "overtime": 0,
+            "countdownMessage": ""
         }
     
     def _get_local_ip(self) -> str:
@@ -249,7 +253,8 @@ class NetworkBroadcaster(QObject):
                     pass  # Client might not have remote_address anymore
     
     def update_timer_data(self, time_str: str, state: str, part_title: str, 
-                        next_part: str = "", end_time: str = "", overtime_seconds: int = 0):
+                    next_part: str = "", end_time: str = "", overtime_seconds: int = 0,
+                    countdown_message: str = ""):
         """Update the current timer data and broadcast to clients"""
         # Update current state
         self.current_state = {
@@ -258,7 +263,8 @@ class NetworkBroadcaster(QObject):
             "part": part_title,
             "nextPart": next_part,
             "endTime": end_time,
-            "overtime": overtime_seconds
+            "overtime": overtime_seconds,
+            "countdownMessage": countdown_message  # Include countdown message
         }
         
         # Broadcast to clients if server is running

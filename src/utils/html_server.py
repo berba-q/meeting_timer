@@ -171,6 +171,14 @@ class NetworkHTTPServer(QObject):
             max-width: 90vw;
         }
         
+        #countdown-message {
+            font-size: 7vmin;
+            font-weight: bold;
+            color: #4a90e2;
+            margin: 2vh 5vw;
+            max-width: 90vw;
+        }
+        
         #end-time {
             font-size: 4vmin;
             margin-top: 2vh;
@@ -201,6 +209,8 @@ class NetworkHTTPServer(QObject):
     
     <div id="current-part">Waiting for connection...</div>
     
+    <div id="countdown-message" style="display: none;"></div>
+    
     <div id="next-part">Next Part: —</div>
     
     <div id="end-time"></div>
@@ -212,6 +222,7 @@ class NetworkHTTPServer(QObject):
         const nextPart = document.getElementById('next-part');
         const endTime = document.getElementById('end-time');
         const status = document.getElementById('status');
+        const countdownMsg = document.getElementById('countdown-message');
         
         // Create WebSocket connection
         const socket = new WebSocket(`ws://${window.location.hostname}:{WS_PORT}`);
@@ -244,18 +255,34 @@ class NetworkHTTPServer(QObject):
                 // Set timer color based on state
                 timerDisplay.className = data.state;
                 
-                // Update part information
-                if (data.part) {
-                    currentPart.textContent = data.part;
+                // Handle meeting countdown display
+                if (data.state === 'stopped' && data.countdownMessage) {
+                    // We're in pre-meeting countdown mode
+                    countdownMsg.textContent = data.countdownMessage;
+                    countdownMsg.style.display = 'block';
+                    nextPart.style.display = 'none';
+                    endTime.style.display = 'none';
+                    currentPart.style.display = 'none';
                 } else {
-                    currentPart.textContent = 'No active part';
-                }
-                
-                // Update next part if available
-                if (data.nextPart) {
-                    nextPart.textContent = `Next Part: ${data.nextPart}`;
-                } else {
-                    nextPart.textContent = 'Next Part: —';
+                    // Regular meeting or part display
+                    countdownMsg.style.display = 'none';
+                    nextPart.style.display = 'block';
+                    endTime.style.display = 'block';
+                    currentPart.style.display = 'block';
+                    
+                    // Update part information
+                    if (data.part) {
+                        currentPart.textContent = data.part;
+                    } else {
+                        currentPart.textContent = 'No active part';
+                    }
+                    
+                    // Update next part if available
+                    if (data.nextPart) {
+                        nextPart.textContent = `Next Part: ${data.nextPart}`;
+                    } else {
+                        nextPart.textContent = 'Next Part: —';
+                    }
                 }
                 
                 // Update end time if available
@@ -284,6 +311,19 @@ class NetworkHTTPServer(QObject):
                 console.error('Error parsing message:', error);
             }
         });
+        
+        // Update the clock while in stopped state
+        function updateClock() {
+            // Only update if the timer is in stopped state
+            if (timerDisplay.className === 'stopped') {
+                const now = new Date();
+                const timeString = now.toTimeString().split(' ')[0];
+                timerDisplay.textContent = timeString;
+            }
+        }
+        
+        // Update clock every second when in stopped state
+        setInterval(updateClock, 1000);
     </script>
 </body>
 </html>
