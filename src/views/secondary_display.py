@@ -17,8 +17,8 @@ from src.views.timer_view import TimerView
 class SecondaryDisplay(QMainWindow):
     """Secondary display window for the timer - designed for speakers"""
     
-    def __init__(self, timer_controller: TimerController):
-        super().__init__(None, Qt.WindowType.Window)
+    def __init__(self, timer_controller: TimerController, parent=None):
+        super().__init__(parent, Qt.WindowType.Window)
         self.timer_controller = timer_controller
         self.next_part = None
         self.show_countdown = False
@@ -100,10 +100,12 @@ class SecondaryDisplay(QMainWindow):
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.timer_label.setStyleSheet("""
             color: #ffffff;
-            font-size: 380px;
             font-weight: bold;
-            font-family: 'Courier New', monospace;
+            font-family: 'Arial Black', 'Courier New', monospace;
         """)
+        self.timer_label.setMinimumSize(0, 0)
+        self.timer_label.setWordWrap(True)
+        self.timer_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         timer_layout.addWidget(self.timer_label)
         
@@ -123,8 +125,10 @@ class SecondaryDisplay(QMainWindow):
             font-size: 60px;
             font-weight: bold;
         """)
+        self.info_label1.setMinimumSize(0, 0)
         self.info_label1.setWordWrap(True)
-        
+        self.info_label1.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
         self.info_label2 = QLabel()
         self.info_label2.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_label2.setStyleSheet("""
@@ -132,7 +136,10 @@ class SecondaryDisplay(QMainWindow):
             font-size: 60px;
             font-weight: bold;
         """)
-        
+        self.info_label2.setMinimumSize(0, 0)
+        self.info_label2.setWordWrap(True)
+        self.info_label2.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
         info_layout.addWidget(self.info_label1)
         info_layout.addWidget(self.info_label2)
         
@@ -155,17 +162,15 @@ class SecondaryDisplay(QMainWindow):
         
     def _update_current_time(self, time_str: str):
         """Update the current time display when in stopped state"""
-        print(f"[DEBUG] _update_current_time called with {time_str}, state={self.timer_controller.timer.state}, show_countdown={self.show_countdown}")
+        #print(f"[DEBUG] _update_current_time called with {time_str}, state={self.timer_controller.timer.state}, show_countdown={self.show_countdown}")
         if self.timer_controller.timer.state == TimerState.STOPPED or self.show_countdown:
             # Update with current time when in stopped state
             self.timer_label.setText(time_str)
             
             # Make sure the time is visible with appropriate styling
             self.timer_label.setStyleSheet("""
-                color: #ffffff; 
-                font-size: 380px;
+                color: #ffffff;
                 font-weight: bold;
-                font-family: 'Courier New', monospace;
             """)
     
     def _update_countdown(self, seconds_remaining: int, message: str):
@@ -218,9 +223,7 @@ class SecondaryDisplay(QMainWindow):
             self.timer_label.setText(time_str)
             self.timer_label.setStyleSheet(f"""
                 color: {color};
-                font-size: 380px;
                 font-weight: bold;
-                font-family: 'Courier New', monospace;
             """)
     
     def _update_timer_state(self, state: TimerState):
@@ -228,18 +231,14 @@ class SecondaryDisplay(QMainWindow):
         if state == TimerState.PAUSED:
             # Blue color for paused state
             self.timer_label.setStyleSheet("""
-                color: #3399ff; 
-                font-size: 380px;
+                color: #3399ff;
                 font-weight: bold;
-                font-family: 'Courier New', monospace;
             """)
         elif state == TimerState.TRANSITION:
             # Purple color for transition state
             self.timer_label.setStyleSheet("""
-                color: #bb86fc; 
-                font-size: 380px;
+                color: #bb86fc;
                 font-weight: bold;
-                font-family: 'Courier New', monospace;
             """)
     
     def _part_changed(self, current_part, index):
@@ -414,3 +413,40 @@ class SecondaryDisplay(QMainWindow):
     def show(self):
         """Override show to always show in fullscreen"""
         self.showFullScreen()
+    def _adjust_font_sizes(self):
+        width = self.width()
+
+        # Dynamically scale the timer font using QFontMetrics for precise fit
+        if hasattr(self, "timer_label"):
+            from PyQt6.QtGui import QFontMetrics
+            sample_text = "88:88:88 "  # Include a space to give a little more realistic breathing room
+            max_width = self.timer_label.width()
+            font = self.timer_label.font()
+            safe_width = int(max_width * 0.95)  # Apply 5% margin
+            for size in range(900, 100, -2):  # Try font sizes from 600 down to 100
+                font.setPointSize(size)
+                metrics = QFontMetrics(font)
+                if metrics.horizontalAdvance(sample_text) <= safe_width:
+                    self.timer_label.setFont(font)
+                    break
+
+        # Dynamically scale the info labels
+        if hasattr(self, "info_label1"):
+            font_size = max(120, min(120, width // 20))
+            font = self.info_label1.font()
+            font.setPointSize(font_size)
+            self.info_label1.setFont(font)
+
+        if hasattr(self, "info_label2"):
+            font_size = max(60, min(120, width // 20))
+            font = self.info_label2.font()
+            font.setPointSize(font_size)
+            self.info_label2.setFont(font)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._adjust_font_sizes()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._adjust_font_sizes()

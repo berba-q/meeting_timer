@@ -259,7 +259,7 @@ class MainWindow(QMainWindow):
         print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
             
     def _update_countdown(self, seconds_remaining: int, message: str):
-        print(f"[DEBUG]Updating countdown: {seconds_remaining} seconds remaining")
+        #print(f"[DEBUG]Updating countdown: {seconds_remaining} seconds remaining")
         """Update the countdown message in the main window"""
         # Update status bar with countdown message
         if seconds_remaining > 0:
@@ -312,7 +312,7 @@ class MainWindow(QMainWindow):
         # Create secondary window if it doesn't exist
         if not self.secondary_display:
             from src.views.secondary_display import SecondaryDisplay
-            self.secondary_display = SecondaryDisplay(self.timer_controller)
+            self.secondary_display = SecondaryDisplay(self.timer_controller, parent=self)
             # Connect countdown updated signal to secondary display
             self.timer_controller.timer.meeting_countdown_updated.connect(
                 self.secondary_display._update_countdown
@@ -1400,8 +1400,9 @@ class MainWindow(QMainWindow):
     
     def closeEvent(self, event):
         """Handle window close event"""
-        # Close secondary display if it exists
-        if self.secondary_display:
+        # Close secondary display if it exists and is visible
+        if self.secondary_display and self.secondary_display.isVisible():
+            print("[DEBUG] Closing secondary display")
             self.secondary_display.close()
 
         # Save dock visibility state

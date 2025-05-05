@@ -102,9 +102,6 @@ class TimerController(QObject):
         
         # Create target datetime
         target_datetime = datetime.combine(meeting_date, meeting_time)
-        print("[DEBUG] Target meeting time:", target_datetime)
-        print("[DEBUG] Now:", datetime.now())
-        print("[DEBUG] Should start countdown?", target_datetime > datetime.now())
         
         # Only set countdown if meeting is in the future
         now = datetime.now()
@@ -133,7 +130,7 @@ class TimerController(QObject):
                 
     def _update_meeting_countdown(self):
         """Update the meeting countdown display"""
-        print("[DEBUG] TimerController._update_meeting_countdown() was called")
+        
         if not self.current_meeting:
             return
             

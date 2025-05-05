@@ -285,5 +285,4 @@ class Timer(QObject):
         """Adjust total duration of the running timer while preserving elapsed time"""
         if self.state in [TimerState.RUNNING, TimerState.PAUSED]:
             self._total_seconds = new_duration_minutes * 60
-            print(f"[Timer] Duration updated mid-part to {new_duration_minutes} minutes.")
             self._update_timer()
