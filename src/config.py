@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Application information
-APP_NAME = "JW Meeting Timer"
+APP_NAME = "OnTime"
 APP_VERSION = "1.0.0"
 APP_AUTHOR = "Open Source"
 

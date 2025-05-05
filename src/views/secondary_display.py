@@ -1,5 +1,5 @@
 """
-Secondary display window for the JW Meeting Timer - Speaker View.
+Secondary display window for the OnTime - Speaker View.
 A streamlined, distraction-free fullscreen view focusing on timer and next part.
 """
 from PyQt6.QtWidgets import (
@@ -45,7 +45,7 @@ class SecondaryDisplay(QMainWindow):
         from src.utils.resources import get_icon
         self.setWindowIcon(get_icon("app_icon"))
         
-        self.setWindowTitle("JW Meeting Timer - Speaker View")
+        self.setWindowTitle("OnTime - Speaker View")
         
         # Set default background to black
         palette = self.palette()
@@ -419,11 +419,15 @@ class SecondaryDisplay(QMainWindow):
         # Dynamically scale the timer font using QFontMetrics for precise fit
         if hasattr(self, "timer_label"):
             from PyQt6.QtGui import QFontMetrics
-            sample_text = "88:88:88 "  # Include a space to give a little more realistic breathing room
+            text = self.timer_label.text() or "00:00"
+            char_count = len(text)
+            sample_text = text + " "  # add slight margin
             max_width = self.timer_label.width()
             font = self.timer_label.font()
-            safe_width = int(max_width * 0.95)  # Apply 5% margin
-            for size in range(900, 100, -2):  # Try font sizes from 600 down to 100
+            safe_width = int(max_width * 0.95)
+            # Scale larger for shorter text
+            max_font_size = 900 if char_count <= 5 else 700 if char_count <= 7 else 600
+            for size in range(max_font_size, 100, -2):
                 font.setPointSize(size)
                 metrics = QFontMetrics(font)
                 if metrics.horizontalAdvance(sample_text) <= safe_width:

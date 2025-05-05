@@ -1,5 +1,5 @@
 """
-JW Meeting Timer - A cross-platform timer application for managing meeting schedules
+OnTime - A cross-platform timer application for managing meeting schedules
 """
 import sys
 import os
