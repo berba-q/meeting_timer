@@ -72,7 +72,7 @@ class CustomHandler(SimpleHTTPRequestHandler):
                     self.wfile.write(html.encode('utf-8'))
                 else:
                     # Fallback to generic response
-                    self.wfile.write(b'<html><body><h1>JW Meeting Timer</h1><p>Network display server is running.</p></body></html>')
+                    self.wfile.write(b'<html><body><h1>OnTime Meeting Timer</h1><p>Network display server is running.</p></body></html>')
             else:
                 # For any other path, return 404
                 self.send_response(404)
@@ -130,7 +130,7 @@ class NetworkHTTPServer(QObject):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Meeting Timer Display</title>
+    <title>OnTime Meeting Timer Display</title>
     <style>
         body {
             background-color: #000000;

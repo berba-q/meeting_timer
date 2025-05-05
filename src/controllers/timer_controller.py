@@ -1,5 +1,5 @@
 """
-Controller for managing timer functionality in the JW Meeting Timer application.
+Controller for managing timer functionality in the OnTime Meeting Timer application.
 """
 from datetime import datetime, timedelta
 from typing import List, Optional

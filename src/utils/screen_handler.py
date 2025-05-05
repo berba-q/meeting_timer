@@ -1,5 +1,5 @@
 """
-Screen handling utilities for the JW Meeting Timer application.
+Screen handling utilities for the OnTime Meeting Timer application.
 """
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QGuiApplication, QScreen

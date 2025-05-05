@@ -1,5 +1,5 @@
 """
-Settings model for the JW Meeting Timer application.
+Settings model for the OnTime Meeting Timer application.
 """
 import json
 import os

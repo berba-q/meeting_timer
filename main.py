@@ -91,8 +91,8 @@ def main():
     """Application entry point"""
     # Set up application
     app = QApplication(sys.argv)
-    app.setApplicationName("JW Meeting Timer")
-    app.setOrganizationName("JW Meeting Timer")
+    app.setApplicationName("OnTime")
+    app.setOrganizationName("OnTime")
     
     # Set application icon
     app.setWindowIcon(get_icon("app_icon"))

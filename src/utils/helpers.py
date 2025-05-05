@@ -1,5 +1,5 @@
 """
-Helper utilities for the JW Meeting Timer application.
+Helper utilities for the OnTime Meeting Timer application.
 """
 import os
 import sys
@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 
 # Set up logging
-logger = logging.getLogger("jwmeetingtimer")
+logger = logging.getLogger("OnTime")
 
 
 def setup_logging(log_file: Optional[str] = None, level: int = logging.INFO):

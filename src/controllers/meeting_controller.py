@@ -1,5 +1,5 @@
 """
-Controller for managing meetings in the JW Meeting Timer application.
+Controller for managing meetings in the OnTime Meeting Timer application.
 """
 import os
 import json
@@ -32,7 +32,7 @@ class MeetingController(QObject):
         super().__init__()
         
         # Setup data directories
-        self.data_dir = os.path.join(os.path.expanduser("~"), ".jwmeetingtimer")
+        self.data_dir = os.path.join(os.path.expanduser("~"), ".ontime")
         self.meetings_dir = os.path.join(self.data_dir, "meetings")
         
         # Create directories if they don't exist

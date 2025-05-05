@@ -43,7 +43,7 @@ class SimpleNetworkServer(QObject):
         self.html_content = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>JW Meeting Timer</title>
+    <title>OnTime Meeting Timer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {{ background: black; color: white; font-family: Arial; text-align: center; margin: 0; padding: 20px; }}
@@ -57,7 +57,7 @@ class SimpleNetworkServer(QObject):
     </style>
 </head>
 <body>
-    <h1>JW Meeting Timer</h1>
+    <h1>OnTime Meeting Timer</h1>
     <div id="timer" class="green">00:00</div>
     <div id="part">Waiting for connection...</div>
     <div id="next">Next: -</div>

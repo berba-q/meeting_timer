@@ -1,3 +1,3 @@
 """
-Models package for the JW Meeting Timer application.
+Models package for the OnTime Meeting Timer application.
 """

@@ -1,5 +1,5 @@
 """
-Network display manager for JW Meeting Timer.
+Network display manager for OnTime Meeting Timer.
 This module integrates the WebSocket and HTTP servers to provide network display functionality.
 """
 import os
@@ -63,7 +63,7 @@ class NetworkDisplayManager(QObject):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Meeting Timer Display</title>
+    <title>OnTime Meeting Timer Display</title>
     <style>
         body {
             background-color: #000000;

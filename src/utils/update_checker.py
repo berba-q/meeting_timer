@@ -1,5 +1,5 @@
 """
-Update checker for JW Meeting Timer application.
+Update checker for OnTime Meeting Timer application.
 Thread-safe implementation that checks for updates against a GitHub repository.
 """
 import os
@@ -93,7 +93,7 @@ class UpdateDialog(QDialog):
         
         # Update information
         info_label = QLabel(
-            f"<b>A new version of JW Meeting Timer is available!</b><br><br>"
+            f"<b>A new version of OnTime Meeting Timer is available!</b><br><br>"
             f"Current version: {CURRENT_VERSION}<br>"
             f"New version: {self.version_info.get('version', 'Unknown')}<br>"
             f"Released: {self.version_info.get('releaseDate', 'Unknown')}<br><br>"
@@ -256,7 +256,7 @@ class UpdateDialog(QDialog):
         
         try:
             # Get the settings manager
-            settings_file = os.path.join(os.path.expanduser("~"), ".jwmeetingtimer", "settings.json")
+            settings_file = os.path.join(os.path.expanduser("~"), ".ontime", "settings.json")
             settings_manager = SettingsManager(settings_file)
             
             # Add skipped version information
@@ -374,7 +374,7 @@ def check_for_updates(parent=None, silent=False):
         # Check if we should skip this version
         try:
             # Get the settings manager
-            settings_file = os.path.join(os.path.expanduser("~"), ".jwmeetingtimer", "settings.json")
+            settings_file = os.path.join(os.path.expanduser("~"), ".ontime", "settings.json")
             if os.path.exists(settings_file):
                 from src.models.settings import SettingsManager
                 settings_manager = SettingsManager(settings_file)

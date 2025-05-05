@@ -1,5 +1,5 @@
 """
-Timer model for the JW Meeting Timer application.
+Timer model for the OnTime Meeting Timer application.
 """
 import time
 from datetime import datetime, timedelta

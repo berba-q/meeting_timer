@@ -1,5 +1,5 @@
 """
-Main application window for the JW Meeting Timer.
+Main application window for the OnTime meeting timer app.
 """
 import os
 from datetime import datetime, timedelta
@@ -92,7 +92,7 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.tools_dock)
         
         # Setup UI
-        self.setWindowTitle("JW Meeting Timer")
+        self.setWindowTitle("OnTime Meeting Timer")
         self.setMinimumSize(600, 400)
         
         # Apply current theme
@@ -138,7 +138,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "No Updates Available",
-            "You are using the latest version of JW Meeting Timer."
+            "You are using the latest version of OnTime Meeting Timer."
         )
     
     def _show_update_error(self, error_message):
@@ -1387,8 +1387,8 @@ class MainWindow(QMainWindow):
         """Show the about dialog"""
         QMessageBox.about(
             self, 
-            "About JW Meeting Timer",
-            "JW Meeting Timer\n\n"
+            "About OnTime Meeting Timer",
+            "OnTime Meeting Timer\n\n"
             "A cross-platform timer application for managing JW meeting schedules.\n\n"
             "Version 1.0.0\n"
             "© 2023 Open Source"

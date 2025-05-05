@@ -1,5 +1,5 @@
 """
-Settings dialog for the JW Meeting Timer application.
+Settings dialog for the OnTime Meeting Timer application.
 """
 import os
 from datetime import time

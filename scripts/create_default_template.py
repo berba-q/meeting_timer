@@ -1,5 +1,5 @@
 """
-Create default meeting templates for the JW Meeting Timer application.
+Create default meeting templates for the OnTime Meeting Timer application.
 This script can be run to create default templates in the resources directory,
 which will be available to the application.
 """

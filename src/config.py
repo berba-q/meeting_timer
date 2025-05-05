@@ -1,5 +1,5 @@
 """
-Application configuration constants and settings for JW Meeting Timer
+Application configuration constants and settings for OnTime Meeting Timer
 """
 import os
 import sys

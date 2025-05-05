@@ -1,4 +1,4 @@
-/* Dark theme for JW Meeting Timer */
+/* Dark theme for OnTime Meeting Timer */
 
 /* Main Window */
 QMainWindow, QDialog {

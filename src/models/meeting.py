@@ -1,5 +1,5 @@
 """
-Meeting data models for the JW Meeting Timer application.
+Meeting data models for the OnTime Meeting Timer application.
 """
 from dataclasses import dataclass
 from datetime import datetime, time
