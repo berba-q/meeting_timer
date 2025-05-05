@@ -1402,7 +1402,6 @@ class MainWindow(QMainWindow):
         """Handle window close event"""
         # Close secondary display if it exists and is visible
         if self.secondary_display and self.secondary_display.isVisible():
-            print("[DEBUG] Closing secondary display")
             self.secondary_display.close()
 
         # Save dock visibility state

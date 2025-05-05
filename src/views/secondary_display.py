@@ -175,7 +175,7 @@ class SecondaryDisplay(QMainWindow):
     
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message"""
-        print("[SecondaryDisplay] _update_countdown called")
+        
         if seconds_remaining > 0:
             # Meeting hasn't started yet, show countdown
             if self.timer_controller.timer.state == TimerState.STOPPED and self.timer_controller.current_part_index == -1:
