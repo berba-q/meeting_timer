@@ -162,7 +162,7 @@ class SecondaryDisplay(QMainWindow):
         
     def _update_current_time(self, time_str: str):
         """Update the current time display when in stopped state"""
-        #print(f"[DEBUG] _update_current_time called with {time_str}, state={self.timer_controller.timer.state}, show_countdown={self.show_countdown}")
+        print(f"[DEBUG] _update_current_time called with {time_str}, state={self.timer_controller.timer.state}, show_countdown={self.show_countdown}")
         if self.timer_controller.timer.state == TimerState.STOPPED or self.show_countdown:
             # Update with current time when in stopped state
             self.timer_label.setText(time_str)
@@ -175,13 +175,14 @@ class SecondaryDisplay(QMainWindow):
     
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message"""
-        
+        print(f"[DEBUG] SecondaryDisplay._update_countdown called with {seconds_remaining} seconds — {message}")
         if seconds_remaining > 0:
             # Meeting hasn't started yet, show countdown
             if self.timer_controller.timer.state == TimerState.STOPPED and self.timer_controller.current_part_index == -1:
                 self.show_countdown = True
                 # Show the countdown message in the info panel
                 self.info_label1.setText(message)
+                print(f"[DEBUG] info_label1 text set to: {self.info_label1.text()}")
                 self.info_label1.setStyleSheet("""
                     color: #4a90e2; 
                     font-size: 80px;
@@ -413,6 +414,7 @@ class SecondaryDisplay(QMainWindow):
     def show(self):
         """Override show to always show in fullscreen"""
         self.showFullScreen()
+        
     def _adjust_font_sizes(self):
         width = self.width()
 
@@ -454,3 +456,10 @@ class SecondaryDisplay(QMainWindow):
     def showEvent(self, event):
         super().showEvent(event)
         self._adjust_font_sizes()
+        
+    def closeEvent(self, event):
+        """Handle close event"""
+        # Force the window to close when the main window is closed
+        #self.timer_controller.stop_timer()
+        
+        event.accept()

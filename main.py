@@ -40,10 +40,10 @@ def _select_meeting_by_day(controller, main_window):
     # Check if today is a meeting day
     if current_day == midweek_day and MeetingType.MIDWEEK in controller.current_meetings:
         meeting_to_select = controller.current_meetings[MeetingType.MIDWEEK]
-        print(f"Selected MIDWEEK meeting based on current day ({current_day})")
+        #print(f"Selected MIDWEEK meeting based on current day ({current_day})")
     elif current_day == weekend_day and MeetingType.WEEKEND in controller.current_meetings:
         meeting_to_select = controller.current_meetings[MeetingType.WEEKEND]
-        print(f"Selected WEEKEND meeting based on current day ({current_day})")
+        #print(f"Selected WEEKEND meeting based on current day ({current_day})")
     else:
         # Find next upcoming meeting
         days_to_midweek = (midweek_day - current_day) % 7
@@ -51,10 +51,10 @@ def _select_meeting_by_day(controller, main_window):
         
         if days_to_midweek <= days_to_weekend and MeetingType.MIDWEEK in controller.current_meetings:
             meeting_to_select = controller.current_meetings[MeetingType.MIDWEEK]
-            print(f"Selected MIDWEEK meeting (next upcoming in {days_to_midweek} days)")
+            #print(f"Selected MIDWEEK meeting (next upcoming in {days_to_midweek} days)")
         elif MeetingType.WEEKEND in controller.current_meetings:
             meeting_to_select = controller.current_meetings[MeetingType.WEEKEND]
-            print(f"Selected WEEKEND meeting (next upcoming in {days_to_weekend} days)")
+            #print(f"Selected WEEKEND meeting (next upcoming in {days_to_weekend} days)")
     
     # Default to any available meeting if none selected
     if not meeting_to_select:
@@ -102,9 +102,10 @@ def main():
     
     # Initialize controller
     controller = MeetingController()
+    settings_controller = SettingsController(controller.settings_manager)
     
     # Create and show main window
-    main_window = MainWindow(controller)
+    main_window = MainWindow(controller, settings_controller)
     
     # Load meetings
     controller.load_meetings()

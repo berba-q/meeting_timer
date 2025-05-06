@@ -59,13 +59,13 @@ class UpdateCheckWorker(QObject):
 class MainWindow(QMainWindow):
     """Main application window"""
     
-    def __init__(self, meeting_controller: MeetingController):
+    def __init__(self, meeting_controller: MeetingController, settings_controller: SettingsController):
         super().__init__()
         
         # Initialize controllers
         self.meeting_controller = meeting_controller
-        self.settings_controller = SettingsController(self.meeting_controller.settings_manager)
-        self.timer_controller = TimerController(self.meeting_controller.settings_manager)
+        self.settings_controller = settings_controller
+        self.timer_controller = TimerController(settings_controller)
         
         # Secondary display window
         self.secondary_display = None
@@ -106,7 +106,6 @@ class MainWindow(QMainWindow):
         
         # Connect signals
         self._connect_signals()
-        
         # Initialize timer to show current time
         self._initialize_timer_display()
         
@@ -120,18 +119,14 @@ class MainWindow(QMainWindow):
         settings = self.settings_controller.get_settings()
         from src.utils.screen_handler import ScreenHandler
         secondary_screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
-        if secondary_screen:
-            print(f"[Startup] Secondary screen index: {settings.display.secondary_screen_index}")
-            print(f"[Startup] Secondary screen name: {secondary_screen.name()} — {secondary_screen.geometry().width()}x{secondary_screen.geometry().height()}")
-        else:
-            print("[Startup] No secondary screen configured or available.")
+        
         
         # Load meetings
         self.meeting_controller.load_meetings()
     
     def _check_for_updates(self, silent=False):
         """Check for application updates"""
-        from src.utils.update_checker import check_for_updates
+        #from src.utils.update_checker import check_for_updates
         
         # Store the thread reference so it doesn't get garbage collected
         self.update_thread = check_for_updates(self, silent)
@@ -266,18 +261,20 @@ class MainWindow(QMainWindow):
         # Initialize meeting countdown
         self.timer_controller._initialize_meeting_countdown()
         
-        print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
+        #print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
             
     def _update_countdown(self, seconds_remaining: int, message: str):
-        #print(f"[DEBUG]Updating countdown: {seconds_remaining} seconds remaining")
+        #print(f"[DEBUG] MainWindow._update_countdown: {seconds_remaining} seconds remaining")
         """Update the countdown message in the main window"""
         # Update status bar with countdown message
         if seconds_remaining > 0:
             # Show countdown in status bar
             self.current_part_label.setText(message)
-            
+            #print(f"[DEBUG] MainWindow label text set to: {self.current_part_label.text()}")
+
             # If the secondary display exists, update it too
             if self.secondary_display:
+                #print("[DEBUG] Updating secondary display countdown label")
                 # Update the info label with just the countdown message
                 self.secondary_display.info_label1.setText(message)
                 self.secondary_display.info_label1.setStyleSheet("""
@@ -321,12 +318,18 @@ class MainWindow(QMainWindow):
 
         # Create secondary window if it doesn't exist
         if not self.secondary_display:
-            from src.views.secondary_display import SecondaryDisplay
-            self.secondary_display = SecondaryDisplay(self.timer_controller)
+            #from src.views.secondary_display import SecondaryDisplay
+            self.secondary_display = SecondaryDisplay(self.timer_controller, parent=self)
+            #print("[DEBUG] SecondaryDisplay created")
             # Connect countdown updated signal to secondary display
             self.timer_controller.timer.meeting_countdown_updated.connect(
                 self.secondary_display._update_countdown
             )
+            #print("[DEBUG] Connected countdown signal to SecondaryDisplay._update_countdown")
+            # After connecting, ensure secondary display receives the latest countdown
+            if self.timer_controller.timer._target_meeting_time:
+                #print("[DEBUG] Manually triggering countdown update for secondary display")
+                self.timer_controller.timer._update_current_time()
             # Apply styling to ensure visibility
             self._apply_secondary_display_theme()
 
@@ -335,7 +338,7 @@ class MainWindow(QMainWindow):
         if screen:
             self.secondary_display.setGeometry(screen.geometry())
             self.secondary_display.show()
-            print(f"[Pre-FullScreen] Secondary screen: {self.secondary_display.screen().name()}")
+            #print(f"[Pre-FullScreen] Secondary screen: {self.secondary_display.screen().name()}")
             QTimer.singleShot(1000, self._make_secondary_fullscreen)
 
         # Update status bar indicator
@@ -347,18 +350,18 @@ class MainWindow(QMainWindow):
     def _make_secondary_fullscreen(self):
         """Helper to enter fullscreen after delay"""
         if self.secondary_display:
-            from PyQt6.QtWidgets import QApplication
+            #from PyQt6.QtWidgets import QApplication
             settings = self.settings_controller.get_settings()
-            print(f"[CHECK] screen index at fullscreen call: {settings.display.secondary_screen_index}")
+            #print(f"[CHECK] screen index at fullscreen call: {settings.display.secondary_screen_index}")
             screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
 
             if screen:
-                print(f"[Fullscreen Fix] Binding secondary window to screen: {screen.name()}")
+                #print(f"[Fullscreen Fix] Binding secondary window to screen: {screen.name()}")
                 self.secondary_display.move(screen.geometry().topLeft())  # Explicitly move the window
                 self.secondary_display.windowHandle().setScreen(screen)
 
             self.secondary_display.showFullScreen()
-            print(f"[Post-FullScreen] Secondary screen: {self.secondary_display.screen().name()}")
+            #print(f"[Post-FullScreen] Secondary screen: {self.secondary_display.screen().name()}")
         
     def showEvent(self, event):
         """Override show event to initialize screens when window is shown"""
@@ -713,6 +716,7 @@ class MainWindow(QMainWindow):
         self.timer_controller.meeting_overtime.connect(self._meeting_overtime)
         self.timer_controller.predicted_end_time_updated.connect(self._update_predicted_end_time)
         self.timer_controller.timer.meeting_countdown_updated.connect(self._update_countdown)
+        #print("[DEBUG] Connected timer countdown signal to MainWindow._update_countdown")
         
         # Settings controller signals
         self.settings_controller.settings_changed.connect(self._settings_changed)
@@ -1269,9 +1273,8 @@ class MainWindow(QMainWindow):
         if settings.display.use_secondary_screen:
             # Delay the creation of secondary display longer to ensure
             # the main window is fully displayed first and avoid focus hijack
-            from PyQt6.QtCore import QTimer
             QTimer.singleShot(800, self._show_secondary_display)
-            print("[Init] Delaying secondary display setup to avoid focus hijack")
+            #("[Init] Delaying secondary display setup to avoid focus hijack")
     
     def _position_main_window(self):
         """Position the main window on the primary screen from settings"""
@@ -1350,7 +1353,6 @@ class MainWindow(QMainWindow):
         screens = self.settings_controller.get_all_screens()
         
         if settings.display.secondary_screen_index is not None and 0 <= settings.display.secondary_screen_index < len(screens):
-            from PyQt6.QtWidgets import QApplication
             screen = QApplication.screens()[settings.display.secondary_screen_index]
             geometry = screen.geometry()
             
@@ -1430,40 +1432,35 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, "Error", message)
     
     def closeEvent(self, event):
-        """Handle window close event and shut down secondary display cleanly"""
-        # If the secondary display exists and is visible, close it and print debug info
-        if self.secondary_display and self.secondary_display.isVisible():
-            print("[Shutdown] Closing secondary display before main window closes")
-            self.secondary_display.close()
-
-        # Save dock visibility state
-        settings = self.settings_controller.get_settings()
-        settings.display.show_tools_dock = self.tools_dock.isVisible()
-        self.settings_controller.save_settings()
+         """Handle window close event"""
+         # Close secondary display if it exists and is visible
+         if self.secondary_display and self.secondary_display.isVisible():
+             #print("[DEBUG] Closing secondary display")
+             self.secondary_display.close()
         
-        # Accept the event to close the main window
-        event.accept()
+ 
+         # Save dock visibility state
+         settings = self.settings_controller.get_settings()
+         settings.display.show_tools_dock = self.tools_dock.isVisible()
+         self.settings_controller.save_settings()
+         
+         # Accept the event to close the main window
+         event.accept()
         
     def _on_secondary_screen_changed(self, *_):
         """Handle live updates to the selected secondary screen"""
         if not self.secondary_display:
             return
 
-        print(f"[EVENT] _on_secondary_screen_changed triggered")
+        #print(f"[EVENT] _on_secondary_screen_changed triggered")
 
         settings = self.settings_controller.get_settings()
-        print(f"Settings screen index: {settings.display.secondary_screen_index}")
-        print(f"Settings screen name: {settings.display.secondary_screen_name}")
-
-        from PyQt6.QtWidgets import QApplication
-        screens = QApplication.screens()
-        print("Available screens:")
-        for i, screen in enumerate(screens):
-            print(f"  [{i}] {screen.name()} — {screen.geometry().width()}x{screen.geometry().height()}")
+        #print(f"Settings screen index: {settings.display.secondary_screen_index}")
+        #print(f"Settings screen name: {settings.display.secondary_screen_name}")
 
         screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
         if screen:
-            print(f"Resolved screen: {screen.name()} — {screen.geometry().width()}x{screen.geometry().height()}")
+            #print(f"Resolved screen: {screen.name()} — {screen.geometry().width()}x{screen.geometry().height()}")
             QTimer.singleShot(500, lambda: self._move_secondary_display(screen))
         else:
             print("[WARNING] Could not resolve a valid screen for secondary display.")
@@ -1474,10 +1471,10 @@ class MainWindow(QMainWindow):
             return
 
         # Insert user alert and log if secondary screen is the same as primary
-        from PyQt6.QtWidgets import QApplication, QMessageBox
+        #from PyQt6.QtWidgets import QApplication, QMessageBox
         primary_screen = QApplication.primaryScreen()
         if screen == primary_screen:
-            print("[WARNING] Secondary screen is the same as primary. Expect overlapping windows.")
+            #print("[WARNING] Secondary screen is the same as primary. Expect overlapping windows.")
             QMessageBox.information(
                 self,
                 "Same Screen Selected",
@@ -1488,4 +1485,4 @@ class MainWindow(QMainWindow):
         self.secondary_display.setGeometry(geometry)
         self.secondary_display.show()
         QTimer.singleShot(200, lambda: self.secondary_display.showFullScreen())
-        print(f"[FIXED] Moved secondary display to screen: {screen.name()}")
+        #print(f"[FIXED] Moved secondary display to screen: {screen.name()}")

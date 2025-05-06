@@ -92,6 +92,7 @@ class Timer(QObject):
         
         # If we have a target meeting time, update the countdown
         if self._target_meeting_time:
+            # Calculate the time difference
             now = datetime.now()
             time_diff = self._target_meeting_time - now
             seconds_remaining = int(time_diff.total_seconds())
@@ -108,8 +109,9 @@ class Timer(QObject):
                     
                 self.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
             else:
+                countdown_msg = "Meeting time has arrived"
                 # Meeting time has passed
-                self.meeting_countdown_updated.emit(0, "Meeting time has arrived")
+                self.meeting_countdown_updated.emit(0, countdown_msg)
                 
     def start_current_time_display(self):
         """Start displaying current time"""
@@ -256,7 +258,6 @@ class Timer(QObject):
             now = time.time()
             elapsed = now - self._start_time
             self._remaining_seconds = max(0, int(self._total_seconds - elapsed))
-            
             if self._remaining_seconds == 0:
                 self.stop()
                 
@@ -276,7 +277,6 @@ class Timer(QObject):
                         countdown_msg = f"Meeting starts in {hours}h {minutes}m {seconds}s"
                     else:
                         countdown_msg = f"Meeting starts in {minutes}m {seconds}s"
-                        
                     self.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
                 else:
                     self.meeting_countdown_updated.emit(0, "Meeting time has arrived")

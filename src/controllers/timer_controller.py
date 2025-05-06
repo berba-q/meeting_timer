@@ -31,11 +31,12 @@ class TimerController(QObject):
     meeting_overtime = pyqtSignal(int)  # total overtime in seconds
     predicted_end_time_updated = pyqtSignal(datetime, datetime)  # original and predicted end times
     
-    def __init__(self, settings_manager):
+    def __init__(self, settings_controller: SettingsController):
+        """Initialize the TimerController with a settings controller"""
         super().__init__()
         
         # Initialize settings controller
-        self.settings_controller = SettingsController(settings_manager)
+        self.settings_controller = settings_controller
         self.settings_controller.settings_changed.connect(self._on_settings_updated)
         
         # Timer model
@@ -64,6 +65,7 @@ class TimerController(QObject):
         self._countdown_timer = QTimer(self)
         self._countdown_timer.setInterval(1000)  # Update every second
         self._countdown_timer.timeout.connect(self._update_meeting_countdown)
+        self._meeting_target_datetime = None
         
         # Connect timer signals
         self.timer.state_changed.connect(self._handle_timer_state_change)
@@ -91,63 +93,73 @@ class TimerController(QObject):
         """Initialize countdown to meeting start time"""
         if not self.current_meeting:
             return
-        
-        # Get meeting date and time
-        meeting_date = self.current_meeting.date
-        # Use correct start time from settings based on meeting type
+
+        now = datetime.now()
+        today = now.date()
+        now_time = now.time()
+
         settings = self.settings_controller.get_settings()
         if self.current_meeting.meeting_type == MeetingType.MIDWEEK:
+            meeting_day = settings.midweek_meeting.day.value
             meeting_time = settings.midweek_meeting.time
         else:
+            meeting_day = settings.weekend_meeting.day.value
             meeting_time = settings.weekend_meeting.time
-        
-        # Create target datetime
-        target_datetime = datetime.combine(meeting_date, meeting_time)
-        
+
+        days_ahead = (meeting_day - today.weekday() + 7) % 7
+        candidate_date = today + timedelta(days=days_ahead)
+
+        # Use today if it's the meeting day and meeting time is still in the future
+        if days_ahead == 0 and meeting_time > now_time:
+            target_date = today
+        else:
+            target_date = candidate_date
+
+        target_datetime = datetime.combine(target_date, meeting_time)
+
         # Only set countdown if meeting is in the future
-        now = datetime.now()
         if target_datetime > now:
             # Set countdown target - this will trigger countdown updates
             self.timer.set_meeting_target_time(target_datetime)
-            
+
+            self._meeting_target_datetime = target_datetime
+
             # Make sure we're in stopped state to show current time
             if self.timer.state != TimerState.STOPPED:
                 self.timer.stop()
                 self.timer.start_current_time_display()
-            
+
             # Start the countdown timer if not already running
             if not self._countdown_timer.isActive():
                 self._countdown_timer.start()
-                
+
             # Emit the countdown signal with target time
             self.countdown_started.emit(target_datetime)
         else:
             # Meeting time has passed, clear any countdown
             self.timer._target_meeting_time = None
-            
+
             # Stop the countdown timer if it's running
             if self._countdown_timer.isActive():
                 self._countdown_timer.stop()
                 
     def _update_meeting_countdown(self):
         """Update the meeting countdown display"""
-        
+        #print("[DEBUG] TimerController._update_meeting_countdown() was called")
         if not self.current_meeting:
             return
-            
-        # Calculate time until meeting
-        meeting_datetime = datetime.combine(
-            self.current_meeting.date, 
-            self.current_meeting.start_time
-        )
-        
+
+        meeting_datetime = self._meeting_target_datetime
+        if not meeting_datetime:
+            return
+
         # Get current time
         now = datetime.now()
-        
+
         # Calculate time difference
         time_diff = meeting_datetime - now
         seconds_remaining = int(time_diff.total_seconds())
-        
+
         # Format countdown message
         if seconds_remaining > 0:
             if seconds_remaining >= 3600:  # More than an hour
@@ -158,11 +170,13 @@ class TimerController(QObject):
                 minutes = seconds_remaining // 60
                 seconds = seconds_remaining % 60
                 countdown_msg = f"Meeting starts in {minutes}m {seconds}s"
+            #(f"[DEBUG] Emitting countdown: {seconds_remaining}s - {countdown_msg}")
             # Emit the updated countdown signal
             self.timer.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
             # Removed auto-start logic: meeting must be started manually
         else:
             countdown_msg = "Meeting starts now!"
+            #print(f"[DEBUG] Emitting countdown: 0s - {countdown_msg}")
             self.timer.meeting_countdown_updated.emit(0, countdown_msg)
             # Stop the countdown timer
             self._countdown_timer.stop()
@@ -516,5 +530,7 @@ class TimerController(QObject):
             self.timer.set_duration(current_part.duration_minutes)
     def _on_settings_updated(self):
         """Handle updates to settings such as meeting time"""
-        if self.current_meeting and self.timer.state in [TimerState.STOPPED, TimerState.COUNTDOWN]:
+        #settings = self.settings_controller.get_settings()
+        if self.current_meeting:
+            # Update the meeting time in the timer
             self._initialize_meeting_countdown()

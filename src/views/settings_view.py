@@ -489,6 +489,12 @@ class SettingsDialog(QDialog):
             self.auto_start_check.isChecked(),
             self.qr_code_check.isChecked()
         )
+
+        # Save the updated settings so get_settings() returns latest values
+        self.settings_controller.save_settings()
+        # Emit the signal to notify changes have occurred
+        self.settings_controller.settings_changed.emit()
+        
         
     def _setup_network_display_tab(self):
         """Setup network display tab in the settings dialog"""
