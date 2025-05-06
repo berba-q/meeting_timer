@@ -116,6 +116,16 @@ class MainWindow(QMainWindow):
         else:
             self.tools_dock.hide()
         
+        # Load settings and print secondary screen debug info
+        settings = self.settings_controller.get_settings()
+        from src.utils.screen_handler import ScreenHandler
+        secondary_screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
+        if secondary_screen:
+            print(f"[Startup] Secondary screen index: {settings.display.secondary_screen_index}")
+            print(f"[Startup] Secondary screen name: {secondary_screen.name()} — {secondary_screen.geometry().width()}x{secondary_screen.geometry().height()}")
+        else:
+            print("[Startup] No secondary screen configured or available.")
+        
         # Load meetings
         self.meeting_controller.load_meetings()
     
@@ -308,31 +318,47 @@ class MainWindow(QMainWindow):
     def _show_secondary_display(self):
         """Show the secondary display on the configured screen"""
         settings = self.settings_controller.get_settings()
-        
+
         # Create secondary window if it doesn't exist
         if not self.secondary_display:
             from src.views.secondary_display import SecondaryDisplay
-            self.secondary_display = SecondaryDisplay(self.timer_controller, parent=self)
+            self.secondary_display = SecondaryDisplay(self.timer_controller)
             # Connect countdown updated signal to secondary display
             self.timer_controller.timer.meeting_countdown_updated.connect(
                 self.secondary_display._update_countdown
             )
             # Apply styling to ensure visibility
             self._apply_secondary_display_theme()
-        
+
         # Use our ScreenHandler to position the window on the correct screen
         screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
         if screen:
-            # Set the geometry of the secondary display
             self.secondary_display.setGeometry(screen.geometry())
-            self.secondary_display.showFullScreen()
-            self.secondary_display.activateWindow()
-        
+            self.secondary_display.show()
+            print(f"[Pre-FullScreen] Secondary screen: {self.secondary_display.screen().name()}")
+            QTimer.singleShot(1000, self._make_secondary_fullscreen)
+
         # Update status bar indicator
         self.secondary_display_label.setText("Secondary Display: Active")
-        
+
         # Update toggle action state
         self.toggle_secondary_action.setChecked(True)
+
+    def _make_secondary_fullscreen(self):
+        """Helper to enter fullscreen after delay"""
+        if self.secondary_display:
+            from PyQt6.QtWidgets import QApplication
+            settings = self.settings_controller.get_settings()
+            print(f"[CHECK] screen index at fullscreen call: {settings.display.secondary_screen_index}")
+            screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
+
+            if screen:
+                print(f"[Fullscreen Fix] Binding secondary window to screen: {screen.name()}")
+                self.secondary_display.move(screen.geometry().topLeft())  # Explicitly move the window
+                self.secondary_display.windowHandle().setScreen(screen)
+
+            self.secondary_display.showFullScreen()
+            print(f"[Post-FullScreen] Secondary screen: {self.secondary_display.screen().name()}")
         
     def showEvent(self, event):
         """Override show event to initialize screens when window is shown"""
@@ -696,6 +722,10 @@ class MainWindow(QMainWindow):
         # Connect network display manager signals
         self.network_display_manager.display_started.connect(self._network_display_started)
         self.network_display_manager.display_stopped.connect(self._network_display_stopped)
+
+        # Connect settings_controller signal for secondary screen live change
+        self.settings_controller.secondary_screen_changed.connect(self._on_secondary_screen_changed)
+
     
     def _network_display_started(self, url):
         """Handle network display started"""
@@ -1237,10 +1267,11 @@ class MainWindow(QMainWindow):
         
         # Show secondary display if enabled in settings
         if settings.display.use_secondary_screen:
-            # Delay the creation of secondary display slightly to ensure
-            # the main window is fully displayed first
+            # Delay the creation of secondary display longer to ensure
+            # the main window is fully displayed first and avoid focus hijack
             from PyQt6.QtCore import QTimer
-            QTimer.singleShot(100, self._show_secondary_display)
+            QTimer.singleShot(800, self._show_secondary_display)
+            print("[Init] Delaying secondary display setup to avoid focus hijack")
     
     def _position_main_window(self):
         """Position the main window on the primary screen from settings"""
@@ -1391,7 +1422,7 @@ class MainWindow(QMainWindow):
             "OnTime Meeting Timer\n\n"
             "A cross-platform timer application for managing JW meeting schedules.\n\n"
             "Version 1.0.0\n"
-            "© 2023 Open Source"
+            "© 2025 Open Source"
         )
     
     def _show_error(self, message):
@@ -1399,9 +1430,10 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, "Error", message)
     
     def closeEvent(self, event):
-        """Handle window close event"""
-        # Close secondary display if it exists and is visible
+        """Handle window close event and shut down secondary display cleanly"""
+        # If the secondary display exists and is visible, close it and print debug info
         if self.secondary_display and self.secondary_display.isVisible():
+            print("[Shutdown] Closing secondary display before main window closes")
             self.secondary_display.close()
 
         # Save dock visibility state
@@ -1411,3 +1443,49 @@ class MainWindow(QMainWindow):
         
         # Accept the event to close the main window
         event.accept()
+        
+    def _on_secondary_screen_changed(self, *_):
+        """Handle live updates to the selected secondary screen"""
+        if not self.secondary_display:
+            return
+
+        print(f"[EVENT] _on_secondary_screen_changed triggered")
+
+        settings = self.settings_controller.get_settings()
+        print(f"Settings screen index: {settings.display.secondary_screen_index}")
+        print(f"Settings screen name: {settings.display.secondary_screen_name}")
+
+        from PyQt6.QtWidgets import QApplication
+        screens = QApplication.screens()
+        print("Available screens:")
+        for i, screen in enumerate(screens):
+            print(f"  [{i}] {screen.name()} — {screen.geometry().width()}x{screen.geometry().height()}")
+
+        screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
+        if screen:
+            print(f"Resolved screen: {screen.name()} — {screen.geometry().width()}x{screen.geometry().height()}")
+            QTimer.singleShot(500, lambda: self._move_secondary_display(screen))
+        else:
+            print("[WARNING] Could not resolve a valid screen for secondary display.")
+
+    def _move_secondary_display(self, screen):
+        """Safely move the secondary display to the selected screen after a delay"""
+        if not self.secondary_display or not screen:
+            return
+
+        # Insert user alert and log if secondary screen is the same as primary
+        from PyQt6.QtWidgets import QApplication, QMessageBox
+        primary_screen = QApplication.primaryScreen()
+        if screen == primary_screen:
+            print("[WARNING] Secondary screen is the same as primary. Expect overlapping windows.")
+            QMessageBox.information(
+                self,
+                "Same Screen Selected",
+                "The primary and secondary screens are the same. This may cause overlapping windows."
+            )
+
+        geometry = screen.geometry()
+        self.secondary_display.setGeometry(geometry)
+        self.secondary_display.show()
+        QTimer.singleShot(200, lambda: self.secondary_display.showFullScreen())
+        print(f"[FIXED] Moved secondary display to screen: {screen.name()}")

@@ -36,6 +36,7 @@ class TimerController(QObject):
         
         # Initialize settings controller
         self.settings_controller = SettingsController(settings_manager)
+        self.settings_controller.settings_changed.connect(self._on_settings_updated)
         
         # Timer model
         self.timer = Timer()
@@ -513,3 +514,7 @@ class TimerController(QObject):
         if 0 <= self.current_part_index < len(self.parts_list):
             current_part = self.parts_list[self.current_part_index]
             self.timer.set_duration(current_part.duration_minutes)
+    def _on_settings_updated(self):
+        """Handle updates to settings such as meeting time"""
+        if self.current_meeting and self.timer.state in [TimerState.STOPPED, TimerState.COUNTDOWN]:
+            self._initialize_meeting_countdown()
