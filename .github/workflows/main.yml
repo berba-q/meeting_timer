@@ -24,7 +24,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref }}
-          name: JW Meeting Timer ${{ steps.get_version.outputs.version }}
+          name: OnTime Meeting Timer ${{ steps.get_version.outputs.version }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name "JW Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --collect-data src
+          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --collect-data src
 
       - name: Download and Install Inno Setup
         run: |
@@ -60,11 +60,11 @@ jobs:
         run: |
           $version = "${{ needs.create-release.outputs.version }}"
           $iss = @"
-          #define MyAppName "JW Meeting Timer"
+          #define MyAppName "OnTime Meeting Timer"
           #define MyAppVersion "$version"
           #define MyAppPublisher "Your Name"
           #define MyAppURL "https://github.com/berb-q/meeting_timer"
-          #define MyAppExeName "JW Meeting Timer.exe"
+          #define MyAppExeName "OnTime Meeting Timer.exe"
 
           [Setup]
           AppId={{F9A6E8D8-3B2F-4A8A-B5D1-57A7F2E7BAC7}
@@ -77,7 +77,7 @@ jobs:
           DefaultDirName={autopf}\{#MyAppName}
           DisableProgramGroupPage=yes
           OutputDir=.
-          OutputBaseFilename=JWMeetingTimer-{#MyAppVersion}-setup
+          OutputBaseFilename=OnTimeMeetingTimer-{#MyAppVersion}-setup
           Compression=lzma
           SolidCompression=yes
           WizardStyle=modern
@@ -90,7 +90,7 @@ jobs:
           Name: "startupitem"; Description: "Run at system startup"; GroupDescription: "Startup Options"
 
           [Files]
-          Source: "dist\JW Meeting Timer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "dist\OnTime Meeting Timer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
           [Icons]
           Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -112,8 +112,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./JWMeetingTimer-${{ needs.create-release.outputs.version }}-setup.exe
-          asset_name: JWMeetingTimer-${{ needs.create-release.outputs.version }}-setup.exe
+          asset_path: ./OntimeMeetingTimer-${{ needs.create-release.outputs.version }}-setup.exe
+          asset_name: OntimeMeetingTimer-${{ needs.create-release.outputs.version }}-setup.exe
           asset_content_type: application/octet-stream
 
   build-macos:
@@ -136,12 +136,12 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name "JW Meeting Timer" --windowed --icon=assets/icons/app-icon.icns --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
+          pyinstaller --name "Ontime Meeting Timer" --windowed --icon=assets/icons/app-icon.icns --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
       
       - name: Create DMG settings file
         run: |
-          echo 'app = defines.get("app", "dist/JW Meeting Timer.app")' > dmg_settings.py
-          echo 'appname = defines.get("appname", "JW Meeting Timer")' >> dmg_settings.py
+          echo 'app = defines.get("app", "dist/OnTime Meeting Timer.app")' > dmg_settings.py
+          echo 'appname = defines.get("appname", "OnTime Meeting Timer")' >> dmg_settings.py
           echo 'window_rect = ((100, 100), (640, 480))' >> dmg_settings.py
           echo 'icon_size = 128' >> dmg_settings.py
           echo 'text_size = 12' >> dmg_settings.py
@@ -154,7 +154,7 @@ jobs:
       
       - name: Build DMG
         run: |
-          dmgbuild -s dmg_settings.py "JW Meeting Timer" "JWMeetingTimer-${{ needs.create-release.outputs.version }}.dmg"
+          dmgbuild -s dmg_settings.py "OnTime Meeting Timer" "OnTimeMeetingTimer-${{ needs.create-release.outputs.version }}.dmg"
         
       - name: Upload DMG to release
         uses: actions/upload-release-asset@v1
@@ -162,8 +162,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./JWMeetingTimer-${{ needs.create-release.outputs.version }}.dmg
-          asset_name: JWMeetingTimer-${{ needs.create-release.outputs.version }}.dmg
+          asset_path: ./OnTimeMeetingTimer-${{ needs.create-release.outputs.version }}.dmg
+          asset_name: OnTimeMeetingTimer-${{ needs.create-release.outputs.version }}.dmg
           asset_content_type: application/octet-stream
 
   build-linux:
@@ -188,18 +188,18 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name "jwmeetingtimer" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
+          pyinstaller --name "ontimemeetingtimer" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
       
       - name: Create .desktop file
         run: |
-          echo "[Desktop Entry]" > jwmeetingtimer.desktop
-          echo "Name=JW Meeting Timer" >> jwmeetingtimer.desktop
-          echo "Comment=Timer application for managing meeting schedules" >> jwmeetingtimer.desktop
-          echo "Exec=jwmeetingtimer" >> jwmeetingtimer.desktop
-          echo "Icon=jwmeetingtimer" >> jwmeetingtimer.desktop
-          echo "Terminal=false" >> jwmeetingtimer.desktop
-          echo "Type=Application" >> jwmeetingtimer.desktop
-          echo "Categories=Utility;" >> jwmeetingtimer.desktop
+          echo "[Desktop Entry]" > ontimemeetingtimer.desktop
+          echo "Name=OnTime Meeting Timer" >> ontimemeetingtimer.desktop
+          echo "Comment=Timer application for managing meeting schedules" >> ontimemeetingtimer.desktop
+          echo "Exec=ontimemeetingtimer" >> ontimemeetingtimer.desktop
+          echo "Icon=ontimemeetingtimer" >> ontimemeetingtimer.desktop
+          echo "Terminal=false" >> ontimemeetingtimer.desktop
+          echo "Type=Application" >> ontimemeetingtimer.desktop
+          echo "Categories=Utility;" >> ontimemeetingtimer.desktop
       
       - name: Download AppImage tools
         run: |
@@ -212,24 +212,24 @@ jobs:
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           
-          cp -r dist/jwmeetingtimer/* AppDir/usr/bin/
-          cp jwmeetingtimer.desktop AppDir/usr/share/applications/
-          cp assets/icons/app-icon.png AppDir/usr/share/icons/hicolor/256x256/apps/jwmeetingtimer.png
+          cp -r dist/ontimemeetingtimer/* AppDir/usr/bin/
+          cp ontimemeetingtimer.desktop AppDir/usr/share/applications/
+          cp assets/icons/app-icon.png AppDir/usr/share/icons/hicolor/256x256/apps/ontimemeetingtimer.png
           
-          ln -s usr/share/applications/jwmeetingtimer.desktop AppDir/jwmeetingtimer.desktop
-          ln -s usr/share/icons/hicolor/256x256/apps/jwmeetingtimer.png AppDir/jwmeetingtimer.png
+          ln -s usr/share/applications/ontimemeetingtimer.desktop AppDir/ontimemeetingtimer.desktop
+          ln -s usr/share/icons/hicolor/256x256/apps/ontimemeetingtimer.png AppDir/ontimemeetingtimer.png
           
           # Create AppRun script
           echo '#!/bin/bash' > AppDir/AppRun
           echo 'SELF=$(readlink -f "$0")' >> AppDir/AppRun
           echo 'HERE=${SELF%/*}' >> AppDir/AppRun
           echo 'export PATH="${HERE}/usr/bin:${PATH}"' >> AppDir/AppRun
-          echo 'exec "${HERE}/usr/bin/jwmeetingtimer" "$@"' >> AppDir/AppRun
+          echo 'exec "${HERE}/usr/bin/ontimemeetingtimer" "$@"' >> AppDir/AppRun
           chmod +x AppDir/AppRun
       
       - name: Build AppImage
         run: |
-          VERSION=${{ needs.create-release.outputs.version }} ./appimagetool-x86_64.AppImage AppDir JWMeetingTimer-${{ needs.create-release.outputs.version }}.AppImage
+          VERSION=${{ needs.create-release.outputs.version }} ./appimagetool-x86_64.AppImage AppDir ontimemeetingtimer-${{ needs.create-release.outputs.version }}.AppImage
         
       - name: Upload AppImage to release
         uses: actions/upload-release-asset@v1
@@ -237,8 +237,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./JWMeetingTimer-${{ needs.create-release.outputs.version }}.AppImage
-          asset_name: JWMeetingTimer-${{ needs.create-release.outputs.version }}.AppImage
+          asset_path: ./ontimemeetingtimer-${{ needs.create-release.outputs.version }}.AppImage
+          asset_name: ontimemeetingtimer-${{ needs.create-release.outputs.version }}.AppImage
           asset_content_type: application/octet-stream
 
   update-version-json:
@@ -259,11 +259,11 @@ jobs:
             "version": "${VERSION}",
             "releaseDate": "${TODAY}",
             "downloadUrl": {
-              "windows": "https://github.com/${REPO}/releases/download/v${VERSION}/JWMeetingTimer-${VERSION}-setup.exe",
-              "macos": "https://github.com/${REPO}/releases/download/v${VERSION}/JWMeetingTimer-${VERSION}.dmg",
-              "linux": "https://github.com/${REPO}/releases/download/v${VERSION}/JWMeetingTimer-${VERSION}.AppImage"
+              "windows": "https://github.com/${REPO}/releases/download/v${VERSION}/ontimemeetingtimer-${VERSION}-setup.exe",
+              "macos": "https://github.com/${REPO}/releases/download/v${VERSION}/ontimemeetingtimer-${VERSION}.dmg",
+              "linux": "https://github.com/${REPO}/releases/download/v${VERSION}/ontimemeetingtimer-${VERSION}.AppImage"
             },
-            "releaseNotes": "Version ${VERSION} of JW Meeting Timer. See GitHub for full release notes."
+            "releaseNotes": "Version ${VERSION} of OnTime Meeting Timer. See GitHub for full release notes."
           }
           EOF
           
