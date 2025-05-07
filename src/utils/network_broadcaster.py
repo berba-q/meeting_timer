@@ -71,17 +71,15 @@ class NetworkBroadcaster(QObject):
         # Register new client
         self.connected_clients.add(websocket)
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
-        print(f"Client connected: {client_id}")
+        #print(f"Client connected: {client_id}")
         self.client_connected.emit(client_id)
         
         # Send current state immediately upon connection
         try:
             serialized = json.dumps(self.current_state)
-            print(f"Sending to client {client_id}: {serialized}")
+            #print(f"Sending to client {client_id}: {serialized}")
             await websocket.send(serialized)
         except (TypeError, ValueError) as e:
-            print(f"[ERROR] Failed to serialize and send current_state to {client_id}: {e}")
-            print(f"[DEBUG] current_state was: {self.current_state}")
             traceback.print_exc()
         
         try:
@@ -98,13 +96,13 @@ class NetworkBroadcaster(QObject):
             # Remove disconnected client
             self.connected_clients.remove(websocket)
             self.client_disconnected.emit(client_id)
-            print(f"Client disconnected: {client_id}")
+            #print(f"Client disconnected: {client_id}")
     
     async def _server_main(self):
         """Main server coroutine with improved error handling"""
         try:
             # Start WebSocket server
-            print(f"Starting WebSocket server on {self.host_ip}:{self.port}")
+            #print(f"Starting WebSocket server on {self.host_ip}:{self.port}")
             
             # Create server with ping/pong enabled for better connection management
             self.server = await serve(
@@ -117,7 +115,7 @@ class NetworkBroadcaster(QObject):
             
             # Emit signal that broadcast has started
             connection_url = f"ws://{self.host_ip}:{self.port}"
-            print(f"WebSocket server started at {connection_url}")
+            #print(f"WebSocket server started at {connection_url}")
             self.broadcast_started.emit(connection_url, self.port)
             self.is_broadcasting = True
             

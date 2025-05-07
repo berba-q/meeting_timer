@@ -314,12 +314,12 @@ class MainWindow(QMainWindow):
         
     def _show_secondary_display(self):
         """Show the secondary display on the configured screen"""
-        print("[DEBUG] Entered _show_secondary_display")
+        
         settings = self.settings_controller.get_settings()
 
         # Create secondary window if it doesn't exist
         if not self.secondary_display:
-            print("[DEBUG] Creating new SecondaryDisplay instance")
+            
             self.secondary_display = SecondaryDisplay(self.timer_controller, self.settings_controller, parent=self)
             #print("[DEBUG] SecondaryDisplay created")
             # Connect countdown updated signal to secondary display
@@ -338,7 +338,6 @@ class MainWindow(QMainWindow):
         screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
         if screen:
             self.secondary_display.setGeometry(screen.geometry())
-            print(f"[DEBUG] Secondary display geometry set to: {screen.geometry()}")
             self.secondary_display.show()
             #print(f"[Pre-FullScreen] Secondary screen: {self.secondary_display.screen().name()}")
             QTimer.singleShot(1000, self._make_secondary_fullscreen)
@@ -1267,8 +1266,7 @@ class MainWindow(QMainWindow):
         """Initialize screen handling during application startup"""
         # Get the current settings (reload from disk to ensure up-to-date)
         settings = self.settings_controller.settings_manager._load_settings()
-        print("[DEBUG] Initializing screens on startup...")
-        print(f"[DEBUG] use_secondary_screen = {settings.display.use_secondary_screen}")
+        
         
         # Position main window on the primary screen
         self._position_main_window()
@@ -1474,7 +1472,7 @@ class MainWindow(QMainWindow):
         if not self.secondary_display or not screen:
             return
 
-        print(f"[DEBUG] Moving secondary display to screen: {screen.name()} — {screen.geometry()}")
+        
         # Insert user alert and log if secondary screen is the same as primary
         #from PyQt6.QtWidgets import QApplication, QMessageBox
         primary_screen = QApplication.primaryScreen()

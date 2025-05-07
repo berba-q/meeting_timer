@@ -334,7 +334,7 @@ class NetworkHTTPServer(QObject):
         try:
             with open(html_path, 'r', encoding='utf-8') as f:
                 self.html_content = f.read()
-                print(f"Loaded HTML content from {html_path}, size: {len(self.html_content)} bytes")
+                
             return True
         except Exception as e:
             self.error_occurred.emit(f"Failed to load HTML content: {str(e)}")
@@ -346,7 +346,7 @@ class NetworkHTTPServer(QObject):
     def set_html_content(self, html_content: str):
         """Set HTML content directly"""
         self.html_content = html_content
-        print(f"HTML content set directly, size: {len(self.html_content)} bytes")
+        #print(f"HTML content set directly, size: {len(self.html_content)} bytes")
     
     def start_server(self, port: Optional[int] = None, ws_port: Optional[int] = None):
         """Start the HTTP server"""
@@ -394,7 +394,7 @@ class NetworkHTTPServer(QObject):
         
         def run_server():
             try:
-                print(f"Binding server to {self.host_ip}:{self.port}")
+                #print(f"Binding server to {self.host_ip}:{self.port}")
                 server_address = ('0.0.0.0', self.port)
                 
                 self.server = RobustHTTPServer(server_address, handler_class)
