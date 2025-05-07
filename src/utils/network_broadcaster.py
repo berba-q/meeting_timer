@@ -1,10 +1,13 @@
 """
 This module provides functionality to broadcast timer data over the network.
 """
+from datetime import datetime
 import json
+import functools
 import asyncio
 import threading
 import websockets
+from websockets.legacy.server import serve, WebSocketServerProtocol
 import socket
 import time
 import traceback
@@ -31,20 +34,22 @@ class NetworkBroadcaster(QObject):
         self.thread = None
         
         # Connection tracking
-        self.connected_clients: Set[websockets.WebSocketServerProtocol] = set()
+        self.connected_clients: Set[WebSocketServerProtocol] = set()
         self.host_ip = self._get_local_ip()
         self.port = 8765  # Default WebSocket port
         self.is_broadcasting = False
         self._stop_event = threading.Event()
         
         # Current state
+        current_time = datetime.now().strftime("%H:%M:%S")
         self.current_state = {
-            "time": "00:00",
+            "time": current_time,
             "state": "stopped",
             "part": "",
             "nextPart": "",
             "endTime": "",
-            "overtime": 0
+            "overtime": 0,
+            "countdownMessage": ""
         }
     
     def _get_local_ip(self) -> str:
@@ -66,48 +71,51 @@ class NetworkBroadcaster(QObject):
         # Register new client
         self.connected_clients.add(websocket)
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
-        print(f"Client connected: {client_id}")
+        #print(f"Client connected: {client_id}")
         self.client_connected.emit(client_id)
         
         # Send current state immediately upon connection
         try:
-            await websocket.send(json.dumps(self.current_state))
-        except Exception as e:
-            print(f"Error sending initial state to client {client_id}: {e}")
+            serialized = json.dumps(self.current_state)
+            #print(f"Sending to client {client_id}: {serialized}")
+            await websocket.send(serialized)
+        except (TypeError, ValueError) as e:
+            traceback.print_exc()
         
         try:
             # Keep connection open until client disconnects
             async for message in websocket:
                 # We don't expect messages from clients, but could handle commands here
                 pass
-        except websockets.exceptions.ConnectionClosed:
-            print(f"Client connection closed: {client_id}")
         except Exception as e:
-            print(f"Error in WebSocket handler for {client_id}: {e}")
+            if isinstance(e, ConnectionResetError) or isinstance(e, websockets.exceptions.ConnectionClosed):
+                print(f"Client connection closed: {client_id}")
+            else:
+                print(f"Error in WebSocket handler for {client_id}: {e}")
         finally:
             # Remove disconnected client
             self.connected_clients.remove(websocket)
             self.client_disconnected.emit(client_id)
-            print(f"Client disconnected: {client_id}")
+            #print(f"Client disconnected: {client_id}")
     
     async def _server_main(self):
         """Main server coroutine with improved error handling"""
         try:
             # Start WebSocket server
-            print(f"Starting WebSocket server on {self.host_ip}:{self.port}")
+            #print(f"Starting WebSocket server on {self.host_ip}:{self.port}")
             
             # Create server with ping/pong enabled for better connection management
-            self.server = await websockets.serve(
-                self._handler, 
-                "0.0.0.0",  # Listen on all interfaces
+            self.server = await serve(
+                self._handler,
+                "0.0.0.0",
                 self.port,
-                ping_interval=30,  # Send ping every 30 seconds
-                ping_timeout=10     # Wait 10 seconds for pong response
+                ping_interval=30,
+                ping_timeout=10
             )
             
             # Emit signal that broadcast has started
             connection_url = f"ws://{self.host_ip}:{self.port}"
-            print(f"WebSocket server started at {connection_url}")
+            #print(f"WebSocket server started at {connection_url}")
             self.broadcast_started.emit(connection_url, self.port)
             self.is_broadcasting = True
             
@@ -150,7 +158,13 @@ class NetworkBroadcaster(QObject):
             try:
                 asyncio.set_event_loop(self.event_loop)
                 self.server_task = self.event_loop.create_task(self._server_main())
-                self.event_loop.run_until_complete(self.server_task)
+                try:
+                    self.event_loop.run_until_complete(self.server_task)
+                except RuntimeError as e:
+                    if "Event loop stopped before Future completed" in str(e):
+                        print("[INFO] Event loop stopped cleanly before Future completed.")
+                    else:
+                        raise
             except Exception as e:
                 print(f"Error in WebSocket server thread: {e}")
                 traceback.print_exc()
@@ -185,8 +199,12 @@ class NetworkBroadcaster(QObject):
         
         # Close server and clean up
         if self.server:
+            async def shutdown_server():
+                self.server.close()
+                await self.server.wait_closed()
+
             if self.event_loop and self.event_loop.is_running():
-                self.event_loop.call_soon_threadsafe(lambda: self.server.close())
+                asyncio.run_coroutine_threadsafe(shutdown_server(), self.event_loop)
             
         # Stop the event loop
         if self.event_loop and self.event_loop.is_running():
@@ -196,6 +214,10 @@ class NetworkBroadcaster(QObject):
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=2)
             print("WebSocket broadcaster thread joined")
+            self.thread = None
+            self.server = None
+            self.server_task = None
+            self.event_loop = None
         
         self.is_broadcasting = False
         self.broadcast_stopped.emit()
@@ -233,7 +255,8 @@ class NetworkBroadcaster(QObject):
                     pass  # Client might not have remote_address anymore
     
     def update_timer_data(self, time_str: str, state: str, part_title: str, 
-                        next_part: str = "", end_time: str = "", overtime_seconds: int = 0):
+                    next_part: str = "", end_time: str = "", overtime_seconds: int = 0,
+                    countdown_message: str = ""):
         """Update the current timer data and broadcast to clients"""
         # Update current state
         self.current_state = {
@@ -242,7 +265,8 @@ class NetworkBroadcaster(QObject):
             "part": part_title,
             "nextPart": next_part,
             "endTime": end_time,
-            "overtime": overtime_seconds
+            "overtime": overtime_seconds,
+            "countdownMessage": countdown_message  # Include countdown message
         }
         
         # Broadcast to clients if server is running
@@ -258,7 +282,7 @@ class NetworkBroadcaster(QObject):
     def get_connection_url(self) -> str:
         """Get the URL clients can use to connect"""
         return f"ws://{self.host_ip}:{self.port}"
-    
+
     def get_client_count(self) -> int:
         """Get the number of connected clients"""
         return len(self.connected_clients)

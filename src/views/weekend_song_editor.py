@@ -1,5 +1,5 @@
 """
-Dialog for editing weekend meeting songs in the JW Meeting Timer application.
+Dialog for editing weekend meeting songs in the OnTime Meeting Timer application.
 """
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,

@@ -1,6 +1,6 @@
-# JW Meeting Timer - Quick Start Guide
+# OnTime - Quick Start Guide
 
-This guide covers the new features added in the latest version of the JW Meeting Timer application.
+This guide covers the new features added in the latest version of the OnTime Meeting Timer application.
 
 ## New Features Overview
 

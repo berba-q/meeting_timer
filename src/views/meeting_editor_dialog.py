@@ -1,5 +1,5 @@
 """
-Meeting editor dialog for creating and editing meetings in the JW Meeting Timer application.
+Meeting editor dialog for creating and editing meetings in the OnTime Meeting Timer application.
 """
 import copy
 from datetime import datetime, time

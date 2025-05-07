@@ -562,7 +562,7 @@ class MeetingScraper:
             if parent:
                 song_elements.append((element, parent))
         
-        print(f"Found {len(song_elements)} song elements")
+        
         
         # Process song elements to find opening and closing songs
         for i, (element, parent) in enumerate(song_elements):

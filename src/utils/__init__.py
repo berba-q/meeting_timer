@@ -1,3 +1,3 @@
 """
-Utilities package for the JW Meeting Timer application.
+Utilities package for the OnTime Meeting Timer application.
 """

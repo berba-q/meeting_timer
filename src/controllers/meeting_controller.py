@@ -1,5 +1,5 @@
 """
-Controller for managing meetings in the JW Meeting Timer application.
+Controller for managing meetings in the OnTime Meeting Timer application.
 """
 import os
 import json
@@ -32,7 +32,7 @@ class MeetingController(QObject):
         super().__init__()
         
         # Setup data directories
-        self.data_dir = os.path.join(os.path.expanduser("~"), ".jwmeetingtimer")
+        self.data_dir = os.path.join(os.path.expanduser("~"), ".ontime")
         self.meetings_dir = os.path.join(self.data_dir, "meetings")
         
         # Create directories if they don't exist
@@ -422,9 +422,6 @@ class MeetingController(QObject):
         self.current_meeting = meeting
         self.meeting_updated.emit(meeting)
         
-        # Print debug info
-        print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
-    
     def get_meeting(self, meeting_type: MeetingType) -> Optional[Meeting]:
         """Get a meeting by type"""
         return self.current_meetings.get(meeting_type)
@@ -553,15 +550,22 @@ class MeetingController(QObject):
             
         return False
     
-    def show_meeting_editor(self, parent=None, meeting: Optional[Meeting] = None):
-        """Show the meeting editor dialog"""
+    def show_meeting_editor(self, parent=None, meeting: Optional[Meeting] = None, on_meeting_updated=None):
+        """Show the meeting editor dialog
+        :param parent: Parent widget
+        :param meeting: Meeting instance to edit
+        :param on_meeting_updated: Optional callback to connect to meeting_updated signal
+        """
         from src.views.meeting_editor_dialog import MeetingEditorDialog
-        
+
         dialog = MeetingEditorDialog(parent, meeting)
-        
+
         # Connect the signal from the dialog
-        dialog.meeting_updated.connect(self._handle_meeting_updated)
-        
+        if on_meeting_updated:
+            dialog.meeting_updated.connect(on_meeting_updated)
+        else:
+            dialog.meeting_updated.connect(self._handle_meeting_updated)
+
         # Show the dialog
         dialog.exec()
     

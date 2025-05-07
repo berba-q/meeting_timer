@@ -1,5 +1,5 @@
 """
-Settings model for the JW Meeting Timer application.
+Settings model for the OnTime Meeting Timer application.
 """
 import json
 import os
@@ -97,6 +97,7 @@ class DisplaySettings:
     use_secondary_screen: bool = False
     show_predicted_end_time: bool = True
     theme: str = "light"  # 'light' or 'dark'
+    show_tools_dock: bool = False
     
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
@@ -114,13 +115,14 @@ class DisplaySettings:
     @classmethod
     def from_dict(cls, data: dict) -> 'DisplaySettings':
         """Create from dictionary"""
+        use_secondary_screen = data.get('use_secondary_screen', False)
         return cls(
-            display_mode=TimerDisplayMode(data['display_mode']),
+            display_mode=TimerDisplayMode(data.get('display_mode', TimerDisplayMode.DIGITAL.value)),
             primary_screen_index=data.get('primary_screen_index', 0),
             primary_screen_name=data.get('primary_screen_name', ""),
             secondary_screen_index=data.get('secondary_screen_index'),
             secondary_screen_name=data.get('secondary_screen_name', ""),
-            use_secondary_screen=data.get('use_secondary_screen', False),
+            use_secondary_screen=use_secondary_screen,
             show_predicted_end_time=data.get('show_predicted_end_time', True),
             theme=data.get('theme', 'light')
         )
@@ -203,9 +205,11 @@ class SettingsManager:
     def _load_settings(self) -> AppSettings:
         """Load settings from file or create default settings"""
         if os.path.exists(self.settings_file):
+           
             try:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings_dict = json.load(f)
+                
                 return AppSettings.from_dict(settings_dict)
             except (json.JSONDecodeError, KeyError, ValueError) as e:
                 print(f"Error loading settings: {e}")

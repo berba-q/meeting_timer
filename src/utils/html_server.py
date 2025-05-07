@@ -72,7 +72,7 @@ class CustomHandler(SimpleHTTPRequestHandler):
                     self.wfile.write(html.encode('utf-8'))
                 else:
                     # Fallback to generic response
-                    self.wfile.write(b'<html><body><h1>JW Meeting Timer</h1><p>Network display server is running.</p></body></html>')
+                    self.wfile.write(b'<html><body><h1>OnTime Meeting Timer</h1><p>Network display server is running.</p></body></html>')
             else:
                 # For any other path, return 404
                 self.send_response(404)
@@ -130,7 +130,7 @@ class NetworkHTTPServer(QObject):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Meeting Timer Display</title>
+    <title>OnTime Meeting Timer Display</title>
     <style>
         body {
             background-color: #000000;
@@ -171,6 +171,14 @@ class NetworkHTTPServer(QObject):
             max-width: 90vw;
         }
         
+        #countdown-message {
+            font-size: 7vmin;
+            font-weight: bold;
+            color: #4a90e2;
+            margin: 2vh 5vw;
+            max-width: 90vw;
+        }
+        
         #end-time {
             font-size: 4vmin;
             margin-top: 2vh;
@@ -201,6 +209,8 @@ class NetworkHTTPServer(QObject):
     
     <div id="current-part">Waiting for connection...</div>
     
+    <div id="countdown-message" style="display: none;"></div>
+    
     <div id="next-part">Next Part: —</div>
     
     <div id="end-time"></div>
@@ -212,6 +222,7 @@ class NetworkHTTPServer(QObject):
         const nextPart = document.getElementById('next-part');
         const endTime = document.getElementById('end-time');
         const status = document.getElementById('status');
+        const countdownMsg = document.getElementById('countdown-message');
         
         // Create WebSocket connection
         const socket = new WebSocket(`ws://${window.location.hostname}:{WS_PORT}`);
@@ -244,18 +255,34 @@ class NetworkHTTPServer(QObject):
                 // Set timer color based on state
                 timerDisplay.className = data.state;
                 
-                // Update part information
-                if (data.part) {
-                    currentPart.textContent = data.part;
+                // Handle meeting countdown display
+                if (data.state === 'stopped' && data.countdownMessage) {
+                    // We're in pre-meeting countdown mode
+                    countdownMsg.textContent = data.countdownMessage;
+                    countdownMsg.style.display = 'block';
+                    nextPart.style.display = 'none';
+                    endTime.style.display = 'none';
+                    currentPart.style.display = 'none';
                 } else {
-                    currentPart.textContent = 'No active part';
-                }
-                
-                // Update next part if available
-                if (data.nextPart) {
-                    nextPart.textContent = `Next Part: ${data.nextPart}`;
-                } else {
-                    nextPart.textContent = 'Next Part: —';
+                    // Regular meeting or part display
+                    countdownMsg.style.display = 'none';
+                    nextPart.style.display = 'block';
+                    endTime.style.display = 'block';
+                    currentPart.style.display = 'block';
+                    
+                    // Update part information
+                    if (data.part) {
+                        currentPart.textContent = data.part;
+                    } else {
+                        currentPart.textContent = 'No active part';
+                    }
+                    
+                    // Update next part if available
+                    if (data.nextPart) {
+                        nextPart.textContent = `Next Part: ${data.nextPart}`;
+                    } else {
+                        nextPart.textContent = 'Next Part: —';
+                    }
                 }
                 
                 // Update end time if available
@@ -284,6 +311,19 @@ class NetworkHTTPServer(QObject):
                 console.error('Error parsing message:', error);
             }
         });
+        
+        // Update the clock while in stopped state
+        function updateClock() {
+            // Only update if the timer is in stopped state
+            if (timerDisplay.className === 'stopped') {
+                const now = new Date();
+                const timeString = now.toTimeString().split(' ')[0];
+                timerDisplay.textContent = timeString;
+            }
+        }
+        
+        // Update clock every second when in stopped state
+        setInterval(updateClock, 1000);
     </script>
 </body>
 </html>
@@ -294,7 +334,7 @@ class NetworkHTTPServer(QObject):
         try:
             with open(html_path, 'r', encoding='utf-8') as f:
                 self.html_content = f.read()
-                print(f"Loaded HTML content from {html_path}, size: {len(self.html_content)} bytes")
+                
             return True
         except Exception as e:
             self.error_occurred.emit(f"Failed to load HTML content: {str(e)}")
@@ -306,7 +346,7 @@ class NetworkHTTPServer(QObject):
     def set_html_content(self, html_content: str):
         """Set HTML content directly"""
         self.html_content = html_content
-        print(f"HTML content set directly, size: {len(self.html_content)} bytes")
+        #print(f"HTML content set directly, size: {len(self.html_content)} bytes")
     
     def start_server(self, port: Optional[int] = None, ws_port: Optional[int] = None):
         """Start the HTTP server"""
@@ -354,7 +394,7 @@ class NetworkHTTPServer(QObject):
         
         def run_server():
             try:
-                print(f"Binding server to {self.host_ip}:{self.port}")
+                #print(f"Binding server to {self.host_ip}:{self.port}")
                 server_address = ('0.0.0.0', self.port)
                 
                 self.server = RobustHTTPServer(server_address, handler_class)

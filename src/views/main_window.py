@@ -1,7 +1,8 @@
 """
-Main application window for the JW Meeting Timer.
+Main application window for the OnTime meeting timer app.
 """
 import os
+from src.utils.lazy_loader import LazyComponentLoader
 from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -59,13 +60,13 @@ class UpdateCheckWorker(QObject):
 class MainWindow(QMainWindow):
     """Main application window"""
     
-    def __init__(self, meeting_controller: MeetingController):
+    def __init__(self, meeting_controller: MeetingController, settings_controller: SettingsController):
         super().__init__()
         
         # Initialize controllers
         self.meeting_controller = meeting_controller
-        self.settings_controller = SettingsController(self.meeting_controller.settings_manager)
-        self.timer_controller = TimerController()
+        self.settings_controller = settings_controller
+        self.timer_controller = TimerController(settings_controller)
         
         # Secondary display window
         self.secondary_display = None
@@ -76,20 +77,24 @@ class MainWindow(QMainWindow):
         # Create network status widget
         self.network_status_widget = NetworkStatusWidget(self.network_display_manager)
 
-        # Create network status dock widget
-        self.network_dock = QDockWidget("Network Display", self)
-        self.network_dock.setWidget(self.network_status_widget)
-        self.network_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
-        self.network_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.network_dock)
+        # Create tab widget for docked tools
+        self.dock_tabs = QTabWidget()
+        self.dock_tabs.setTabPosition(QTabWidget.TabPosition.North)
+        self.dock_tabs.addTab(self.network_status_widget, "Network")
 
-        # Hide dock by default unless network display is enabled
-        if self.settings_controller.get_settings().network_display.mode == NetworkDisplayMode.DISABLED:
-            self.network_dock.hide()
+        # Wrap in tools dock
+        self.tools_dock = QDockWidget("Tools", self)
+        self.tools_dock.setWidget(self.dock_tabs)
+        self.tools_dock.setMinimumSize(200, 200)
+        self.tools_dock.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.tools_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
+        self.tools_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea)
+
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.tools_dock)
         
         # Setup UI
-        self.setWindowTitle("JW Meeting Timer")
-        self.setMinimumSize(1000, 700)
+        self.setWindowTitle("OnTime Meeting Timer")
+        self.setMinimumSize(600, 400)
         
         # Apply current theme
         self._apply_current_theme()
@@ -102,16 +107,30 @@ class MainWindow(QMainWindow):
         
         # Connect signals
         self._connect_signals()
-        
         # Initialize timer to show current time
         self._initialize_timer_display()
+        
+        # Restore dock visibility state
+        if self.settings_controller.get_settings().display.show_tools_dock:
+            self.tools_dock.show()
+        else:
+            self.tools_dock.hide()
+        
+        # Load settings and print secondary screen debug info
+        settings = self.settings_controller.get_settings()
+        from src.utils.screen_handler import ScreenHandler
+        secondary_screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
+        
+        # Directly create components that were previously lazy-loaded
+        self.meeting_view = MeetingView(self.meeting_controller, self.timer_controller)
+        self.network_status_widget = NetworkStatusWidget(self.network_display_manager)
         
         # Load meetings
         self.meeting_controller.load_meetings()
     
     def _check_for_updates(self, silent=False):
         """Check for application updates"""
-        from src.utils.update_checker import check_for_updates
+        #from src.utils.update_checker import check_for_updates
         
         # Store the thread reference so it doesn't get garbage collected
         self.update_thread = check_for_updates(self, silent)
@@ -122,22 +141,22 @@ class MainWindow(QMainWindow):
         from src.utils.update_checker import UpdateDialog
         dialog = UpdateDialog(version_info, self)
         dialog.exec()
-    
+
     def _show_no_update_message(self):
-        """Show no update available message"""
-        QMessageBox.information(
+        """Show no update available message (thread-safe)"""
+        QTimer.singleShot(0, lambda: QMessageBox.information(
             self,
             "No Updates Available",
-            "You are using the latest version of JW Meeting Timer."
-        )
-    
+            "You are using the latest version of OnTime Meeting Timer."
+        ))
+
     def _show_update_error(self, error_message):
-        """Show update error message"""
-        QMessageBox.warning(
+        """Show update error message (thread-safe)"""
+        QTimer.singleShot(0, lambda: QMessageBox.warning(
             self,
             "Update Check Failed",
             f"Failed to check for updates:\n{error_message}"
-        )
+        ))
     
     def _initialize_timer_display(self):
         """Initialize timer to show current time and meeting countdown"""
@@ -152,9 +171,6 @@ class MainWindow(QMainWindow):
             meeting = self.meeting_controller.current_meeting
             self.timer_controller.set_meeting(meeting)
             
-            # initialize countdown
-            self.timer_controller._initialize_meeting_countdown()
-            
             # Force refresh of the meeting view
             self.meeting_view.set_meeting(meeting)
             
@@ -162,8 +178,8 @@ class MainWindow(QMainWindow):
             self.current_part_label.setText(f"Meeting: {meeting.title}")
             
             # Debug output
-            print(f"Selected meeting in _initialize_timer_display: {meeting.title}, Type: {meeting.meeting_type.value}")
-            print(f"Sections: {[s.title for s in meeting.sections]}")
+            #print(f"Selected meeting in _initialize_timer_display: {meeting.title}, Type: {meeting.meeting_type.value}")
+            #print(f"Sections: {[s.title for s in meeting.sections]}")
     
     def _auto_select_current_meeting(self):
         """Automatically select the appropriate meeting based on the current day"""
@@ -249,17 +265,23 @@ class MainWindow(QMainWindow):
         # Initialize meeting countdown
         self.timer_controller._initialize_meeting_countdown()
         
-        print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
+        #print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
             
     def _update_countdown(self, seconds_remaining: int, message: str):
+        # Guard clause: do not update countdown display after the meeting has started
+        if self.timer_controller.current_part_index >= 0:
+            return
+        #print(f"[DEBUG] MainWindow._update_countdown: {seconds_remaining} seconds remaining")
         """Update the countdown message in the main window"""
         # Update status bar with countdown message
         if seconds_remaining > 0:
             # Show countdown in status bar
             self.current_part_label.setText(message)
-            
+            #print(f"[DEBUG] MainWindow label text set to: {self.current_part_label.text()}")
+
             # If the secondary display exists, update it too
             if self.secondary_display:
+                #print("[DEBUG] Updating secondary display countdown label")
                 # Update the info label with just the countdown message
                 self.secondary_display.info_label1.setText(message)
                 self.secondary_display.info_label1.setStyleSheet("""
@@ -299,29 +321,55 @@ class MainWindow(QMainWindow):
         
     def _show_secondary_display(self):
         """Show the secondary display on the configured screen"""
-        settings = self.settings_controller.get_settings()
         
+        settings = self.settings_controller.get_settings()
+
         # Create secondary window if it doesn't exist
         if not self.secondary_display:
-            from src.views.secondary_display import SecondaryDisplay
-            self.secondary_display = SecondaryDisplay(self.timer_controller)
             
+            self.secondary_display = SecondaryDisplay(self.timer_controller, self.settings_controller, parent=self)
+            #print("[DEBUG] SecondaryDisplay created")
+            # Connect countdown updated signal to secondary display
+            self.timer_controller.timer.meeting_countdown_updated.connect(
+                self.secondary_display._update_countdown
+            )
+            #print("[DEBUG] Connected countdown signal to SecondaryDisplay._update_countdown")
+            # After connecting, ensure secondary display receives the latest countdown
+            if self.timer_controller.timer._target_meeting_time:
+                #print("[DEBUG] Manually triggering countdown update for secondary display")
+                self.timer_controller.timer._update_current_time()
             # Apply styling to ensure visibility
             self._apply_secondary_display_theme()
-        
+
         # Use our ScreenHandler to position the window on the correct screen
         screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
         if screen:
-            # Set the geometry of the secondary display
             self.secondary_display.setGeometry(screen.geometry())
-            self.secondary_display.showFullScreen()
-            self.secondary_display.activateWindow()
-        
+            self.secondary_display.show()
+            #print(f"[Pre-FullScreen] Secondary screen: {self.secondary_display.screen().name()}")
+            QTimer.singleShot(1000, self._make_secondary_fullscreen)
+
         # Update status bar indicator
         self.secondary_display_label.setText("Secondary Display: Active")
-        
+
         # Update toggle action state
         self.toggle_secondary_action.setChecked(True)
+
+    def _make_secondary_fullscreen(self):
+        """Helper to enter fullscreen after delay"""
+        if self.secondary_display:
+            #from PyQt6.QtWidgets import QApplication
+            settings = self.settings_controller.get_settings()
+            #print(f"[CHECK] screen index at fullscreen call: {settings.display.secondary_screen_index}")
+            screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
+
+            if screen:
+                #print(f"[Fullscreen Fix] Binding secondary window to screen: {screen.name()}")
+                self.secondary_display.move(screen.geometry().topLeft())  # Explicitly move the window
+                self.secondary_display.windowHandle().setScreen(screen)
+
+            self.secondary_display.showFullScreen()
+            #print(f"[Post-FullScreen] Secondary screen: {self.secondary_display.screen().name()}")
         
     def showEvent(self, event):
         """Override show event to initialize screens when window is shown"""
@@ -338,7 +386,7 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(1000, self._auto_start_network_display)
         
         # check for updates after a short delay
-        QTimer.singleShot(3000, lambda: self._check_for_updates(False))
+        #QTimer.singleShot(3000, lambda: self._check_for_updates(False))
     
     def _create_menu_bar(self):
         """Create the application menu bar"""
@@ -390,8 +438,8 @@ class MainWindow(QMainWindow):
         # Toggle network dock widget
         toggle_network_dock_action = QAction("Show Network Panel", self)
         toggle_network_dock_action.setCheckable(True)
-        toggle_network_dock_action.setChecked(self.network_dock.isVisible())
-        toggle_network_dock_action.triggered.connect(lambda checked: self.network_dock.setVisible(checked))
+        toggle_network_dock_action.setChecked(self.tools_dock.isVisible())
+        toggle_network_dock_action.triggered.connect(lambda checked: self.tools_dock.setVisible(checked))
         self.network_menu.addAction(toggle_network_dock_action)
 
         # Start/stop network display
@@ -556,23 +604,22 @@ class MainWindow(QMainWindow):
             mode = self.settings_controller.get_settings().network_display.mode
             http_port = self.settings_controller.get_settings().network_display.http_port
             ws_port = self.settings_controller.get_settings().network_display.ws_port
-            
-            # Show the network dock if it's not visible
-            if not self.network_dock.isVisible():
-                self.network_dock.show()
-            
+
+            # Show the tools dock if it's not visible
+            if not self.tools_dock.isVisible():
+                self.tools_dock.show()
+
             # Start network display
             if mode != NetworkDisplayMode.DISABLED:
-                self.network_display_manager.start_network_display(mode, http_port, ws_port)
+                QTimer.singleShot(0, lambda: self.network_display_manager.start_network_display(mode, http_port, ws_port))
                 self.toggle_network_action.setText("Stop Network Display")
             else:
                 # Show message if network display is disabled in settings
-                from PyQt6.QtWidgets import QMessageBox
-                QMessageBox.information(
+                QTimer.singleShot(0, lambda: QMessageBox.information(
                     self,
                     "Network Display Disabled",
                     "Network display is disabled in settings. Please enable it in Settings > Network Display."
-                )
+                ))
     
     def _show_network_info(self):
         """Show network display information dialog"""
@@ -588,7 +635,7 @@ class MainWindow(QMainWindow):
         
         # Start network display
         if mode != NetworkDisplayMode.DISABLED:
-            self.network_display_manager.start_network_display(mode, http_port, ws_port)
+            QTimer.singleShot(0, lambda: self.network_display_manager.start_network_display(mode, http_port, ws_port))
             self.toggle_network_action.setText("Stop Network Display")
     
     def _create_central_widget(self):
@@ -598,17 +645,23 @@ class MainWindow(QMainWindow):
         
         # Main layout
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(4)
         
         # Splitter for timer and parts
         splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.setChildrenCollapsible(False)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
         
         # Timer view
         self.timer_view = TimerView(self.timer_controller)
+        self.timer_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         splitter.addWidget(self.timer_view)
         
         # Meeting view
         self.meeting_view = MeetingView(self.meeting_controller, self.timer_controller)
+        self.meeting_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         splitter.addWidget(self.meeting_view)
         
         # Set initial sizes
@@ -623,6 +676,7 @@ class MainWindow(QMainWindow):
         
         # Current part label
         self.current_part_label = QLabel("No meeting selected")
+        self.current_part_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         status_bar.addWidget(self.current_part_label)
         
         # Spacer
@@ -669,6 +723,7 @@ class MainWindow(QMainWindow):
         self.timer_controller.meeting_overtime.connect(self._meeting_overtime)
         self.timer_controller.predicted_end_time_updated.connect(self._update_predicted_end_time)
         self.timer_controller.timer.meeting_countdown_updated.connect(self._update_countdown)
+        #print("[DEBUG] Connected timer countdown signal to MainWindow._update_countdown")
         
         # Settings controller signals
         self.settings_controller.settings_changed.connect(self._settings_changed)
@@ -678,6 +733,10 @@ class MainWindow(QMainWindow):
         # Connect network display manager signals
         self.network_display_manager.display_started.connect(self._network_display_started)
         self.network_display_manager.display_stopped.connect(self._network_display_stopped)
+
+        # Connect settings_controller signal for secondary screen live change
+        self.settings_controller.secondary_screen_changed.connect(self._on_secondary_screen_changed)
+
     
     def _network_display_started(self, url):
         """Handle network display started"""
@@ -754,18 +813,18 @@ class MainWindow(QMainWindow):
         
     def _part_updated(self, part, section_index, part_index):
         """Handle a part being updated"""
-        # Update the timer controller if needed
-        if self.timer_controller.current_part_index != -1:
-            # Check if the updated part is the current part
-            global_part_index = self._get_global_part_index(section_index, part_index)
-            if global_part_index == self.timer_controller.current_part_index:
-                # Update the timer with the new duration if it has changed
-                current_part = self.timer_controller.parts_list[global_part_index]
-                if current_part.duration_minutes != part.duration_minutes:
-                    # Adjust the timer duration
-                    # This requires additional logic to handle currently running timers
-                    # For now, just update the display
-                    self.timer_controller.part_changed.emit(part, global_part_index)
+        global_index = self._get_global_part_index(section_index, part_index)
+
+        # Replace the part in the timer's active list
+        if 0 <= global_index < len(self.timer_controller.parts_list):
+            self.timer_controller.parts_list[global_index] = part
+
+            # If this is the current part and the timer is running, update its duration
+            if global_index == self.timer_controller.current_part_index:
+                self.timer_controller.apply_current_part_update()
+
+        # Emit part_changed to refresh display
+        self.timer_controller.part_changed.emit(part, global_index)
     
     def _meeting_started(self):
         """Handle meeting start event in the main window"""
@@ -1006,10 +1065,10 @@ class MainWindow(QMainWindow):
     def _start_meeting(self):
         """Start the current meeting"""
         if not self.meeting_controller.current_meeting:
-            QMessageBox.warning(self, "No Meeting Selected", 
-                                "Please select a meeting to start.")
+            QTimer.singleShot(0, lambda: QMessageBox.warning(self, "No Meeting Selected",
+                                                            "Please select a meeting to start."))
             return
-        
+
         self.timer_controller.start_meeting()
     
     def _stop_meeting(self):
@@ -1053,7 +1112,7 @@ class MainWindow(QMainWindow):
     def _open_meeting(self):
         """Open an existing meeting file"""
         from PyQt6.QtWidgets import QFileDialog
-        
+
         # Show file dialog
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -1061,7 +1120,7 @@ class MainWindow(QMainWindow):
             str(self.meeting_controller.meetings_dir),
             "Meeting Files (*.json)"
         )
-        
+
         if file_path:
             try:
                 # Load meeting
@@ -1069,16 +1128,16 @@ class MainWindow(QMainWindow):
                 if meeting:
                     # Set as current meeting
                     self.meeting_controller.set_current_meeting(meeting)
-                    
+
                     # Update meeting view
                     self.meeting_view.set_meeting(meeting)
-                    
+
                     # Add to recent meetings
                     if file_path not in self.meeting_controller.settings_manager.settings.recent_meetings:
                         self.meeting_controller.settings_manager.settings.recent_meetings.append(file_path)
                         self.meeting_controller.settings_manager.save_settings()
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to load meeting: {str(e)}")
+                QTimer.singleShot(0, lambda: QMessageBox.critical(self, "Error", f"Failed to load meeting: {str(e)}"))
     
     def _update_meetings(self):
         """Update meetings from web with enhanced weekend meeting handling"""
@@ -1091,41 +1150,41 @@ class MainWindow(QMainWindow):
             progress.setWindowTitle("Updating Meetings")
             progress.setWindowModality(Qt.WindowModality.WindowModal)
             progress.show()
-            
+
             try:
                 # Use web scraping
                 meetings = self.meeting_controller.update_meetings_from_web()
-                
+
                 # Process weekend meeting to ensure songs are properly displayed
                 if MeetingType.WEEKEND in meetings:
                     weekend_meeting = meetings[MeetingType.WEEKEND]
                     self._process_weekend_meeting_songs(weekend_meeting)
-                
+
                 progress.close()
-                
+
                 # Show a success message
-                QMessageBox.information(self, "Update Complete", 
-                                       "Meetings have been successfully updated.")
+                QTimer.singleShot(0, lambda: QMessageBox.information(self, "Update Complete",
+                                               "Meetings have been successfully updated."))
             except Exception as e:
                 progress.close()
-                QMessageBox.warning(self, "Update Failed", 
-                                  f"Failed to update meetings: {str(e)}")
+                QTimer.singleShot(0, lambda: QMessageBox.warning(self, "Update Failed",
+                                              f"Failed to update meetings: {str(e)}"))
         else:
             # Show options dialog as before
             from PyQt6.QtWidgets import QMenu
-            
+
             menu = QMenu(self)
             web_action = menu.addAction("Update from Web")
             web_action.triggered.connect(self.meeting_controller.update_meetings_from_web)
-            
+
             edit_action = menu.addAction("Edit Current Meeting")
             edit_action.triggered.connect(lambda: self._edit_current_meeting())
-            
+
             menu.addSeparator()
-            
+
             create_action = menu.addAction("Create New Meeting")
             create_action.triggered.connect(self._create_new_meeting)
-            
+
             # Position menu below the update button
             menu.exec(self.sender().mapToGlobal(self.sender().rect().bottomLeft()))
             
@@ -1133,61 +1192,77 @@ class MainWindow(QMainWindow):
         """Process weekend meeting to ensure songs are properly displayed"""
         # Flag to track if we need to prompt the user
         missing_songs = False
-        
+
         for section in meeting.sections:
             for part in section.parts:
                 if "song" in part.title.lower() and "song" == part.title.strip().lower():
                     # Found a generic song without a number
                     missing_songs = True
-        
+
         # If there are missing songs, prompt the user
         if missing_songs:
-            reply = QMessageBox.question(
-                self, "Update Weekend Songs", 
-                "Some weekend meeting songs need to be added manually. Would you like to edit them now?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
-                # Show the meeting editor
-                self.meeting_controller.show_meeting_editor(self, meeting)
+            def ask_and_edit():
+                reply = QMessageBox.question(
+                    self, "Update Weekend Songs",
+                    "Some weekend meeting songs need to be added manually. Would you like to edit them now?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    # Show the meeting editor
+                    self.meeting_controller.show_meeting_editor(self, meeting)
+            QTimer.singleShot(0, ask_and_edit)
     
     def _edit_current_meeting(self):
         """Edit the currently selected meeting"""
         if not self.meeting_controller.current_meeting:
-            QMessageBox.warning(self, "No Meeting Selected", 
-                            "Please select a meeting to edit.")
+            QTimer.singleShot(0, lambda: QMessageBox.warning(self, "No Meeting Selected",
+                                                            "Please select a meeting to edit."))
             return
-        
-        # Show the meeting editor dialog with the current meeting
+
+        from src.views.meeting_editor_dialog import MeetingEditorDialog
+
+        dialog = MeetingEditorDialog(self, self.meeting_controller.current_meeting)
+        dialog.meeting_updated.connect(self._on_meeting_updated)
+        dialog.exec()
+
+        # Pass the _on_meeting_updated method so changes reflect live
         self.meeting_controller.show_meeting_editor(
-            self, self.meeting_controller.current_meeting
+        self,
+        self.meeting_controller.current_meeting,
+        self._on_meeting_updated
         )
+
+
+    def _on_meeting_updated(self, updated_meeting: Meeting):
+        """Apply updated meeting edits immediately"""
+        self.meeting_controller.set_current_meeting(updated_meeting)
+        self.timer_controller.set_meeting(updated_meeting)
+        self._initialize_timer_display()
     
     def _edit_weekend_meeting_songs(self):
         """Edit weekend meeting songs"""
         current_meeting = self.meeting_controller.current_meeting
-        
+
         # Check if we have a weekend meeting selected
         if not current_meeting or current_meeting.meeting_type != MeetingType.WEEKEND:
-            QMessageBox.warning(self, "Not a Weekend Meeting", 
-                            "Please select a weekend meeting first.")
+            QTimer.singleShot(0, lambda: QMessageBox.warning(self, "Not a Weekend Meeting",
+                                                            "Please select a weekend meeting first."))
             return
-        
+
         # Show the weekend song editor dialog
         from src.views.weekend_song_editor import WeekendSongEditorDialog
         dialog = WeekendSongEditorDialog(current_meeting, self)
-        
+
         if dialog.exec() == QDialog.DialogCode.Accepted:
             # Save the updated meeting
             self.meeting_controller.save_meeting(current_meeting)
-            
+
             # Update the meeting display
             self.meeting_view.set_meeting(current_meeting)
-            
+
             # Show confirmation message
-            QMessageBox.information(self, "Songs Updated", 
-                                "Weekend meeting songs have been updated.")
+            QTimer.singleShot(0, lambda: QMessageBox.information(self, "Songs Updated",
+                                                                "Weekend meeting songs have been updated."))
     
     def _open_settings(self):
         """Open settings dialog"""
@@ -1196,18 +1271,19 @@ class MainWindow(QMainWindow):
     
     def _initialize_screens(self):
         """Initialize screen handling during application startup"""
-        # Get the current settings
-        settings = self.settings_controller.get_settings()
+        # Get the current settings (reload from disk to ensure up-to-date)
+        settings = self.settings_controller.settings_manager._load_settings()
+        
         
         # Position main window on the primary screen
         self._position_main_window()
         
         # Show secondary display if enabled in settings
         if settings.display.use_secondary_screen:
-            # Delay the creation of secondary display slightly to ensure
-            # the main window is fully displayed first
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(100, self._show_secondary_display)
+            # Delay the creation of secondary display longer to ensure
+            # the main window is fully displayed first and avoid focus hijack
+            QTimer.singleShot(800, self._show_secondary_display)
+            #("[Init] Delaying secondary display setup to avoid focus hijack")
     
     def _position_main_window(self):
         """Position the main window on the primary screen from settings"""
@@ -1251,6 +1327,7 @@ class MainWindow(QMainWindow):
         
         self.settings_controller.toggle_secondary_screen(new_state)
         self._update_secondary_display()
+        self.settings_controller.save_settings()
     
     def _update_secondary_display(self):
         """Update secondary display based on settings"""
@@ -1259,7 +1336,7 @@ class MainWindow(QMainWindow):
         if settings.display.use_secondary_screen and settings.display.secondary_screen_index is not None:
             # Create secondary window if it doesn't exist
             if not self.secondary_display:
-                self.secondary_display = SecondaryDisplay(self.timer_controller)
+                self.secondary_display = SecondaryDisplay(self.timer_controller, self.settings_controller)
             
             # Apply proper styling to ensure visibility
             self._apply_secondary_display_theme()
@@ -1286,7 +1363,6 @@ class MainWindow(QMainWindow):
         screens = self.settings_controller.get_all_screens()
         
         if settings.display.secondary_screen_index is not None and 0 <= settings.display.secondary_screen_index < len(screens):
-            from PyQt6.QtWidgets import QApplication
             screen = QApplication.screens()[settings.display.secondary_screen_index]
             geometry = screen.geometry()
             
@@ -1354,22 +1430,74 @@ class MainWindow(QMainWindow):
         """Show the about dialog"""
         QMessageBox.about(
             self, 
-            "About JW Meeting Timer",
-            "JW Meeting Timer\n\n"
+            "About OnTime Meeting Timer",
+            "OnTime Meeting Timer\n\n"
             "A cross-platform timer application for managing JW meeting schedules.\n\n"
             "Version 1.0.0\n"
-            "© 2023 Open Source"
+            "© 2025 Open Source"
         )
     
     def _show_error(self, message):
-        """Show error message"""
-        QMessageBox.critical(self, "Error", message)
+        """Show error message (thread-safe)"""
+        QTimer.singleShot(0, lambda: QMessageBox.critical(self, "Error", message))
     
     def closeEvent(self, event):
         """Handle window close event"""
-        # Close secondary display if it exists
-        if self.secondary_display:
+        # Close secondary display if it exists and is visible
+        if self.secondary_display and self.secondary_display.isVisible():
+            #print("[DEBUG] Closing secondary display")
             self.secondary_display.close()
-        
+
+        # Gracefully stop the network display if running, with robust cleanup
+        if self.network_display_manager:
+            try:
+                self.network_display_manager.cleanup()
+            except Exception as e:
+                print(f"[WARNING] Error during network display cleanup: {e}")
+
+        # Save dock visibility state
+        settings = self.settings_controller.get_settings()
+        settings.display.show_tools_dock = self.tools_dock.isVisible()
+        self.settings_controller.save_settings()
+
         # Accept the event to close the main window
         event.accept()
+        
+    def _on_secondary_screen_changed(self, *_):
+        """Handle live updates to the selected secondary screen"""
+        if not self.secondary_display:
+            return
+
+        #print(f"[EVENT] _on_secondary_screen_changed triggered")
+
+        settings = self.settings_controller.get_settings()
+        #print(f"Settings screen index: {settings.display.secondary_screen_index}")
+        #print(f"Settings screen name: {settings.display.secondary_screen_name}")
+
+        screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
+        if screen:
+            #print(f"Resolved screen: {screen.name()} — {screen.geometry().width()}x{screen.geometry().height()}")
+            QTimer.singleShot(500, lambda: self._move_secondary_display(screen))
+        else:
+            print("[WARNING] Could not resolve a valid screen for secondary display.")
+
+    def _move_secondary_display(self, screen):
+        """Safely move the secondary display to the selected screen after a delay"""
+        if not self.secondary_display or not screen:
+            return
+
+        # Insert user alert and log if secondary screen is the same as primary
+        primary_screen = QApplication.primaryScreen()
+        if screen == primary_screen:
+            QTimer.singleShot(0, lambda: QMessageBox.information(
+                self,
+                "Same Screen Selected",
+                "The primary and secondary screens are the same. This may cause overlapping windows."
+            ))
+
+        geometry = screen.geometry()
+        self.secondary_display.setGeometry(geometry)
+        self.secondary_display.show()
+        QTimer.singleShot(200, lambda: self.secondary_display.showFullScreen())
+        #print(f"[FIXED] Moved secondary display to screen: {screen.name()}")
+    # The following methods were used for lazy-loading and are now removed:

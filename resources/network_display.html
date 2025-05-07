@@ -3,94 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Meeting Timer - Network Display</title>
+    <title>OnTime - Network Display</title>
     <style>
-        :root {
-            --text-color: #ffffff;
-            --bg-color: #000000;
-            --timer-running: #4caf50;
-            --timer-warning: #ff9800;
-            --timer-danger: #f44336;
-            --timer-paused: #2196f3;
-            --timer-transition: #bb86fc;
-            --info-bg: rgba(50, 50, 50, 0.8);
-        }
-        
-        @media (prefers-color-scheme: light) {
-            :root {
-                --text-color: #000000;
-                --bg-color: #f5f5f5;
-                --info-bg: rgba(230, 230, 230, 0.8);
-            }
-        }
-        
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            background-color: #000000;
+            color: #ffffff;
             font-family: 'Segoe UI', 'Arial', sans-serif;
             margin: 0;
             padding: 0;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
             height: 100vh;
             text-align: center;
             overflow: hidden;
-            transition: background-color 0.3s ease;
-        }
-        
-        #header {
-            width: 100%;
-            padding: 10px 0;
-        }
-        
-        #timer-container {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            flex-grow: 1;
-            width: 100%;
         }
         
         #timer-display {
             font-family: 'Courier New', monospace;
-            font-size: 20vmin;
+            font-size: 25vmin;
             font-weight: bold;
             margin: 0;
             line-height: 1;
-            transition: color 0.3s ease;
         }
         
         #current-part {
-            font-size: 6vmin;
+            font-size: 7vmin;
             font-weight: bold;
             margin: 2vh 5vw;
             max-width: 90vw;
         }
         
-        #info-container {
-            width: 100%;
-            padding: 20px 0;
-        }
-        
-        #next-part-container {
-            background-color: var(--info-bg);
-            border-radius: 15px;
-            padding: 15px;
-            margin: 0 auto;
-            max-width: 80%;
-        }
-        
         #next-part {
-            font-size: 4vmin;
-            margin: 0;
+            font-size: 5vmin;
+            margin: 1vh 5vw;
+            padding: 2vh;
+            background-color: rgba(50, 50, 50, 0.8);
+            border-radius: 15px;
+            max-width: 90vw;
+        }
+        
+        #countdown-message {
+            font-size: 7vmin;
+            font-weight: bold;
+            color: #4a90e2;
+            margin: 2vh 5vw;
+            max-width: 90vw;
         }
         
         #end-time {
-            font-size: 3vmin;
-            margin-top: 10px;
+            font-size: 4vmin;
+            margin-top: 2vh;
         }
         
         #status {
@@ -99,305 +63,190 @@
             right: 10px;
             padding: 5px 10px;
             background-color: rgba(0, 0, 0, 0.7);
-            color: #ffffff;
             border-radius: 5px;
             font-size: 14px;
-            z-index: 100;
         }
         
-        #status.connected {
-            background-color: rgba(76, 175, 80, 0.7);
-        }
-        
-        #status.disconnected {
-            background-color: rgba(244, 67, 54, 0.7);
-        }
-        
-        #status.connecting {
-            background-color: rgba(255, 152, 0, 0.7);
-        }
-        
-        .running { color: var(--timer-running); }
-        .warning { color: var(--timer-warning); }
-        .danger { color: var(--timer-danger); }
-        .paused { color: var(--timer-paused); }
-        .transition { color: var(--timer-transition); }
-        
-        /* Responsive design */
-        @media (max-height: 600px) {
-            #timer-display {
-                font-size: 18vmin;
-            }
-            
-            #current-part {
-                font-size: 5vmin;
-                margin: 1vh 5vw;
-            }
-            
-            #next-part {
-                font-size: 3vmin;
-            }
-            
-            #end-time {
-                font-size: 2.5vmin;
-            }
-        }
-        
-        @media (max-height: 400px) {
-            #timer-display {
-                font-size: 15vmin;
-            }
-            
-            #current-part {
-                font-size: 4vmin;
-                margin: 0.5vh 5vw;
-            }
-        }
-        
-        /* Dark mode toggle */
-        #mode-toggle {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            padding: 5px 10px;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: #ffffff;
-            border-radius: 5px;
-            font-size: 14px;
-            cursor: pointer;
-            z-index: 100;
-            border: none;
-        }
-        
-        /* Fullscreen toggle */
-        #fullscreen-toggle {
-            position: absolute;
-            top: 10px;
-            left: 70px;
-            padding: 5px 10px;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: #ffffff;
-            border-radius: 5px;
-            font-size: 14px;
-            cursor: pointer;
-            z-index: 100;
-            border: none;
-        }
-        
-        .dark-mode {
-            --text-color: #ffffff;
-            --bg-color: #000000;
-            --info-bg: rgba(50, 50, 50, 0.8);
-        }
-        
-        .light-mode {
-            --text-color: #000000;
-            --bg-color: #f5f5f5;
-            --info-bg: rgba(230, 230, 230, 0.8);
-        }
+        .running { color: #4caf50; }
+        .warning { color: #ff9800; }
+        .danger { color: #f44336; }
+        .paused { color: #2196f3; }
+        .transition { color: #bb86fc; }
+        .stopped { color: #ffffff; }
     </style>
 </head>
 <body>
-    <div id="status" class="connecting">Connecting...</div>
-    <button id="mode-toggle">☀️/🌙</button>
-    <button id="fullscreen-toggle">⛶</button>
+    <div id="status">Connecting...</div>
     
-    <div id="header">
-        <h2 id="meeting-title">JW Meeting Timer</h2>
-    </div>
+    <h2 id="meeting-title">OnTime</h2>
     
-    <div id="timer-container">
-        <h1 id="timer-display" class="stopped">00:00</h1>
-        <div id="current-part">Waiting for connection...</div>
-    </div>
+    <h1 id="timer-display" class="stopped">00:00:00</h1>
     
-    <div id="info-container">
-        <div id="next-part-container">
-            <div id="next-part">Next Part: —</div>
-            <div id="end-time"></div>
-        </div>
-    </div>
+    <div id="current-part">Waiting for connection...</div>
+    
+    <div id="countdown-message" style="display: none;"></div>
+    
+    <div id="next-part">Next Part: —</div>
+    
+    <div id="end-time"></div>
     
     <script>
-        // DOM elements
+        // Timer display elements
         const timerDisplay = document.getElementById('timer-display');
         const currentPart = document.getElementById('current-part');
         const nextPart = document.getElementById('next-part');
         const endTime = document.getElementById('end-time');
         const status = document.getElementById('status');
-        const meetingTitle = document.getElementById('meeting-title');
-        const modeToggle = document.getElementById('mode-toggle');
-        const fullscreenToggle = document.getElementById('fullscreen-toggle');
+        const countdownMsg = document.getElementById('countdown-message');
         
-        // Get the WebSocket port from query parameter or use default
-        const urlParams = new URLSearchParams(window.location.search);
-        let ws_port = urlParams.get('port') || '{WS_PORT}';
+        // Track state for clock updates
+        let timerState = "stopped";
+        let clockInterval = null;
+        let receivedCountdownMessage = "";
+        
+        // Start clock immediately
+        startClock();
         
         // Create WebSocket connection
-        let socket;
-        let reconnectAttempts = 0;
-        let reconnectTimeout;
+        const socket = new WebSocket(`ws://${window.location.hostname}:{WS_PORT}`);
         
-        function connect() {
-            // Clear any existing reconnect timeout
-            if (reconnectTimeout) {
-                clearTimeout(reconnectTimeout);
-            }
+        // Connection opened
+        socket.addEventListener('open', function(event) {
+            status.textContent = 'Connected';
+            status.style.color = '#4caf50';
+        });
+        
+        // Connection closed
+        socket.addEventListener('close', function(event) {
+            status.textContent = 'Disconnected';
+            status.style.color = '#f44336';
             
-            // Update status
-            status.className = 'connecting';
-            status.textContent = 'Connecting...';
-            
-            // Create WebSocket connection
-            socket = new WebSocket(`ws://${window.location.hostname}:${ws_port}`);
-            
-            // Connection opened
-            socket.addEventListener('open', function(event) {
-                status.className = 'connected';
-                status.textContent = 'Connected';
-                reconnectAttempts = 0;
+            // Try to reconnect after 5 seconds
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        });
+        
+        // Listen for messages
+        socket.addEventListener('message', function(event) {
+            try {
+                const data = JSON.parse(event.data);
                 
-                // Hide status after 3 seconds
-                setTimeout(() => {
-                    status.style.opacity = '0';
-                    setTimeout(() => {
-                        status.style.display = 'none';
-                    }, 1000);
-                }, 3000);
-            });
-            
-            // Connection closed
-            socket.addEventListener('close', function(event) {
-                status.className = 'disconnected';
-                status.textContent = 'Disconnected - Reconnecting...';
-                status.style.display = 'block';
-                status.style.opacity = '1';
+                // Store the timer state
+                timerState = data.state;
                 
-                // Try to reconnect with exponential backoff
-                const delay = Math.min(30000, 1000 * Math.pow(1.5, reconnectAttempts));
-                reconnectAttempts++;
-                
-                reconnectTimeout = setTimeout(connect, delay);
-            });
-            
-            // Connection error
-            socket.addEventListener('error', function(event) {
-                status.className = 'disconnected';
-                status.textContent = 'Connection Error';
-                status.style.display = 'block';
-                status.style.opacity = '1';
-            });
-            
-            // Listen for messages
-            socket.addEventListener('message', function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    updateDisplay(data);
-                } catch (error) {
-                    console.error('Error parsing message:', error);
+                // Only update timer display if not in stopped state
+                // (we'll let the clock interval handle the display in stopped state)
+                if (timerState !== 'stopped') {
+                    timerDisplay.textContent = data.time;
                 }
-            });
-        }
-        
-        function updateDisplay(data) {
-            // Update timer display
-            timerDisplay.textContent = data.time;
-            
-            // Set timer color based on state
-            timerDisplay.className = data.state;
-            
-            // Update part information
-            if (data.part) {
-                currentPart.textContent = data.part;
-            } else {
-                currentPart.textContent = 'No active part';
-            }
-            
-            // Update next part if available
-            if (data.nextPart) {
-                nextPart.textContent = `Next Part: ${data.nextPart}`;
-            } else {
-                nextPart.textContent = 'Next Part: —';
-            }
-            
-            // Update end time if available
-            if (data.endTime) {
-                let endTimeText = `Predicted End: ${data.endTime}`;
                 
-                // Add overtime information if available
-                if (data.overtime > 0) {
-                    const minutes = Math.floor(data.overtime / 60);
-                    const seconds = data.overtime % 60;
+                // Set timer color based on state
+                timerDisplay.className = timerState;
+                
+                // Store countdown message
+                receivedCountdownMessage = data.countdownMessage;
+                
+                // Handle meeting countdown display
+                if (timerState === 'stopped' && receivedCountdownMessage) {
+                    // We're in pre-meeting countdown mode
+                    countdownMsg.textContent = receivedCountdownMessage;
+                    countdownMsg.style.display = 'block';
+                    nextPart.style.display = 'none';
+                    endTime.style.display = 'none';
                     
-                    if (minutes > 0) {
-                        endTimeText += ` (+${minutes}m ${seconds}s)`;
+                    // Hide part display when showing countdown
+                    if (data.part === "") {
+                        currentPart.style.display = 'none';
                     } else {
-                        endTimeText += ` (+${seconds}s)`;
+                        currentPart.style.display = 'block';
+                        currentPart.textContent = data.part;
+                    }
+                } else {
+                    // Regular meeting or part display
+                    countdownMsg.style.display = 'none';
+                    nextPart.style.display = 'block';
+                    endTime.style.display = 'block';
+                    currentPart.style.display = 'block';
+                    
+                    // Update part information
+                    if (data.part) {
+                        currentPart.textContent = data.part;
+                    } else {
+                        currentPart.textContent = 'No active part';
                     }
                     
-                    endTime.style.color = '#f44336';
-                } else {
-                    endTime.style.color = '#4caf50';
+                    // Update next part if available
+                    if (data.nextPart) {
+                        nextPart.textContent = `Next Part: ${data.nextPart}`;
+                    } else {
+                        nextPart.textContent = 'Next Part: —';
+                    }
                 }
                 
-                endTime.textContent = endTimeText;
-            } else {
-                endTime.textContent = '';
+                // Update end time if available
+                if (data.endTime) {
+                    endTime.textContent = `Predicted End: ${data.endTime}`;
+                    
+                    // Add overtime information if available
+                    if (data.overtime > 0) {
+                        const minutes = Math.floor(data.overtime / 60);
+                        const seconds = data.overtime % 60;
+                        
+                        if (minutes > 0) {
+                            endTime.textContent += ` (+${minutes}m ${seconds}s)`;
+                        } else {
+                            endTime.textContent += ` (+${seconds}s)`;
+                        }
+                        
+                        endTime.style.color = '#f44336';
+                    } else {
+                        endTime.style.color = '#4caf50';
+                    }
+                } else {
+                    endTime.textContent = '';
+                }
+            } catch (error) {
+                console.error('Error parsing message:', error);
             }
+        });
+        
+        // Start the clock update interval
+        function startClock() {
+            // Clear any existing interval
+            if (clockInterval) {
+                clearInterval(clockInterval);
+            }
+            
+            // Update immediately
+            updateClock();
+            
+            // Set interval to update every second
+            clockInterval = setInterval(updateClock, 1000);
         }
         
-        // Theme management
-        function initTheme() {
-            // Check for saved preference
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'light') {
-                document.body.classList.add('light-mode');
-                document.body.classList.remove('dark-mode');
-            } else {
-                document.body.classList.add('dark-mode');
-                document.body.classList.remove('light-mode');
+        // Update the clock while in stopped state
+        function updateClock() {
+            // Only update if the timer is in stopped state
+            if (timerState === 'stopped') {
+                const now = new Date();
+                const hours = now.getHours().toString().padStart(2, '0');
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+                const seconds = now.getSeconds().toString().padStart(2, '0');
+                const timeString = `${hours}:${minutes}:${seconds}`;
+                
+                // Update the timer display
+                timerDisplay.textContent = timeString;
+                
+                // If we have a countdown message, make sure it's displayed
+                if (receivedCountdownMessage) {
+                    countdownMsg.textContent = receivedCountdownMessage;
+                    countdownMsg.style.display = 'block';
+                    nextPart.style.display = 'none';
+                    endTime.style.display = 'none';
+                }
             }
         }
-        
-        modeToggle.addEventListener('click', function() {
-            if (document.body.classList.contains('dark-mode')) {
-                document.body.classList.remove('dark-mode');
-                document.body.classList.add('light-mode');
-                localStorage.setItem('theme', 'light');
-            } else {
-                document.body.classList.remove('light-mode');
-                document.body.classList.add('dark-mode');
-                localStorage.setItem('theme', 'dark');
-            }
-        });
-        
-        // Fullscreen toggle
-        fullscreenToggle.addEventListener('click', function() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
-                });
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
-            }
-        });
-        
-        // Start connection
-        connect();
-        
-        // Initialize theme
-        initTheme();
-        
-        // Handle visibility changes to reconnect when tab becomes visible again
-        document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'visible') {
-                if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
-                    connect();
-                }
-            }
-        });
     </script>
 </body>
 </html>

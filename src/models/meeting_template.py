@@ -1,5 +1,5 @@
 """
-Meeting template models for the JW Meeting Timer application.
+Meeting template models for the OnTime Meeting Timer application.
 
 This module provides classes for managing meeting templates,
 which can be used to quickly create meetings with standard structures.

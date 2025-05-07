@@ -1,5 +1,5 @@
 """
-Controller for managing application settings in the JW Meeting Timer application.
+Controller for managing application settings in the OnTime Meeting Timer application.
 """
 from datetime import time
 from typing import List, Dict

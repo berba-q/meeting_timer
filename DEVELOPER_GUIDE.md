@@ -1,4 +1,4 @@
-# JW Meeting Timer - Developer Guide
+# OnTime - Developer Guide
 
 This guide is intended for developers who want to understand, modify, or contribute to the JW Meeting Timer application.
 

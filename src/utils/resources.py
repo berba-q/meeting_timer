@@ -1,5 +1,5 @@
 """
-Resources utility for loading assets in the JW Meeting Timer application.
+Resources utility for loading assets in the OnTime Meeting Timer application.
 """
 import os
 import sys

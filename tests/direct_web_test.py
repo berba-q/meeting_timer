@@ -14,7 +14,7 @@ import json
 import signal
 import threading
 import time
-import websockets
+from websockets.legacy.server import serve
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from websockets.server import WebSocketServerProtocol
 
@@ -339,7 +339,7 @@ async def main():
     
     # Start WebSocket server
     print("Starting WebSocket server...")
-    async with websockets.serve(websocket_handler, HOST, WS_PORT):
+    async with serve(websocket_handler, HOST, WS_PORT):
         print(f"WebSocket server running at ws://localhost:{WS_PORT}")
         
         # Start timer update task

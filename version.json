@@ -1,10 +1,10 @@
 {
-  "version": "1.0.0",
-  "releaseDate": "2025-04-30",
+  "version": "1.0.1",
+  "releaseDate": "2025-05-07",
   "downloadUrl": {
-    "windows": "https://github.com/berba_q/meeting_timer/releases/download/v1.0.0/JWMeetingTimer-1.0.0-setup.exe",
-    "macos": "https://github.com/berba_q/meeting_timer/releases/download/v1.0.0/JWMeetingTimer-1.0.0.dmg",
-    "linux": "https://github.com/berba_q/meeting_timer/releases/download/v1.0.0/JWMeetingTimer-1.0.0.AppImage"
+    "windows": "https://github.com/berba_q/meeting_timer/releases/download/v1.0.1/OnTime-1.0.1-setup.exe",
+    "macos": "https://github.com/berba_q/meeting_timer/releases/download/v1.0.1/OnTime-1.0.1.dmg",
+    "linux": "https://github.com/berba_q/meeting_timer/releases/download/v1.0.1/OnTime-1.0.1.AppImage"
   },
-  "releaseNotes": "Initial release of JW Meeting Timer with network display features."
+  "releaseNotes": "v1.0.1 adds a splash screen, asynchronous loading, and performance improvements."
 }

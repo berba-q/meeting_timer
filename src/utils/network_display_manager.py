@@ -1,9 +1,10 @@
 """
-Network display manager for JW Meeting Timer.
+Network display manager for OnTime Meeting Timer.
 This module integrates the WebSocket and HTTP servers to provide network display functionality.
 """
 import os
 from typing import Optional, Tuple
+from datetime import datetime
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 
 from src.utils.network_broadcaster import NetworkBroadcaster
@@ -22,6 +23,7 @@ class NetworkDisplayManager(QObject):
     client_connected = pyqtSignal(str)
     client_disconnected = pyqtSignal(str)
     status_updated = pyqtSignal(str, int)  # Status message, client count
+    network_ready = pyqtSignal()
     
     def __init__(self, timer_controller: TimerController, settings_manager: SettingsManager):
         super().__init__()
@@ -62,7 +64,7 @@ class NetworkDisplayManager(QObject):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JW Meeting Timer Display</title>
+    <title>OnTime Meeting Timer Display</title>
     <style>
         body {
             background-color: #000000;
@@ -251,15 +253,21 @@ class NetworkDisplayManager(QObject):
             # Use default ports if not specified
             if http_port is None:
                 http_port = self.settings_manager.settings.network_display.http_port
-            
+
             if ws_port is None:
                 ws_port = self.settings_manager.settings.network_display.ws_port
-            
+
+            # Prevent double start
+            if self.broadcaster.is_broadcasting:
+                print("[DEBUG] Network display already running. Skipping startup.")
+                return True
+
             # Start services based on mode
             if mode == NetworkDisplayMode.WEB_SOCKET_ONLY:
                 # Start only WebSocket broadcaster
                 self.broadcaster.start_broadcasting(ws_port)
                 self.status_timer.start()
+                self.network_ready.emit()
                 return True
                 
             elif mode == NetworkDisplayMode.HTTP_AND_WS:
@@ -267,8 +275,9 @@ class NetworkDisplayManager(QObject):
                 self.http_server.start_server(http_port, ws_port)
                 self.broadcaster.start_broadcasting(ws_port)
                 self.status_timer.start()
+                self.network_ready.emit()
                 return True
-            
+
             return False
                 
         except Exception as e:
@@ -324,54 +333,88 @@ class NetworkDisplayManager(QObject):
         self.status_updated.emit(f"Error: {error_message}", 0)
     
     def _on_time_updated(self, seconds: int):
-        """Handle timer time updates"""
-        # Format time for display
-        if seconds < 0:  # Overtime
-            minutes = abs(seconds) // 60
-            secs = abs(seconds) % 60
-            time_str = f"-{minutes:02d}:{secs:02d}"
-        else:
-            minutes = seconds // 60
-            secs = seconds % 60
-            time_str = f"{minutes:02d}:{secs:02d}"
-        
-        # Get current part title
+        """Handle timer time updates with proper current time and countdown display"""
+        # Initialize variables
+        current_time = datetime.now()
+        time_str = "00:00"
+        state_str = "stopped"
         part_title = ""
-        if self.timer_controller.current_part_index >= 0 and self.timer_controller.parts_list:
-            current_part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
-            part_title = current_part.title
-        
-        # Get next part title
         next_part_title = ""
-        next_part_index = self.timer_controller.current_part_index + 1
-        if self.timer_controller.parts_list and next_part_index < len(self.timer_controller.parts_list):
-            next_part = self.timer_controller.parts_list[next_part_index]
-            next_part_title = next_part.title
-        
-        # Map timer state to string representation
-        state_map = {
-            TimerState.RUNNING: "running",
-            TimerState.PAUSED: "paused",
-            TimerState.OVERTIME: "danger",
-            TimerState.TRANSITION: "transition",
-            TimerState.STOPPED: "stopped",
-            TimerState.COUNTDOWN: "running"
-        }
-        
-        state_str = state_map.get(self.timer_controller.timer.state, "stopped")
-        
-        # If timer is running and less than 60 seconds, use warning color
-        if (self.timer_controller.timer.state == TimerState.RUNNING and 
-            0 < self.timer_controller.timer.remaining_seconds <= 60):
-            state_str = "warning"
-        
-        # Get predicted end time
         end_time_str = ""
-        if hasattr(self.timer_controller, '_predicted_end_time') and self.timer_controller._predicted_end_time:
-            end_time_str = self.timer_controller._predicted_end_time.strftime("%H:%M")
+        overtime_seconds = 0
+        countdown_message = ""
         
-        # Get overtime seconds
-        overtime_seconds = getattr(self.timer_controller, '_total_overtime_seconds', 0)
+        # Check if we're in STOPPED state with no active part (pre-meeting)
+        if (self.timer_controller.timer.state == TimerState.STOPPED and 
+            self.timer_controller.current_part_index < 0):
+            
+            # Use current time for display in stopped state
+            now = datetime.now()
+            time_str = now.strftime("%H:%M:%S")
+            
+            # Check if we have a countdown message
+            if hasattr(self.timer_controller.timer, '_target_meeting_time'):
+                target = self.timer_controller.timer._target_meeting_time
+                if target and target > now:
+                    time_diff = target - now
+                    seconds_remaining = int(time_diff.total_seconds())
+                    
+                    if seconds_remaining > 0:
+                        hours, remainder = divmod(seconds_remaining, 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        
+                        if hours > 0:
+                            countdown_message = f"Meeting starts in {hours}h {minutes}m {seconds}s"
+                        else:
+                            countdown_message = f"Meeting starts in {minutes}m {seconds}s"
+            
+            # In pre-meeting state, don't show next part
+            next_part_title = ""
+        else:
+            # Normal timer operation (during meeting)
+            if seconds < 0:  # Overtime
+                minutes = abs(seconds) // 60
+                secs = abs(seconds) % 60
+                time_str = f"-{minutes:02d}:{secs:02d}"
+            else:
+                minutes = seconds // 60
+                secs = seconds % 60
+                time_str = f"{minutes:02d}:{secs:02d}"
+            
+            # Map timer state to string representation
+            state_map = {
+                TimerState.RUNNING: "running",
+                TimerState.PAUSED: "paused",
+                TimerState.OVERTIME: "danger",
+                TimerState.TRANSITION: "transition",
+                TimerState.STOPPED: "stopped",
+                TimerState.COUNTDOWN: "running"
+            }
+            
+            state_str = state_map.get(self.timer_controller.timer.state, "stopped")
+            
+            # If timer is running and less than 60 seconds, use warning color
+            if (self.timer_controller.timer.state == TimerState.RUNNING and 
+                0 < self.timer_controller.timer.remaining_seconds <= 60):
+                state_str = "warning"
+            
+            # Get current part title
+            if self.timer_controller.current_part_index >= 0 and self.timer_controller.parts_list:
+                current_part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
+                part_title = current_part.title
+            
+            # Get next part title
+            next_part_index = self.timer_controller.current_part_index + 1
+            if self.timer_controller.parts_list and next_part_index < len(self.timer_controller.parts_list):
+                next_part = self.timer_controller.parts_list[next_part_index]
+                next_part_title = next_part.title
+            
+            # Get predicted end time
+            if hasattr(self.timer_controller, '_predicted_end_time') and self.timer_controller._predicted_end_time:
+                end_time_str = self.timer_controller._predicted_end_time.strftime("%H:%M")
+            
+            # Get overtime seconds
+            overtime_seconds = getattr(self.timer_controller, '_total_overtime_seconds', 0)
         
         # Update broadcaster with current state
         self.broadcaster.update_timer_data(
@@ -380,7 +423,8 @@ class NetworkDisplayManager(QObject):
             part_title=part_title,
             next_part=next_part_title,
             end_time=end_time_str,
-            overtime_seconds=overtime_seconds
+            overtime_seconds=overtime_seconds,
+            countdown_message=countdown_message
         )
     
     def _on_state_changed(self, state: TimerState):
@@ -413,3 +457,7 @@ class NetworkDisplayManager(QObject):
         )
         
         return (http_url, client_count, active_services)
+    
+    def cleanup(self):
+        """Ensure everything is stopped cleanly"""
+        self.stop_network_display()

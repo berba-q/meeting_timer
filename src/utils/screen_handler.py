@@ -1,5 +1,5 @@
 """
-Screen handling utilities for the JW Meeting Timer application.
+Screen handling utilities for the OnTime Meeting Timer application.
 """
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QGuiApplication, QScreen
@@ -48,7 +48,15 @@ class ScreenHandler:
         for i, screen in enumerate(screens):
             if screen == primary_screen:
                 return i
-        return 0  # Default to first screen if no primary found
+        # If not found, try to match by object identity
+        screens = QApplication.screens()
+        if primary_screen in screens:
+            return screens.index(primary_screen)
+        # If no match, prefer non-primary if available
+        for i, screen in enumerate(screens):
+            if screen != QApplication.primaryScreen():
+                return i
+        return 0  # fallback to first screen if only one available
     
     @staticmethod
     def save_screen_selection(settings, primary_screen, secondary_screen):
@@ -74,7 +82,7 @@ class ScreenHandler:
             name = getattr(settings.display, 'secondary_screen_name', '')
         
         # Try by index first
-        if 0 <= index < len(screens):
+        if index is not None and 0 <= index < len(screens):
             return screens[index]
         
         # If index fails, try by name
@@ -89,8 +97,10 @@ class ScreenHandler:
         else:
             # For secondary, use a non-primary screen if available
             primary_screen = QApplication.primaryScreen()
-            for screen in screens:
-                if screen != primary_screen:
-                    return screen
-            # If only one screen, use it
-            return screens[0]
+            secondary_candidates = [screen for screen in screens if screen != primary_screen]
+            if secondary_candidates:
+                return secondary_candidates[0]
+            # Fallback to last available screen if present
+            if screens:
+                return screens[-1]
+            return None

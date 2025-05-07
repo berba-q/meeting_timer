@@ -1,5 +1,5 @@
 """
-Secondary display window for the JW Meeting Timer - Speaker View.
+Secondary display window for the OnTime - Speaker View.
 A streamlined, distraction-free fullscreen view focusing on timer and next part.
 """
 from PyQt6.QtWidgets import (
@@ -16,12 +16,13 @@ from src.views.timer_view import TimerView
 
 class SecondaryDisplay(QMainWindow):
     """Secondary display window for the timer - designed for speakers"""
-    
-    def __init__(self, timer_controller: TimerController):
-        super().__init__(None, Qt.WindowType.Window)
+
+    def __init__(self, timer_controller: TimerController, settings_controller, parent=None):
+        super().__init__(parent, Qt.WindowType.Window)
         self.timer_controller = timer_controller
+        self.settings_controller = settings_controller
         self.next_part = None
-        self.show_countdown = False
+        self._show_countdown = False
         
         # Set window flags for presentation display - fullscreen with no chrome
         self.setWindowFlags(
@@ -29,13 +30,16 @@ class SecondaryDisplay(QMainWindow):
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint
         )
-        
+
         # Setup UI
         self._setup_ui()
-        
+
         # Connect signals
         self._connect_signals()
-        
+
+        # Connect settings changed signal
+        self.settings_controller.settings_changed.connect(self._on_settings_updated)
+
         # Show in fullscreen by default
         self.showFullScreen()
     
@@ -45,7 +49,7 @@ class SecondaryDisplay(QMainWindow):
         from src.utils.resources import get_icon
         self.setWindowIcon(get_icon("app_icon"))
         
-        self.setWindowTitle("JW Meeting Timer - Speaker View")
+        self.setWindowTitle("OnTime - Speaker View")
         
         # Set default background to black
         palette = self.palette()
@@ -78,7 +82,7 @@ class SecondaryDisplay(QMainWindow):
         
         # Main layout with ample margins for readability
         layout = QVBoxLayout(central_widget)
-        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setContentsMargins(40, 20, 40, 20)
         layout.setSpacing(30)
         
         # Large digital timer display - very prominent
@@ -100,10 +104,14 @@ class SecondaryDisplay(QMainWindow):
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.timer_label.setStyleSheet("""
             color: #ffffff;
-            font-size: 380px;
             font-weight: bold;
-            font-family: 'Courier New', monospace;
+            font-family: 'Tahoma', 'Arial Black', sans-serif;
+            padding: 0px;
+            margin: 0px;
         """)
+        self.timer_label.setMinimumSize(0, 0)
+        self.timer_label.setWordWrap(True)
+        self.timer_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         timer_layout.addWidget(self.timer_label)
         
@@ -120,25 +128,29 @@ class SecondaryDisplay(QMainWindow):
         self.info_label1.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_label1.setStyleSheet("""
             color: #ffffff;
-            font-size: 60px;
             font-weight: bold;
         """)
+        self.info_label1.setMinimumSize(0, 0)
         self.info_label1.setWordWrap(True)
-        
+        self.info_label1.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
         self.info_label2 = QLabel()
         self.info_label2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Match info_label1 size
         self.info_label2.setStyleSheet("""
-            color: #ffffff;
-            font-size: 60px;
+            color: #ff4d4d;
             font-weight: bold;
         """)
-        
+        self.info_label2.setMinimumSize(0, 0)
+        self.info_label2.setWordWrap(True)
+        self.info_label2.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
         info_layout.addWidget(self.info_label1)
         info_layout.addWidget(self.info_label2)
         
         # Add the main components to the layout
-        layout.addWidget(self.timer_frame, 7)  # Timer gets more vertical space
-        layout.addWidget(self.info_frame, 2)
+        layout.addWidget(self.timer_frame, 10)  # Timer gets more vertical space
+        layout.addWidget(self.info_frame, 1)   # Info panel gets less vertical space
         
     
     def _connect_signals(self):
@@ -155,37 +167,36 @@ class SecondaryDisplay(QMainWindow):
         
     def _update_current_time(self, time_str: str):
         """Update the current time display when in stopped state"""
-        if self.timer_controller.timer.state == TimerState.STOPPED:
+        if self.timer_controller.timer.state == TimerState.STOPPED or self.show_countdown:
             # Update with current time when in stopped state
             self.timer_label.setText(time_str)
             
             # Make sure the time is visible with appropriate styling
             self.timer_label.setStyleSheet("""
-                color: #ffffff; 
-                font-size: 380px;
+                color: #ffffff;
                 font-weight: bold;
-                font-family: 'Courier New', monospace;
             """)
     
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message"""
+
+        # Guard clause: If meeting is not stopped or meeting has started, never show countdown
+        if self.timer_controller.timer.state != TimerState.STOPPED or self.timer_controller.current_part_index >= 0:
+            self.show_countdown = False
+            self._show_countdown = False
+            return
+
+        # Block all updates unless explicitly in countdown mode (use internal flag strictly)
+        if not getattr(self, "_show_countdown", False):
+            return
+
         if seconds_remaining > 0:
-            # Meeting hasn't started yet, show countdown
-            if self.timer_controller.timer.state == TimerState.STOPPED and self.timer_controller.current_part_index == -1:
-                self.show_countdown = True
-                # Show the countdown message in the info panel
-                self.info_label1.setText(message)
-                self.info_label1.setStyleSheet("""
-                    color: #4a90e2; 
-                    font-size: 80px;
-                    font-weight: bold;
-                """)
-                # Clear the second label
-                self.info_label2.setText("")
+            self.info_label1.setText(message.upper())
+            self.info_label2.setText("")
         else:
             # Countdown ended
             self.show_countdown = False
-            # Clear the info labels if we're still in pre-meeting state
+            self._show_countdown = False
             if self.timer_controller.timer.state == TimerState.STOPPED and self.timer_controller.current_part_index == -1:
                 self.info_label1.setText("")
                 self.info_label2.setText("")
@@ -216,9 +227,7 @@ class SecondaryDisplay(QMainWindow):
             self.timer_label.setText(time_str)
             self.timer_label.setStyleSheet(f"""
                 color: {color};
-                font-size: 380px;
                 font-weight: bold;
-                font-family: 'Courier New', monospace;
             """)
     
     def _update_timer_state(self, state: TimerState):
@@ -226,46 +235,38 @@ class SecondaryDisplay(QMainWindow):
         if state == TimerState.PAUSED:
             # Blue color for paused state
             self.timer_label.setStyleSheet("""
-                color: #3399ff; 
-                font-size: 380px;
+                color: #3399ff;
                 font-weight: bold;
-                font-family: 'Courier New', monospace;
             """)
         elif state == TimerState.TRANSITION:
             # Purple color for transition state
             self.timer_label.setStyleSheet("""
-                color: #bb86fc; 
-                font-size: 380px;
+                color: #bb86fc;
                 font-weight: bold;
-                font-family: 'Courier New', monospace;
             """)
     
     def _part_changed(self, current_part, index):
         """Update display when current part changes"""
         # We're in a meeting, show next part and predicted end
         self.show_countdown = False
-        
+
         # Update next part information
         parts = self.timer_controller.parts_list
-        
+
         # Reset styling
         self.info_label1.setStyleSheet("""
-            color: #ffffff; 
-            font-size: 60px;
+            color: #ffffff;
             font-weight: bold;
         """)
-        
+
         # Check if there's a next part
         if index + 1 < len(parts):
             self.next_part = parts[index + 1]
-            self.info_label1.setText(f"Next Part: {self.next_part.title}")
-            
-            # Adjust font size based on title length
-            self._adjust_font_size(self.info_label1, 60, self.next_part.title)
+            self.info_label1.setText(f"NEXT PART: {self.next_part.title.upper()}")
         else:
             # No next part (this is the last part)
             self.next_part = None
-            self.info_label1.setText("Last Part")
+            self.info_label1.setText("LAST PART")
     
     def _adjust_font_size(self, label, base_size, text):
         """Adjust font size based on text length to ensure readability"""
@@ -295,7 +296,7 @@ class SecondaryDisplay(QMainWindow):
             pass
         else:
             # If this is the last transition
-            self.info_label1.setText("Meeting conclusion")
+            self.info_label1.setText("MEETING CONCLUSION")
     
     def _update_predicted_end_time(self, original_end_time, predicted_end_time):
         """Update the predicted end time display with improved precision"""
@@ -338,11 +339,10 @@ class SecondaryDisplay(QMainWindow):
                 else:
                     # Minutes and seconds
                     time_text = f"Predicted End: {predicted_time_str} (+{minutes}m {seconds}s)"
-            
+
             # Red color for overtime
             self.info_label2.setStyleSheet("""
-                color: #ff4d4d; 
-                font-size: 60px;
+                color: #ff4d4d;
                 font-weight: bold;
             """)
         elif diff_seconds < 0:
@@ -361,54 +361,157 @@ class SecondaryDisplay(QMainWindow):
                 else:
                     # Minutes and seconds
                     time_text = f"Predicted End: {predicted_time_str} (-{minutes}m {seconds}s)"
-            
+
             # Green color for under time
             self.info_label2.setStyleSheet("""
-                color: #4caf50; 
-                font-size: 60px;
+                color: #4caf50;
                 font-weight: bold;
             """)
         else:
             # On time
             time_text = f"Predicted End: {predicted_time_str} (on time)"
             self.info_label2.setStyleSheet("""
-                color: #ffffff; 
-                font-size: 60px;
+                color: #ffffff;
                 font-weight: bold;
             """)
-        
-        # Set the text
+
+        # Set the text, and make it uppercase like info_label1
         self.info_label2.setText(time_text)
+        self.info_label2.setText(time_text.upper())
         
     def _meeting_started(self):
         """Handle meeting start event"""
         # Meeting started, switch from countdown to part info
         self.show_countdown = False
-        
+        # Immediately clear countdown labels
+        self.info_label1.setText("")
+        self.info_label2.setText("")
+        try:
+            self.timer_controller.timer.meeting_countdown_updated.disconnect(self._update_countdown)
+            
+        except TypeError:
+            print("[DEBUG] Signal already disconnected or not connected")
+
         # Set initial next part info
         if len(self.timer_controller.parts_list) > 1:
             next_part = self.timer_controller.parts_list[1]
-            self.info_label1.setText(f"Next Part: {next_part.title}")
+            self.info_label1.setText(f"NEXT PART: {next_part.title.upper()}")
             self.info_label1.setStyleSheet("""
-                color: #ffffff; 
-                font-size: 60px;
+                color: #ffffff;
                 font-weight: bold;
             """)
-            
             # Show the info labels for meeting info
             self.info_label2.setVisible(True)
         else:
             # No next part (only one part in the meeting)
-            self.info_label1.setText("Last Part")
+            self.info_label1.setText("LAST PART")
             self.info_label2.setVisible(True)
     
     def _meeting_ended(self):
         """Handle meeting end"""
         # Show meeting completed message
-        self.info_label1.setText("Meeting Completed")
+        self.info_label1.setText("MEETING COMPLETED")
         self.info_label2.setText("")
         
     
     def show(self):
         """Override show to always show in fullscreen"""
         self.showFullScreen()
+        
+    def _adjust_font_sizes(self):
+        width = self.width()
+
+        # Dynamically scale the timer font using QFontMetrics for precise fit
+        if hasattr(self, "timer_label"):
+            from PyQt6.QtGui import QFontMetrics
+            text = self.timer_label.text() or "00:00"
+
+            char_count = len(text)
+            sample_text = text + " "  # add slight margin
+            max_width = self.timer_label.width()
+            font = self.timer_label.font()
+            safe_width = int(max_width * 0.95)
+            # Scale larger for shorter text
+            max_font_size = 1400 if char_count <= 5 else 1000 if char_count <= 7 else 800
+            for size in range(max_font_size, 100, -2):
+                font.setPointSize(size)
+                metrics = QFontMetrics(font)
+                if (metrics.horizontalAdvance(sample_text) <= safe_width and
+                    metrics.height() <= self.timer_label.height() * 0.95):
+                    self.timer_label.setFont(font)
+                    break
+
+        # Dynamically scale the info labels based on height and width
+        if hasattr(self, "info_label1"):
+            from PyQt6.QtGui import QFontMetrics
+            text1 = self.info_label1.text() or "SAMPLE"
+            font = self.info_label1.font()
+            for size in range(100, 60, -2):
+                font.setPointSize(size)
+                metrics = QFontMetrics(font)
+                if (metrics.height() <= self.info_label1.height() * 0.60 and
+                    metrics.horizontalAdvance(text1) <= self.info_label1.width() * 0.95):
+                    self.info_label1.setFont(font)
+                    break
+
+        if hasattr(self, "info_label2"):
+            text2 = self.info_label2.text() or "SAMPLE"
+            font = self.info_label2.font()
+            for size in range(100, 60, -2):
+                font.setPointSize(size)
+                metrics = QFontMetrics(font)
+                if (metrics.height() <= self.info_label2.height() * 0.60 and
+                    metrics.horizontalAdvance(text2) <= self.info_label2.width() * 0.95):
+                    self.info_label2.setFont(font)
+                    break
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._adjust_font_sizes()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._adjust_font_sizes()
+        
+    def closeEvent(self, event):
+        """Handle close event"""
+        # Force the window to close when the main window is closed
+        #self.timer_controller.stop_timer()
+        
+        event.accept()
+        
+    def _on_settings_updated(self):
+        #print("[DEBUG] SecondaryDisplay: settings changed signal received")
+        self._move_to_configured_screen()
+
+    def _move_to_configured_screen(self):
+        settings = self.settings_controller.get_settings()
+        screen_name = settings.display.secondary_screen_name
+        screens = QApplication.screens()
+        for screen in screens:
+            if screen.name() == screen_name:
+                #print(f"[DEBUG] Moving secondary display to screen: {screen.name()}")
+                self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+                self.showNormal()
+
+                # Move to correct geometry manually
+                self.setGeometry(screen.geometry())
+                #print(f"[DEBUG] Set window geometry to: {screen.geometry()}")
+
+                # Move to screen explicitly
+                self.windowHandle().setScreen(screen)
+
+                # Restore topmost and fullscreen
+                self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+                self.showFullScreen()
+                break
+    @property
+    def show_countdown(self):
+        return self._show_countdown
+
+    @show_countdown.setter
+    def show_countdown(self, value):
+        if self.timer_controller.timer.state != TimerState.STOPPED or self.timer_controller.current_part_index >= 0:
+            
+            return
+        self._show_countdown = value
