@@ -264,6 +264,9 @@ class MainWindow(QMainWindow):
         #print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
             
     def _update_countdown(self, seconds_remaining: int, message: str):
+        # Guard clause: do not update countdown display after the meeting has started
+        if self.timer_controller.current_part_index >= 0:
+            return
         #print(f"[DEBUG] MainWindow._update_countdown: {seconds_remaining} seconds remaining")
         """Update the countdown message in the main window"""
         # Update status bar with countdown message

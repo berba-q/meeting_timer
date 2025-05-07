@@ -91,6 +91,9 @@ class TimerController(QObject):
         
     def _initialize_meeting_countdown(self):
         """Initialize countdown to meeting start time"""
+        # Prevent countdown reinitialization if meeting is already in progress
+        if self.current_part_index >= 0:
+            return
         if not self.current_meeting:
             return
 

@@ -82,7 +82,7 @@ class ScreenHandler:
             name = getattr(settings.display, 'secondary_screen_name', '')
         
         # Try by index first
-        if 0 <= index < len(screens):
+        if index is not None and 0 <= index < len(screens):
             return screens[index]
         
         # If index fails, try by name
