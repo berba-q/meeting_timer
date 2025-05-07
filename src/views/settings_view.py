@@ -397,7 +397,7 @@ class SettingsDialog(QDialog):
             self.secondary_screen_combo.setCurrentIndex(secondary_index)
         
         self.use_secondary_check.setChecked(settings.display.use_secondary_screen)
-        print("[DEBUG] SettingsDialog._load_settings -> use_secondary_screen =", settings.display.use_secondary_screen)
+        
         self._toggle_secondary_screen(settings.display.use_secondary_screen)
         # Do NOT call toggle_secondary_screen on the controller here; only update UI.
         

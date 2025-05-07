@@ -205,11 +205,11 @@ class SettingsManager:
     def _load_settings(self) -> AppSettings:
         """Load settings from file or create default settings"""
         if os.path.exists(self.settings_file):
-            print("[DEBUG] Loading settings from:", self.settings_file)
+           
             try:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings_dict = json.load(f)
-                print("[DEBUG] Loaded use_secondary_screen =", settings_dict.get("display", {}).get("use_secondary_screen"))
+                
                 return AppSettings.from_dict(settings_dict)
             except (json.JSONDecodeError, KeyError, ValueError) as e:
                 print(f"Error loading settings: {e}")
@@ -218,8 +218,6 @@ class SettingsManager:
     
     def save_settings(self):
         """Save current settings to file"""
-        print("[DEBUG] Saving settings to:", self.settings_file)
-        print("[DEBUG] use_secondary_screen =", self.settings.display.use_secondary_screen)
         with open(self.settings_file, 'w', encoding='utf-8') as f:
             json.dump(self.settings.to_dict(), f, indent=2)
     
