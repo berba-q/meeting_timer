@@ -352,7 +352,9 @@ class SettingsDialog(QDialog):
     
     def _load_settings(self):
         """Load current settings into UI"""
-        settings = self.settings_controller.get_settings()
+        # Optionally, use load_settings() instead of get_settings() for freshness.
+        # settings = self.settings_controller.get_settings()
+        settings = self.settings_controller.settings_manager._load_settings()
         
         # General settings
         language_index = self.language_combo.findData(settings.language)
@@ -395,7 +397,9 @@ class SettingsDialog(QDialog):
             self.secondary_screen_combo.setCurrentIndex(secondary_index)
         
         self.use_secondary_check.setChecked(settings.display.use_secondary_screen)
+        print("[DEBUG] SettingsDialog._load_settings -> use_secondary_screen =", settings.display.use_secondary_screen)
         self._toggle_secondary_screen(settings.display.use_secondary_screen)
+        # Do NOT call toggle_secondary_screen on the controller here; only update UI.
         
         # Meeting source settings
         source_mode = settings.meeting_source.mode
@@ -408,7 +412,6 @@ class SettingsDialog(QDialog):
         
         # Update visibility based on current settings
         self._update_source_options_visibility()
-        
         
         # Network display settings
         if hasattr(self, 'network_mode_radios'):
@@ -458,11 +461,10 @@ class SettingsDialog(QDialog):
         primary_screen = self.primary_screen_combo.currentData()
         self.settings_controller.set_primary_screen(primary_screen)
         
-        if self.use_secondary_check.isChecked():
-            secondary_screen = self.secondary_screen_combo.currentData()
-            self.settings_controller.set_secondary_screen(secondary_screen)
-        else:
-            self.settings_controller.toggle_secondary_screen(False)
+        secondary_screen = self.secondary_screen_combo.currentData()
+        self.settings_controller.set_secondary_screen(secondary_screen)
+        # Move toggle_secondary_screen to the end of display-related settings, after all screen and theme settings
+        self.settings_controller.toggle_secondary_screen(self.use_secondary_check.isChecked())
         
         # Meeting source settings
         for mode, radio in self.source_mode_radios.items():

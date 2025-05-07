@@ -16,10 +16,11 @@ from src.views.timer_view import TimerView
 
 class SecondaryDisplay(QMainWindow):
     """Secondary display window for the timer - designed for speakers"""
-    
-    def __init__(self, timer_controller: TimerController, parent=None):
+
+    def __init__(self, timer_controller: TimerController, settings_controller, parent=None):
         super().__init__(parent, Qt.WindowType.Window)
         self.timer_controller = timer_controller
+        self.settings_controller = settings_controller
         self.next_part = None
         self.show_countdown = False
         
@@ -29,13 +30,16 @@ class SecondaryDisplay(QMainWindow):
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint
         )
-        
+
         # Setup UI
         self._setup_ui()
-        
+
         # Connect signals
         self._connect_signals()
-        
+
+        # Connect settings changed signal
+        self.settings_controller.settings_changed.connect(self._on_settings_updated)
+
         # Show in fullscreen by default
         self.showFullScreen()
     
@@ -162,7 +166,6 @@ class SecondaryDisplay(QMainWindow):
         
     def _update_current_time(self, time_str: str):
         """Update the current time display when in stopped state"""
-        print(f"[DEBUG] _update_current_time called with {time_str}, state={self.timer_controller.timer.state}, show_countdown={self.show_countdown}")
         if self.timer_controller.timer.state == TimerState.STOPPED or self.show_countdown:
             # Update with current time when in stopped state
             self.timer_label.setText(time_str)
@@ -175,14 +178,12 @@ class SecondaryDisplay(QMainWindow):
     
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message"""
-        print(f"[DEBUG] SecondaryDisplay._update_countdown called with {seconds_remaining} seconds — {message}")
         if seconds_remaining > 0:
             # Meeting hasn't started yet, show countdown
             if self.timer_controller.timer.state == TimerState.STOPPED and self.timer_controller.current_part_index == -1:
                 self.show_countdown = True
                 # Show the countdown message in the info panel
                 self.info_label1.setText(message)
-                print(f"[DEBUG] info_label1 text set to: {self.info_label1.text()}")
                 self.info_label1.setStyleSheet("""
                     color: #4a90e2; 
                     font-size: 80px;
@@ -463,3 +464,29 @@ class SecondaryDisplay(QMainWindow):
         #self.timer_controller.stop_timer()
         
         event.accept()
+        
+    def _on_settings_updated(self):
+        #print("[DEBUG] SecondaryDisplay: settings changed signal received")
+        self._move_to_configured_screen()
+
+    def _move_to_configured_screen(self):
+        settings = self.settings_controller.get_settings()
+        screen_name = settings.display.secondary_screen_name
+        screens = QApplication.screens()
+        for screen in screens:
+            if screen.name() == screen_name:
+                #print(f"[DEBUG] Moving secondary display to screen: {screen.name()}")
+                self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+                self.showNormal()
+
+                # Move to correct geometry manually
+                self.setGeometry(screen.geometry())
+                #print(f"[DEBUG] Set window geometry to: {screen.geometry()}")
+
+                # Move to screen explicitly
+                self.windowHandle().setScreen(screen)
+
+                # Restore topmost and fullscreen
+                self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+                self.showFullScreen()
+                break

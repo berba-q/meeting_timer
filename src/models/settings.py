@@ -115,13 +115,14 @@ class DisplaySettings:
     @classmethod
     def from_dict(cls, data: dict) -> 'DisplaySettings':
         """Create from dictionary"""
+        use_secondary_screen = data.get('use_secondary_screen', False)
         return cls(
-            display_mode=TimerDisplayMode(data['display_mode']),
+            display_mode=TimerDisplayMode(data.get('display_mode', TimerDisplayMode.DIGITAL.value)),
             primary_screen_index=data.get('primary_screen_index', 0),
             primary_screen_name=data.get('primary_screen_name', ""),
             secondary_screen_index=data.get('secondary_screen_index'),
             secondary_screen_name=data.get('secondary_screen_name', ""),
-            use_secondary_screen=data.get('use_secondary_screen', False),
+            use_secondary_screen=use_secondary_screen,
             show_predicted_end_time=data.get('show_predicted_end_time', True),
             theme=data.get('theme', 'light')
         )
@@ -204,9 +205,11 @@ class SettingsManager:
     def _load_settings(self) -> AppSettings:
         """Load settings from file or create default settings"""
         if os.path.exists(self.settings_file):
+            print("[DEBUG] Loading settings from:", self.settings_file)
             try:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings_dict = json.load(f)
+                print("[DEBUG] Loaded use_secondary_screen =", settings_dict.get("display", {}).get("use_secondary_screen"))
                 return AppSettings.from_dict(settings_dict)
             except (json.JSONDecodeError, KeyError, ValueError) as e:
                 print(f"Error loading settings: {e}")
@@ -215,6 +218,8 @@ class SettingsManager:
     
     def save_settings(self):
         """Save current settings to file"""
+        print("[DEBUG] Saving settings to:", self.settings_file)
+        print("[DEBUG] use_secondary_screen =", self.settings.display.use_secondary_screen)
         with open(self.settings_file, 'w', encoding='utf-8') as f:
             json.dump(self.settings.to_dict(), f, indent=2)
     
