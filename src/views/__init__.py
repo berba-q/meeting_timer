@@ -1,3 +1,3 @@
 """
-Views package for the JW Meeting Timer application.
+Views package for the Ontime Meeting Timer application.
 """
