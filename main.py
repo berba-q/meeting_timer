@@ -3,8 +3,8 @@ OnTime - A cross-platform timer application for managing meeting schedules
 """
 import sys
 import os
-#import qrcode
-from datetime import datetime
+import time
+from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QComboBox, QTabWidget, QMessageBox,
@@ -12,8 +12,108 @@ from PyQt6.QtWidgets import (
     QApplication, QSizePolicy
 )
 from PyQt6.QtGui import QAction
-#from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QSplashScreen
+from PyQt6.QtGui import QPixmap, QPainter, QColor
+from PyQt6.QtCore import Qt, QSize
+
+class BackgroundInitializer(QThread):
+    progress_updated = pyqtSignal(int, str)
+    initialization_complete = pyqtSignal(object, object)
+
+    def run(self):
+        from src.controllers.meeting_controller import MeetingController
+        from src.controllers.settings_controller import SettingsController
+        import time
+
+        self.progress_updated.emit(10, "Initializing controllers...")
+        controller = MeetingController()
+
+        self.progress_updated.emit(20, "Loading settings...")
+        settings_controller = SettingsController(controller.settings_manager)
+
+        self.progress_updated.emit(30, "Settings loaded")
+        self.progress_updated.emit(40, "Loading theme...")
+        self.progress_updated.emit(50, "Preparing to load meetings...")
+
+        self.progress_updated.emit(70, "Loading meeting data...")
+        controller.load_meetings()
+
+        self.progress_updated.emit(100, "Starting application...")
+        self.initialization_complete.emit(controller, settings_controller)
+
+class CustomSplashScreen(QSplashScreen):
+    def __init__(self):
+        super().__init__()
+        from src.utils.resources import get_icon
+        from src import __version__
+
+        # Set fixed size for splash screen
+        self.setFixedSize(400, 300)
+
+        # Create central pixmap with white background
+        pixmap = QPixmap(self.size())
+        pixmap.fill(QColor("#ffffff"))
+
+        self.setPixmap(pixmap)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setStyleSheet("background-color: white;")
+
+        # Add widgets over splash
+        from PyQt6.QtWidgets import QLabel, QVBoxLayout
+
+        self.icon_label = QLabel(self)
+        try:
+            app_icon = get_icon("app_icon")
+            icon_pixmap = app_icon.pixmap(QSize(96, 96))
+            self.icon_label.setPixmap(icon_pixmap)
+            self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception as e:
+            print(f"[WARN] Could not load icon: {e}")
+            self.icon_label.setText("⏱️")
+            self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.icon_label.setFont(QFont("Arial", 40))
+
+        self.title_label = QLabel("OnTime Meeting Timer", self)
+        self.title_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.status_label = QLabel("Initializing...", self)
+        self.status_label.setFont(QFont("Arial", 12))
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setStyleSheet("color: #333;")
+
+        self.version_label = QLabel(f"Version {__version__}", self)
+        self.version_label.setFont(QFont("Arial", 10))
+        self.version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.version_label.setStyleSheet("color: #888;")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.addWidget(self.icon_label)
+        layout.addWidget(self.title_label)
+        layout.addSpacing(10)
+        layout.addWidget(self.status_label)
+        layout.addSpacing(5)
+        layout.addWidget(self.version_label)
+
+        self.witty_lines = [
+            "Warming up the mic...",
+            "Checking the speaker notes...",
+            "Counting backwards from 10...",
+            "Synchronizing timers...",
+            "Just a moment more..."
+        ]
+        self._start_witty_messages()
+
+    def _start_witty_messages(self, index=0):
+        if index < len(self.witty_lines):
+            self.status_label.setText(self.witty_lines[index])
+            QTimer.singleShot(2000, lambda: self._start_witty_messages(index + 1))
+
+from datetime import datetime
 from pathlib import Path
 
 from src.models.meeting import MeetingType
@@ -89,33 +189,42 @@ def _select_meeting_by_day(controller, main_window):
 
 def main():
     """Application entry point"""
-    # Set up application
+    start_time = time.perf_counter()
     app = QApplication(sys.argv)
     app.setApplicationName("OnTime")
     app.setOrganizationName("OnTime")
-    
-    # Set application icon
+
     app.setWindowIcon(get_icon("app_icon"))
-    
-    # Apply stylesheet (light theme by default)
     apply_stylesheet(app, "light")
-    
-    # Initialize controller
-    controller = MeetingController()
-    settings_controller = SettingsController(controller.settings_manager)
-    
-    # Create and show main window
-    main_window = MainWindow(controller, settings_controller)
-    
-    # Load meetings
-    controller.load_meetings()
-    
-    # Force selection of the appropriate meeting based on current day
-    _select_meeting_by_day(controller, main_window)
-    
-    main_window.show()
-    
-    # Start application event loop
+
+    splash = CustomSplashScreen()
+    splash.show()
+    primary_screen = app.primaryScreen()
+    screen_geometry = primary_screen.geometry()
+    splash.move(
+        screen_geometry.center().x() - splash.width() // 2,
+        screen_geometry.center().y() - splash.height() // 2
+    )
+    app.processEvents()
+    splash.raise_()
+    splash.activateWindow()
+
+    initializer = BackgroundInitializer()
+    initializer.progress_updated.connect(lambda _, msg: splash.status_label.setText(msg))
+
+    def on_initialization_complete(controller, settings_controller):
+        def launch_main():
+            main_window = MainWindow(controller, settings_controller)
+            _select_meeting_by_day(controller, main_window)
+            splash.finish(main_window)
+            main_window.show()
+            elapsed = time.perf_counter() - start_time
+            print(f"[PERF] App ready in {elapsed:.2f} seconds")
+        QTimer.singleShot(100, launch_main)
+
+    initializer.initialization_complete.connect(on_initialization_complete)
+    initializer.start()
+
     sys.exit(app.exec())
     
 if __name__ == "__main__":

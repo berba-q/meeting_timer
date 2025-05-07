@@ -2,6 +2,7 @@
 Main application window for the OnTime meeting timer app.
 """
 import os
+from src.utils.lazy_loader import LazyComponentLoader
 from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -120,6 +121,11 @@ class MainWindow(QMainWindow):
         from src.utils.screen_handler import ScreenHandler
         secondary_screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
         
+        # Start lazy loader for components
+        self.lazy_loader = LazyComponentLoader(self)
+        self.lazy_loader.component_loaded.connect(self._on_lazy_component_loaded)
+        self.lazy_loader.all_components_loaded.connect(self._on_all_components_loaded)
+        self.lazy_loader.start()
         
         # Load meetings
         self.meeting_controller.load_meetings()
@@ -1492,3 +1498,13 @@ class MainWindow(QMainWindow):
         self.secondary_display.show()
         QTimer.singleShot(200, lambda: self.secondary_display.showFullScreen())
         #print(f"[FIXED] Moved secondary display to screen: {screen.name()}")
+    def _on_lazy_component_loaded(self, component_name, component_object):
+        if component_name == "meeting_view":
+            self.meeting_view = component_object
+        elif component_name == "network_manager":
+            self.network_display_manager = component_object
+        elif component_name == "network_widget":
+            self.network_status_widget = component_object
+
+    def _on_all_components_loaded(self):
+        print("[INFO] All lazy-loaded components initialized.")
