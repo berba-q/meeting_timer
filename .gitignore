@@ -175,8 +175,8 @@ cython_debug/
 .pypirc
 
 # Sensitive configuration files
-*.yml
-*.yaml
+
+
 *.env
 *.secret
 *.key
