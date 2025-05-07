@@ -105,7 +105,9 @@ class SecondaryDisplay(QMainWindow):
         self.timer_label.setStyleSheet("""
             color: #ffffff;
             font-weight: bold;
-            font-family: 'Impact', 'Arial Black', sans-serif;
+            font-family: 'Tahoma', 'Arial Black', sans-serif;
+            padding: 0px;
+            margin: 0px;
         """)
         self.timer_label.setMinimumSize(0, 0)
         self.timer_label.setWordWrap(True)
@@ -134,6 +136,7 @@ class SecondaryDisplay(QMainWindow):
 
         self.info_label2 = QLabel()
         self.info_label2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Match info_label1 size
         self.info_label2.setStyleSheet("""
             color: #ff4d4d;
             font-weight: bold;
@@ -146,8 +149,8 @@ class SecondaryDisplay(QMainWindow):
         info_layout.addWidget(self.info_label2)
         
         # Add the main components to the layout
-        layout.addWidget(self.timer_frame, 7)  # Timer gets more vertical space
-        layout.addWidget(self.info_frame, 2)
+        layout.addWidget(self.timer_frame, 10)  # Timer gets more vertical space
+        layout.addWidget(self.info_frame, 1)   # Info panel gets less vertical space
         
     
     def _connect_signals(self):
@@ -176,17 +179,9 @@ class SecondaryDisplay(QMainWindow):
     
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message"""
-        print("[DEBUG] _update_countdown called")
-        print("[DEBUG] show_countdown =", self.show_countdown)
-        import traceback
-        traceback.print_stack(limit=5)
-        print("[DEBUG] state =", self.timer_controller.timer.state)
-        print("[DEBUG] current_part_index =", self.timer_controller.current_part_index)
 
         # Guard clause: If meeting is not stopped or meeting has started, never show countdown
         if self.timer_controller.timer.state != TimerState.STOPPED or self.timer_controller.current_part_index >= 0:
-            if self.show_countdown:
-                print("[DEBUG] Disabling countdown display permanently after meeting start")
             self.show_countdown = False
             self._show_countdown = False
             return
@@ -344,11 +339,10 @@ class SecondaryDisplay(QMainWindow):
                 else:
                     # Minutes and seconds
                     time_text = f"Predicted End: {predicted_time_str} (+{minutes}m {seconds}s)"
-            
+
             # Red color for overtime
             self.info_label2.setStyleSheet("""
-                color: #ff4d4d; 
-                font-size: 60px;
+                color: #ff4d4d;
                 font-weight: bold;
             """)
         elif diff_seconds < 0:
@@ -367,24 +361,23 @@ class SecondaryDisplay(QMainWindow):
                 else:
                     # Minutes and seconds
                     time_text = f"Predicted End: {predicted_time_str} (-{minutes}m {seconds}s)"
-            
+
             # Green color for under time
             self.info_label2.setStyleSheet("""
-                color: #4caf50; 
-                font-size: 60px;
+                color: #4caf50;
                 font-weight: bold;
             """)
         else:
             # On time
             time_text = f"Predicted End: {predicted_time_str} (on time)"
             self.info_label2.setStyleSheet("""
-                color: #ffffff; 
-                font-size: 60px;
+                color: #ffffff;
                 font-weight: bold;
             """)
-        
-        # Set the text
+
+        # Set the text, and make it uppercase like info_label1
         self.info_label2.setText(time_text)
+        self.info_label2.setText(time_text.upper())
         
     def _meeting_started(self):
         """Handle meeting start event"""
@@ -395,10 +388,9 @@ class SecondaryDisplay(QMainWindow):
         self.info_label2.setText("")
         try:
             self.timer_controller.timer.meeting_countdown_updated.disconnect(self._update_countdown)
-            print("[DEBUG] Disconnected meeting_countdown_updated signal")
+            
         except TypeError:
             print("[DEBUG] Signal already disconnected or not connected")
-        print("[DEBUG] _meeting_started triggered — show_countdown set to False")
 
         # Set initial next part info
         if len(self.timer_controller.parts_list) > 1:
@@ -445,7 +437,7 @@ class SecondaryDisplay(QMainWindow):
                 font.setPointSize(size)
                 metrics = QFontMetrics(font)
                 if (metrics.horizontalAdvance(sample_text) <= safe_width and
-                    metrics.height() <= self.timer_label.height() * 0.85):
+                    metrics.height() <= self.timer_label.height() * 0.95):
                     self.timer_label.setFont(font)
                     break
 
@@ -454,10 +446,10 @@ class SecondaryDisplay(QMainWindow):
             from PyQt6.QtGui import QFontMetrics
             text1 = self.info_label1.text() or "SAMPLE"
             font = self.info_label1.font()
-            for size in range(200, 100, -2):
+            for size in range(100, 60, -2):
                 font.setPointSize(size)
                 metrics = QFontMetrics(font)
-                if (metrics.height() <= self.info_label1.height() * 0.85 and
+                if (metrics.height() <= self.info_label1.height() * 0.60 and
                     metrics.horizontalAdvance(text1) <= self.info_label1.width() * 0.95):
                     self.info_label1.setFont(font)
                     break
@@ -465,10 +457,10 @@ class SecondaryDisplay(QMainWindow):
         if hasattr(self, "info_label2"):
             text2 = self.info_label2.text() or "SAMPLE"
             font = self.info_label2.font()
-            for size in range(200, 100, -2):
+            for size in range(100, 60, -2):
                 font.setPointSize(size)
                 metrics = QFontMetrics(font)
-                if (metrics.height() <= self.info_label2.height() * 0.85 and
+                if (metrics.height() <= self.info_label2.height() * 0.60 and
                     metrics.horizontalAdvance(text2) <= self.info_label2.width() * 0.95):
                     self.info_label2.setFont(font)
                     break
@@ -520,6 +512,6 @@ class SecondaryDisplay(QMainWindow):
     @show_countdown.setter
     def show_countdown(self, value):
         if self.timer_controller.timer.state != TimerState.STOPPED or self.timer_controller.current_part_index >= 0:
-            print("[GUARD] Prevented re-enabling countdown after meeting start")
+            
             return
         self._show_countdown = value
