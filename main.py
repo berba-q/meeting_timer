@@ -4,7 +4,7 @@ OnTime - A cross-platform timer application for managing meeting schedules
 import sys
 import os
 import time
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QComboBox, QTabWidget, QMessageBox,
@@ -18,31 +18,6 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QSplashScreen
 from PyQt6.QtGui import QPixmap, QPainter, QColor
 from PyQt6.QtCore import Qt, QSize
-
-class BackgroundInitializer(QThread):
-    progress_updated = pyqtSignal(int, str)
-    initialization_complete = pyqtSignal(object, object)
-
-    def run(self):
-        from src.controllers.meeting_controller import MeetingController
-        from src.controllers.settings_controller import SettingsController
-        import time
-
-        self.progress_updated.emit(10, "Initializing controllers...")
-        controller = MeetingController()
-
-        self.progress_updated.emit(20, "Loading settings...")
-        settings_controller = SettingsController(controller.settings_manager)
-
-        self.progress_updated.emit(30, "Settings loaded")
-        self.progress_updated.emit(40, "Loading theme...")
-        self.progress_updated.emit(50, "Preparing to load meetings...")
-
-        self.progress_updated.emit(70, "Loading meeting data...")
-        controller.load_meetings()
-
-        self.progress_updated.emit(100, "Starting application...")
-        self.initialization_complete.emit(controller, settings_controller)
 
 class CustomSplashScreen(QSplashScreen):
     def __init__(self):
@@ -209,21 +184,19 @@ def main():
     splash.raise_()
     splash.activateWindow()
 
-    initializer = BackgroundInitializer()
-    initializer.progress_updated.connect(lambda _, msg: splash.status_label.setText(msg))
+    # Direct initialization
+    controller = MeetingController()
+    settings_controller = SettingsController(controller.settings_manager)
+    controller.load_meetings()
+    splash.status_label.setText("Loading complete...")
 
-    def on_initialization_complete(controller, settings_controller):
-        def launch_main():
-            main_window = MainWindow(controller, settings_controller)
-            _select_meeting_by_day(controller, main_window)
-            splash.finish(main_window)
-            main_window.show()
-            elapsed = time.perf_counter() - start_time
-            print(f"[PERF] App ready in {elapsed:.2f} seconds")
-        QTimer.singleShot(100, launch_main)
+    main_window = MainWindow(controller, settings_controller)
+    _select_meeting_by_day(controller, main_window)
+    splash.finish(main_window)
+    main_window.show()
 
-    initializer.initialization_complete.connect(on_initialization_complete)
-    initializer.start()
+    elapsed = time.perf_counter() - start_time
+    print(f"[PERF] App ready in {elapsed:.2f} seconds")
 
     sys.exit(app.exec())
     

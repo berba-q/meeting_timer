@@ -23,6 +23,7 @@ class NetworkDisplayManager(QObject):
     client_connected = pyqtSignal(str)
     client_disconnected = pyqtSignal(str)
     status_updated = pyqtSignal(str, int)  # Status message, client count
+    network_ready = pyqtSignal()
     
     def __init__(self, timer_controller: TimerController, settings_manager: SettingsManager):
         super().__init__()
@@ -252,15 +253,21 @@ class NetworkDisplayManager(QObject):
             # Use default ports if not specified
             if http_port is None:
                 http_port = self.settings_manager.settings.network_display.http_port
-            
+
             if ws_port is None:
                 ws_port = self.settings_manager.settings.network_display.ws_port
-            
+
+            # Prevent double start
+            if self.broadcaster.is_broadcasting:
+                print("[DEBUG] Network display already running. Skipping startup.")
+                return True
+
             # Start services based on mode
             if mode == NetworkDisplayMode.WEB_SOCKET_ONLY:
                 # Start only WebSocket broadcaster
                 self.broadcaster.start_broadcasting(ws_port)
                 self.status_timer.start()
+                self.network_ready.emit()
                 return True
                 
             elif mode == NetworkDisplayMode.HTTP_AND_WS:
@@ -268,8 +275,9 @@ class NetworkDisplayManager(QObject):
                 self.http_server.start_server(http_port, ws_port)
                 self.broadcaster.start_broadcasting(ws_port)
                 self.status_timer.start()
+                self.network_ready.emit()
                 return True
-            
+
             return False
                 
         except Exception as e:
@@ -449,3 +457,7 @@ class NetworkDisplayManager(QObject):
         )
         
         return (http_url, client_count, active_services)
+    
+    def cleanup(self):
+        """Ensure everything is stopped cleanly"""
+        self.stop_network_display()

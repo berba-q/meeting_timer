@@ -214,6 +214,10 @@ class NetworkBroadcaster(QObject):
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=2)
             print("WebSocket broadcaster thread joined")
+            self.thread = None
+            self.server = None
+            self.server_task = None
+            self.event_loop = None
         
         self.is_broadcasting = False
         self.broadcast_stopped.emit()
@@ -278,7 +282,7 @@ class NetworkBroadcaster(QObject):
     def get_connection_url(self) -> str:
         """Get the URL clients can use to connect"""
         return f"ws://{self.host_ip}:{self.port}"
-    
+
     def get_client_count(self) -> int:
         """Get the number of connected clients"""
         return len(self.connected_clients)
