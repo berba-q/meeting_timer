@@ -146,8 +146,15 @@ def _select_meeting_by_day(controller, main_window):
         main_window.timer_controller.set_meeting(meeting_to_select)
         
         # Force complete refresh of meeting view
-        main_window.meeting_view.set_meeting(None)  # Clear first
-        main_window.meeting_view.set_meeting(meeting_to_select)
+        # Clear meeting view safely
+        if main_window._is_component_ready('meeting_view'):
+            main_window.meeting_view.set_meeting(None)
+        else:
+            main_window._store_pending_action('meeting_view', 'set_meeting', None)
+        if main_window._is_component_ready('meeting_view'):
+            main_window.meeting_view.set_meeting(meeting_to_select)
+        else:
+            main_window._store_pending_action('meeting_view', 'set_meeting', meeting_to_select)
         
         # Update meeting selection in dropdown
         for i in range(main_window.meeting_selector.count()):

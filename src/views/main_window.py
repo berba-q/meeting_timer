@@ -80,6 +80,8 @@ class MainWindow(QMainWindow):
         self.network_display_manager = None
         self.network_status_widget = None
         self.secondary_display_handler = None
+        # Secondary display window placeholder
+        self.secondary_display = None
         
         # Setup UI
         self.setWindowTitle("OnTime Meeting Timer")
@@ -225,7 +227,7 @@ class MainWindow(QMainWindow):
             if self.meeting_controller.current_meeting:
                 component.set_meeting(self.meeting_controller.current_meeting)
                 
-        elif name == "network_manager":
+        elif name == "network_display_manager":
             # Connect the network manager's signals
             self._connect_network_signals()
             
@@ -309,7 +311,10 @@ class MainWindow(QMainWindow):
             self.timer_controller.set_meeting(meeting)
             
             # Force refresh of the meeting view
-            self.meeting_view.set_meeting(meeting)
+            if self._is_component_ready('meeting_view'):
+                self.meeting_view.set_meeting(meeting)
+            else:
+                self._store_pending_action('meeting_view', 'set_meeting', meeting)
             
             # Ensure the status bar shows the correct meeting
             self.current_part_label.setText(f"Meeting: {meeting.title}")
@@ -394,7 +399,10 @@ class MainWindow(QMainWindow):
         self.timer_controller.set_meeting(meeting)
         
         # Update the meeting view
-        self.meeting_view.set_meeting(meeting)
+        if self._is_component_ready('meeting_view'):
+            self.meeting_view.set_meeting(meeting)
+        else:
+            self._store_pending_action('meeting_view', 'set_meeting', meeting)
         
         # Update status bar
         self.current_part_label.setText(f"Meeting: {meeting.title}")
@@ -732,7 +740,7 @@ class MainWindow(QMainWindow):
             # Try to load the network manager component
             if hasattr(self, 'component_loader') and self.component_loader:
                 # Load with blocking to ensure it's available
-                self.component_loader.get_component('network_manager', blocking=True, timeout=5000)
+                self.component_loader.get_component('network_display_manager', blocking=True, timeout=5000)
             
             # Check again if it's available
             if not self._is_component_ready('network_display_manager'):
@@ -772,7 +780,7 @@ class MainWindow(QMainWindow):
             # Try to load the network manager
             if hasattr(self, 'component_loader') and self.component_loader:
                 # Load with blocking to ensure it's available
-                self.component_loader.get_component('network_manager', blocking=True, timeout=5000)
+                self.component_loader.get_component('network_display_manager', blocking=True, timeout=5000)
             
             # Check again if it's available
             if not self._is_component_ready('network_display_manager'):
@@ -1332,7 +1340,10 @@ class MainWindow(QMainWindow):
                     self.meeting_controller.set_current_meeting(meeting)
 
                     # Update meeting view
-                    self.meeting_view.set_meeting(meeting)
+                    if self._is_component_ready('meeting_view'):
+                        self.meeting_view.set_meeting(meeting)
+                    else:
+                        self._store_pending_action('meeting_view', 'set_meeting', meeting)
 
                     # Add to recent meetings
                     if file_path not in self.meeting_controller.settings_manager.settings.recent_meetings:
@@ -1460,7 +1471,10 @@ class MainWindow(QMainWindow):
             self.meeting_controller.save_meeting(current_meeting)
 
             # Update the meeting display
-            self.meeting_view.set_meeting(current_meeting)
+            if self._is_component_ready('meeting_view'):
+                self.meeting_view.set_meeting(current_meeting)
+            else:
+                self._store_pending_action('meeting_view', 'set_meeting', current_meeting)
 
             # Show confirmation message
             QTimer.singleShot(0, lambda: QMessageBox.information(self, "Songs Updated",
@@ -1503,24 +1517,6 @@ class MainWindow(QMainWindow):
                 self.width(),
                 self.height()
             )
-            
-    def _position_secondary_display(self):
-        """Position the secondary display on the correct screen"""
-        if not self.secondary_display:
-            return
-        
-        settings = self.settings_controller.get_settings()
-        #secondary_index = settings.display.secondary_screen_index
-        
-        # Get the screen for the secondary display
-        screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
-        if screen:
-            # Get the geometry of the secondary screen
-            geometry = screen.geometry()
-            
-            # Set the geometry of the secondary display
-            self.secondary_display.setGeometry(geometry)
-            self.secondary_display.showFullScreen()
     
     def _toggle_secondary_display(self):
         """Toggle the secondary display window with lazy-loaded components"""
@@ -1671,8 +1667,9 @@ class MainWindow(QMainWindow):
             self.network_display_manager.cleanup()
             
         # Clean up component loader
-        if hasattr(self, 'component_loader') and self.component_loader and hasattr(self.component_loader, 'loader'):
+        if hasattr(self.component_loader, "loader"):
             self.component_loader.loader.stop()
+            self.component_loader.loader.wait() 
             
         # Save dock visibility state
         settings = self.settings_controller.get_settings()
