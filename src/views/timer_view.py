@@ -21,6 +21,8 @@ class TimerView(QWidget):
         super().__init__(parent)
         self.timer_controller = timer_controller
         
+        self.show_clock = True # Flag to show/hide clock
+        
         # Current display properties
         self.display_mode = TimerDisplayMode.DIGITAL
         self.remaining_seconds = 0
@@ -115,11 +117,12 @@ class TimerView(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
     
     def _update_current_time(self, time_str: str):
-        """Update the displayed current time when in stopped state"""
+        """Update the displayed current time when allowed"""
         self.current_time = time_str
-        
-        # Only update display if we're in stopped state
-        if self.timer_state == TimerState.STOPPED:
+
+        # Show the clock only if (a) we are in STOPPED state and (b) the view
+        # isn’t currently suppressed by a running meeting.
+        if self.timer_state == TimerState.STOPPED and self.show_clock:
             self.timer_label.setText(time_str)
     
     def _update_countdown(self, seconds_remaining: int, message: str):
@@ -157,7 +160,10 @@ class TimerView(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
     
     def _update_time(self, seconds: int):
-        """Update the displayed time"""
+        """Update the displayed time (count‑down / timer).  
+        This should *always* run, regardless of the show_clock flag, because
+        show_clock only suppresses the live clock when the meeting is stopped.
+        """
         self.remaining_seconds = seconds
         self._update_display()
     

@@ -21,6 +21,8 @@ class SecondaryDisplay(QMainWindow):
         super().__init__(parent, Qt.WindowType.Window)
         self.timer_controller = timer_controller
         self.settings_controller = settings_controller
+        # Controls whether the live clock is allowed to update the label
+        self.show_clock: bool = True
         self.next_part = None
         self._show_countdown = False
         
@@ -167,7 +169,7 @@ class SecondaryDisplay(QMainWindow):
         
     def _update_current_time(self, time_str: str):
         """Update the current time display when in stopped state"""
-        if self.timer_controller.timer.state == TimerState.STOPPED or self.show_countdown:
+        if (self.timer_controller.timer.state == TimerState.STOPPED or self.show_countdown) and self.show_clock:
             # Update with current time when in stopped state
             self.timer_label.setText(time_str)
             
@@ -381,6 +383,8 @@ class SecondaryDisplay(QMainWindow):
         
     def _meeting_started(self):
         """Handle meeting start event"""
+        # Suppress the real‑time clock while the meeting is running
+        self.show_clock = False
         # Meeting started, switch from countdown to part info
         self.show_countdown = False
         # Immediately clear countdown labels
@@ -409,6 +413,8 @@ class SecondaryDisplay(QMainWindow):
     
     def _meeting_ended(self):
         """Handle meeting end"""
+        # Re‑enable the clock after the meeting ends
+        self.show_clock = True
         # Show meeting completed message
         self.info_label1.setText("MEETING COMPLETED")
         self.info_label2.setText("")

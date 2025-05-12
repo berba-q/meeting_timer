@@ -1055,7 +1055,9 @@ class MainWindow(QMainWindow):
         self.increase_button.setEnabled(True)
         
         # If secondary display exists, update it to show meeting info
+        self.timer_view.show_clock = False
         if self.secondary_display:
+            self.secondary_display.show_clock = False
             # Hide countdown, show part info
             self.secondary_display.show_countdown = False
             
@@ -1106,8 +1108,12 @@ class MainWindow(QMainWindow):
         # Reset predicted end time
         self.predicted_end_time_label.setVisible(False)
         
+        # show the clock in the timer view
+        self.timer_view.show_clock = True
+        
         # Update secondary display
         if self.secondary_display:
+            self.secondary_display.show_clock = True
             # Show meeting completed message
             self.secondary_display.info_label1.setText("Meeting Completed")
             self.secondary_display.info_label1.setStyleSheet("""
@@ -1119,6 +1125,8 @@ class MainWindow(QMainWindow):
             self.secondary_display.info_label2.setText("")
             # Reset countdown flag
             self.secondary_display.show_countdown = False
+        # force an immediate refresh so the time appears right away
+        self.timer_controller.timer._update_current_time()
     
     def _transition_started(self, transition_msg):
         """Handle chairman transition period"""
