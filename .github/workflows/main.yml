@@ -45,6 +45,7 @@ jobs:
       - name: Build with PyInstaller
         run: |
           pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --collect-data src
+          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --collect-data src
 
       - name: Download and Install Inno Setup
         run: |
@@ -59,9 +60,11 @@ jobs:
           $version = "${{ needs.release-please.outputs.version }}"
           $iss = @"
           #define MyAppName "OnTime Meeting Timer"
+          #define MyAppName "OnTime Meeting Timer"
           #define MyAppVersion "$version"
           #define MyAppPublisher "Your Name"
           #define MyAppURL "https://github.com/berb-q/meeting_timer"
+          #define MyAppExeName "OnTime Meeting Timer.exe"
           #define MyAppExeName "OnTime Meeting Timer.exe"
 
           [Setup]
@@ -76,6 +79,7 @@ jobs:
           DisableProgramGroupPage=yes
           OutputDir=.
           OutputBaseFilename=OnTimeMeetingTimer-{#MyAppVersion}-setup
+          OutputBaseFilename=OnTimeMeetingTimer-{#MyAppVersion}-setup
           Compression=lzma
           SolidCompression=yes
           WizardStyle=modern
@@ -88,6 +92,7 @@ jobs:
           Name: "startupitem"; Description: "Run at system startup"; GroupDescription: "Startup Options"
 
           [Files]
+          Source: "dist\OnTime Meeting Timer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
           Source: "dist\OnTime Meeting Timer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
           [Icons]
