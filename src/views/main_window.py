@@ -738,7 +738,7 @@ class MainWindow(QMainWindow):
             self.toggle_network_action.setText("Stop Network Display")
     
     def _create_central_widget(self):
-        """Create the central widget with timer and meeting views"""
+        """Create the central widget with timer and a placeholder for meeting view"""
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
@@ -753,20 +753,35 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         
-        # Timer view
+        # Timer view - this is needed right away so create it directly
         self.timer_view = TimerView(self.timer_controller)
         self.timer_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         splitter.addWidget(self.timer_view)
         
-        # Meeting view
-        self.meeting_view = MeetingView(self.meeting_controller, self.timer_controller)
-        self.meeting_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        splitter.addWidget(self.meeting_view)
+        # Meeting view placeholder until the real one is loaded
+        meeting_view_placeholder = QWidget()
+        meeting_view_layout = QVBoxLayout(meeting_view_placeholder)
+        
+        # Create a placeholder message
+        placeholder_label = QLabel("Loading meeting information...")
+        placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        meeting_view_layout.addWidget(placeholder_label)
+        
+        # Add progress indicator
+        progress = QProgressBar()
+        progress.setRange(0, 0)  # Indeterminate progress
+        meeting_view_layout.addWidget(progress)
+        
+        meeting_view_placeholder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        splitter.addWidget(meeting_view_placeholder)
         
         # Set initial sizes
         splitter.setSizes([300, 400])
         
         main_layout.addWidget(splitter)
+        
+        # Store splitter reference to allow replacing widgets later
+        self.main_splitter = splitter
     
     def _create_status_bar(self):
         """Create the status bar"""
