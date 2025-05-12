@@ -2,7 +2,6 @@
 Main application window for the OnTime meeting timer app.
 """
 import os
-from src.utils.lazy_loader import LazyComponentLoader
 from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -68,36 +67,26 @@ class MainWindow(QMainWindow):
         self.settings_controller = settings_controller
         self.timer_controller = TimerController(settings_controller)
         
-        # Secondary display window
-        self.secondary_display = None
+        # Create the component load manager
+        from src.utils.lazy_loader import ComponentLoadManager
+        self.component_loader = ComponentLoadManager(self)
         
-        # Initialize network display manager
-        self.network_display_manager = NetworkDisplayManager(self.timer_controller, self.settings_controller.settings_manager)
-
-        # Create network status widget
-        self.network_status_widget = NetworkStatusWidget(self.network_display_manager)
-
-        # Create tab widget for docked tools
-        self.dock_tabs = QTabWidget()
-        self.dock_tabs.setTabPosition(QTabWidget.TabPosition.North)
-        self.dock_tabs.addTab(self.network_status_widget, "Network")
-
-        # Wrap in tools dock
-        self.tools_dock = QDockWidget("Tools", self)
-        self.tools_dock.setWidget(self.dock_tabs)
-        self.tools_dock.setMinimumSize(200, 200)
-        self.tools_dock.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.tools_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
-        self.tools_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea)
-
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.tools_dock)
+        # Connect component loader signals
+        self.component_loader.component_ready.connect(self._on_component_ready)
+        self.component_loader.all_components_ready.connect(self._on_all_components_ready)
+        
+        # Create placeholders for lazy-loaded components
+        self.meeting_view = None
+        self.network_display_manager = None
+        self.network_status_widget = None
+        self.secondary_display_handler = None
         
         # Setup UI
         self.setWindowTitle("OnTime Meeting Timer")
         self.setMinimumSize(600, 400)
         
-        # Apply current theme
-        self._apply_current_theme()
+        # Apply minimal styling immediately
+        self._apply_minimal_styling()
         
         # Create UI components
         self._create_menu_bar()
@@ -107,26 +96,127 @@ class MainWindow(QMainWindow):
         
         # Connect signals
         self._connect_signals()
+        
         # Initialize timer to show current time
         self._initialize_timer_display()
+        
+        # Create tools dock without components yet
+        self._create_empty_dock()
+        
+        # Start loading components in background
+        QTimer.singleShot(100, self._start_component_loading)
+        
+    def _apply_minimal_styling(self):
+        """Apply minimal styling for fast initial display"""
+        theme = self.settings_controller.get_settings().display.theme
+        if theme == "dark":
+            self.setStyleSheet("""
+                QMainWindow, QWidget {
+                    background-color: #2d2d2d;
+                    color: #f0f0f0;
+                }
+                QLabel {
+                    color: #f0f0f0;
+                }
+                QPushButton {
+                    background-color: #3d7ebd;
+                    color: white;
+                    border: 1px solid #2d6ebd;
+                    padding: 5px;
+                }
+            """)
+    
+    def _create_empty_dock(self):
+        """Create empty dock widgets for later population"""
+        # Create tab widget for docked tools
+        self.dock_tabs = QTabWidget()
+        self.dock_tabs.setTabPosition(QTabWidget.TabPosition.North)
+        
+        # Create a placeholder widget
+        placeholder = QWidget()
+        placeholder_layout = QVBoxLayout(placeholder)
+        loading_label = QLabel("Loading components...")
+        placeholder_layout.addWidget(loading_label)
+        
+        # Add to dock tabs
+        self.dock_tabs.addTab(placeholder, "Network")
+        
+        # Wrap in tools dock
+        self.tools_dock = QDockWidget("Tools", self)
+        self.tools_dock.setWidget(self.dock_tabs)
+        self.tools_dock.setMinimumSize(200, 200)
+        self.tools_dock.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.tools_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
+        self.tools_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea)
+        
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.tools_dock)
         
         # Restore dock visibility state
         if self.settings_controller.get_settings().display.show_tools_dock:
             self.tools_dock.show()
         else:
             self.tools_dock.hide()
+    
+    def _start_component_loading(self):
+        """Start loading components in background"""
+        # Start with meeting_view as high priority
+        self.component_loader.start_loading(priority_components=["meeting_view"])
         
-        # Load settings and print secondary screen debug info
-        settings = self.settings_controller.get_settings()
-        from src.utils.screen_handler import ScreenHandler
-        secondary_screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
+        # Update status bar
+        self.statusBar().showMessage("Loading components...", 5000)
+    
+    def _on_component_ready(self, name, component):
+        """Handle a component being ready"""
+        if name == "meeting_view":
+            # Get the splitter from the central widget
+            splitter = self.centralWidget().layout().itemAt(0).widget()
+            
+            # Get the second widget in the splitter (current placeholder)
+            old_widget = splitter.widget(1)
+            
+            # Replace with the new meeting view
+            splitter.replaceWidget(1, component)
+            self.meeting_view = component
+            
+            # Clean up the old widget
+            if old_widget:
+                old_widget.deleteLater()
+                
+            # If we have a current meeting, update the view
+            if self.meeting_controller.current_meeting:
+                self.meeting_view.set_meeting(self.meeting_controller.current_meeting)
+                
+        elif name == "network_manager":
+            self.network_display_manager = component
+            
+        elif name == "network_widget":
+            # Replace the placeholder in the dock tabs
+            old_widget = self.dock_tabs.widget(0)
+            self.dock_tabs.removeTab(0)
+            self.dock_tabs.insertTab(0, component, "Network")
+            self.network_status_widget = component
+            
+            # Clean up the old widget
+            if old_widget:
+                old_widget.deleteLater()
+                
+        elif name == "secondary_display_handler":
+            self.secondary_display_handler = component
+            
+            # If secondary display is enabled, update it
+            if self.settings_controller.get_settings().display.use_secondary_screen:
+                QTimer.singleShot(1000, self.secondary_display_handler.update_display)
+    
+    def _on_all_components_ready(self):
+        """Handle all components being loaded"""
+        # Update status bar
+        self.statusBar().showMessage("All components loaded", 3000)
         
-        # Directly create components that were previously lazy-loaded
-        self.meeting_view = MeetingView(self.meeting_controller, self.timer_controller)
-        self.network_status_widget = NetworkStatusWidget(self.network_display_manager)
-        
-        # Load meetings
-        self.meeting_controller.load_meetings()
+        # Auto-start network display if enabled
+        if self.settings_controller.get_settings().network_display.auto_start:
+            mode = self.settings_controller.get_settings().network_display.mode
+            if mode != NetworkDisplayMode.DISABLED and self.network_display_manager:
+                QTimer.singleShot(500, self._auto_start_network_display)
     
     def _check_for_updates(self, silent=False):
         """Check for application updates"""
@@ -595,7 +685,16 @@ class MainWindow(QMainWindow):
         
     def _toggle_network_display(self):
         """Toggle network display on/off"""
-        if self.network_display_manager.broadcaster.is_broadcasting:
+        # Ensure network manager is loaded
+        if not self.network_display_manager:
+            # Start a manual load of the network manager
+            self.component_loader.get_component("network_manager", blocking=True)
+            
+        if not self.network_display_manager:
+            self.statusBar().showMessage("Network display component not available", 3000)
+            return
+            
+        if self.network_display_manager.broadcaster and self.network_display_manager.broadcaster.is_broadcasting:
             # Stop network display
             self.network_display_manager.stop_network_display()
             self.toggle_network_action.setText("Start Network Display")
@@ -1322,12 +1421,23 @@ class MainWindow(QMainWindow):
     
     def _toggle_secondary_display(self):
         """Toggle the secondary display window"""
-        settings = self.settings_controller.get_settings()
-        new_state = not settings.display.use_secondary_screen
-        
-        self.settings_controller.toggle_secondary_screen(new_state)
-        self._update_secondary_display()
-        self.settings_controller.save_settings()
+        # Ensure the handler is loaded
+        if not self.secondary_display_handler:
+            # Start a manual load of the secondary display handler
+            self.component_loader.get_component("secondary_display_handler", blocking=True)
+            
+        if self.secondary_display_handler:
+            self.secondary_display_handler.toggle_display()
+            
+            # Update toggle action
+            settings = self.settings_controller.get_settings()
+            self.toggle_secondary_action.setChecked(settings.display.use_secondary_screen)
+            
+            # Update status label
+            is_active = settings.display.use_secondary_screen
+            self.secondary_display_label.setText(
+                "Secondary Display: Active" if is_active else "Secondary Display: Inactive"
+            )
     
     def _update_secondary_display(self):
         """Update secondary display based on settings"""
@@ -1443,24 +1553,24 @@ class MainWindow(QMainWindow):
     
     def closeEvent(self, event):
         """Handle window close event"""
-        # Close secondary display if it exists and is visible
-        if self.secondary_display and self.secondary_display.isVisible():
-            #print("[DEBUG] Closing secondary display")
-            self.secondary_display.close()
-
-        # Gracefully stop the network display if running, with robust cleanup
+        # Clean up secondary display if it exists
+        if self.secondary_display_handler:
+            self.secondary_display_handler.cleanup()
+            
+        # Clean up network display
         if self.network_display_manager:
-            try:
-                self.network_display_manager.cleanup()
-            except Exception as e:
-                print(f"[WARNING] Error during network display cleanup: {e}")
-
+            self.network_display_manager.cleanup()
+            
+        # Clean up component loader
+        if hasattr(self, 'component_loader') and self.component_loader.loader:
+            self.component_loader.loader.stop()
+            
         # Save dock visibility state
         settings = self.settings_controller.get_settings()
         settings.display.show_tools_dock = self.tools_dock.isVisible()
         self.settings_controller.save_settings()
-
-        # Accept the event to close the main window
+        
+        # Accept the event
         event.accept()
         
     def _on_secondary_screen_changed(self, *_):
