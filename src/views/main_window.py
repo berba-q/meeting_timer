@@ -165,8 +165,45 @@ class MainWindow(QMainWindow):
         # Update status bar
         self.statusBar().showMessage("Loading components...", 5000)
     
+    def _is_component_ready(self, component_name):
+        """Check if a component is ready for use"""
+        return hasattr(self, component_name) and getattr(self, component_name) is not None
+
+    def _store_pending_action(self, component_name, method_name, *args, **kwargs):
+        """Store a pending action to be executed when the component is ready"""
+        if not hasattr(self, '_pending_actions'):
+            self._pending_actions = {}
+        
+        if component_name not in self._pending_actions:
+            self._pending_actions[component_name] = []
+        
+        self._pending_actions[component_name].append((method_name, args, kwargs))
+        
+        # If the component loader exists, try to prioritize loading this component
+        if hasattr(self, 'component_loader') and self.component_loader:
+            self.component_loader.start_loading(priority_components=[component_name])
+
+    def _process_pending_actions(self, component_name, component):
+        """Process any pending actions for a component that has just become available"""
+        if not hasattr(self, '_pending_actions') or component_name not in self._pending_actions:
+            return
+        
+        pending = self._pending_actions[component_name]
+        for method_name, args, kwargs in pending:
+            if hasattr(component, method_name):
+                method = getattr(component, method_name)
+                if callable(method):
+                    method(*args, **kwargs)
+        
+        # Clear processed actions
+        self._pending_actions[component_name] = []
+        
     def _on_component_ready(self, name, component):
-        """Handle a component being ready"""
+        """Handle a component being ready and process any pending actions"""
+        # Store the component
+        setattr(self, name, component)
+        
+        # Component-specific handling
         if name == "meeting_view":
             # Get the splitter from the central widget
             splitter = self.centralWidget().layout().itemAt(0).widget()
@@ -176,39 +213,46 @@ class MainWindow(QMainWindow):
             
             # Replace with the new meeting view
             splitter.replaceWidget(1, component)
-            self.meeting_view = component
             
             # Clean up the old widget
             if old_widget:
                 old_widget.deleteLater()
                 
+            # Process any pending actions for this component
+            self._process_pending_actions(name, component)
+                
             # If we have a current meeting, update the view
             if self.meeting_controller.current_meeting:
-                self.meeting_view.set_meeting(self.meeting_controller.current_meeting)
+                component.set_meeting(self.meeting_controller.current_meeting)
                 
         elif name == "network_manager":
-            self.network_display_manager = component
-            
-            # Now that we have the network display manager, connect its signals
+            # Connect the network manager's signals
             self._connect_network_signals()
+            
+            # Process any pending actions for this component
+            self._process_pending_actions(name, component)
             
         elif name == "network_widget":
             # Replace the placeholder in the dock tabs
             old_widget = self.dock_tabs.widget(0)
             self.dock_tabs.removeTab(0)
             self.dock_tabs.insertTab(0, component, "Network")
-            self.network_status_widget = component
             
             # Clean up the old widget
             if old_widget:
                 old_widget.deleteLater()
                 
+            # Process any pending actions for this component
+            self._process_pending_actions(name, component)
+                
         elif name == "secondary_display_handler":
-            self.secondary_display_handler = component
-            
             # If secondary display is enabled, update it
             if self.settings_controller.get_settings().display.use_secondary_screen:
-                QTimer.singleShot(1000, self.secondary_display_handler.update_display)
+                QTimer.singleShot(1000, component.update_display)
+                
+            # Process any pending actions for this component
+            self._process_pending_actions(name, component)
+
     
     def _on_all_components_ready(self):
         """Handle all components being loaded"""
@@ -361,31 +405,27 @@ class MainWindow(QMainWindow):
         #print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
             
     def _update_countdown(self, seconds_remaining: int, message: str):
-        # Guard clause: do not update countdown display after the meeting has started
-        if self.timer_controller.current_part_index >= 0:
-            return
-        #print(f"[DEBUG] MainWindow._update_countdown: {seconds_remaining} seconds remaining")
-        """Update the countdown message in the main window"""
+        """Update the countdown message with lazy-loaded components"""
         # Update status bar with countdown message
         if seconds_remaining > 0:
             # Show countdown in status bar
             self.current_part_label.setText(message)
-            #print(f"[DEBUG] MainWindow label text set to: {self.current_part_label.text()}")
-
+            
             # If the secondary display exists, update it too
-            if self.secondary_display:
-                #print("[DEBUG] Updating secondary display countdown label")
-                # Update the info label with just the countdown message
-                self.secondary_display.info_label1.setText(message)
-                self.secondary_display.info_label1.setStyleSheet("""
-                    color: #4a90e2; 
-                    font-size: 80px;
-                    font-weight: bold;
-                """)
-                # Clear the second label during countdown
-                self.secondary_display.info_label2.setText("")
-                # Set flag to track that we're showing countdown
-                self.secondary_display.show_countdown = True
+            if self._is_component_ready('secondary_display_handler'):
+                secondary_display = self.secondary_display_handler.get_display()
+                if secondary_display:
+                    # Update the info label with just the countdown message
+                    secondary_display.info_label1.setText(message)
+                    secondary_display.info_label1.setStyleSheet("""
+                        color: #4a90e2; 
+                        font-size: 80px;
+                        font-weight: bold;
+                    """)
+                    # Clear the second label during countdown
+                    secondary_display.info_label2.setText("")
+                    # Set flag to track that we're showing countdown
+                    secondary_display.show_countdown = True
         else:
             # Reset status bar when countdown ends
             if self.meeting_controller.current_meeting:
@@ -687,16 +727,19 @@ class MainWindow(QMainWindow):
         tool_bar.addWidget(settings_button)
         
     def _toggle_network_display(self):
-        """Toggle network display on/off"""
-        # Ensure network manager is loaded
-        if not self.network_display_manager:
-            # Start a manual load of the network manager
-            self.component_loader.get_component("network_manager", blocking=True)
+        """Toggle network display on/off with lazy-loaded components"""
+        if not self._is_component_ready('network_display_manager'):
+            # Try to load the network manager component
+            if hasattr(self, 'component_loader') and self.component_loader:
+                # Load with blocking to ensure it's available
+                self.component_loader.get_component('network_manager', blocking=True, timeout=5000)
             
-        if not self.network_display_manager:
-            self.statusBar().showMessage("Network display component not available", 3000)
-            return
-            
+            # Check again if it's available
+            if not self._is_component_ready('network_display_manager'):
+                self.statusBar().showMessage("Network display component not available", 3000)
+                return
+        
+        # Now use the component
         if self.network_display_manager.broadcaster and self.network_display_manager.broadcaster.is_broadcasting:
             # Stop network display
             self.network_display_manager.stop_network_display()
@@ -724,20 +767,47 @@ class MainWindow(QMainWindow):
                 ))
     
     def _show_network_info(self):
-        """Show network display information dialog"""
+        """Show network display information dialog with lazy-loaded components"""
+        if not self._is_component_ready('network_display_manager'):
+            # Try to load the network manager
+            if hasattr(self, 'component_loader') and self.component_loader:
+                # Load with blocking to ensure it's available
+                self.component_loader.get_component('network_manager', blocking=True, timeout=5000)
+            
+            # Check again if it's available
+            if not self._is_component_ready('network_display_manager'):
+                self.statusBar().showMessage("Network display component not available", 3000)
+                return
+        
+        # Now use the component
         from src.views.network_status_widget import NetworkInfoDialog
         dialog = NetworkInfoDialog(self.network_display_manager, self)
         dialog.exec()
         
     def _auto_start_network_display(self):
-        """Auto-start network display with current settings"""
+        """Auto-start network display with lazy-loaded components"""
+        if not self._is_component_ready('network_display_manager'):
+            # Try to load the network manager
+            if hasattr(self, 'component_loader') and self.component_loader:
+                # Store this as a pending action rather than blocking
+                self._store_pending_action('network_display_manager', '_auto_start_network_display_impl')
+                return
+        
+        # If we have the component, call the implementation
+        self._auto_start_network_display_impl()
+        
+    def _auto_start_network_display_impl(self):
+        """Implementation of auto-start network display once component is available"""
+        if not self._is_component_ready('network_display_manager'):
+            return
+            
         mode = self.settings_controller.get_settings().network_display.mode
         http_port = self.settings_controller.get_settings().network_display.http_port
         ws_port = self.settings_controller.get_settings().network_display.ws_port
         
-        # Start network display
+        # Start network display if enabled
         if mode != NetworkDisplayMode.DISABLED:
-            QTimer.singleShot(0, lambda: self.network_display_manager.start_network_display(mode, http_port, ws_port))
+            self.network_display_manager.start_network_display(mode, http_port, ws_port)
             self.toggle_network_action.setText("Stop Network Display")
     
     def _create_central_widget(self):
@@ -901,38 +971,47 @@ class MainWindow(QMainWindow):
 
     
     def _meeting_updated(self, meeting):
-        """Handle meeting update"""
-        self.meeting_view.set_meeting(meeting)
+        """Handle meeting update with lazy-loaded components"""
+        if self._is_component_ready('meeting_view'):
+            self.meeting_view.set_meeting(meeting)
+        else:
+            self._store_pending_action('meeting_view', 'set_meeting', meeting)
+
     
     def _part_changed(self, part, index):
-        """Handle part change notification from timer controller"""
+        """Handle part change with lazy-loaded components"""
         # Update status bar
         self.current_part_label.setText(f"Current part: {part.title} ({part.duration_minutes} min)")
         
         # Highlight the current part in the meeting view
-        self.meeting_view.highlight_part(index)
+        if self._is_component_ready('meeting_view'):
+            self.meeting_view.highlight_part(index)
+        else:
+            self._store_pending_action('meeting_view', 'highlight_part', index)
         
         # Update secondary display if available
-        if self.secondary_display:
-            # Check if there's a next part
-            parts = self.timer_controller.parts_list
-            if index + 1 < len(parts):
-                next_part = parts[index + 1]
-                # Update info_label1 with next part info
-                self.secondary_display.info_label1.setText(f"Next Part: {next_part.title}")
-                self.secondary_display.info_label1.setStyleSheet("""
-                    color: #ffffff; 
-                    font-size: 60px;
-                    font-weight: bold;
-                """)
-            else:
-                # No next part (this is the last part)
-                self.secondary_display.info_label1.setText("Last Part")
-                self.secondary_display.info_label1.setStyleSheet("""
-                    color: #ffffff; 
-                    font-size: 60px;
-                    font-weight: bold;
-                """)
+        if self._is_component_ready('secondary_display_handler'):
+            secondary_display = self.secondary_display_handler.get_display()
+            if secondary_display:
+                # Check if there's a next part
+                parts = self.timer_controller.parts_list
+                if index + 1 < len(parts):
+                    next_part = parts[index + 1]
+                    # Update info_label1 with next part info
+                    secondary_display.info_label1.setText(f"Next Part: {next_part.title}")
+                    secondary_display.info_label1.setStyleSheet("""
+                        color: #ffffff; 
+                        font-size: 60px;
+                        font-weight: bold;
+                    """)
+                else:
+                    # No next part (this is the last part)
+                    secondary_display.info_label1.setText("Last Part")
+                    secondary_display.info_label1.setStyleSheet("""
+                        color: #ffffff; 
+                        font-size: 60px;
+                        font-weight: bold;
+                    """)
         
     def _part_updated(self, part, section_index, part_index):
         """Handle a part being updated"""
@@ -1444,24 +1523,30 @@ class MainWindow(QMainWindow):
             self.secondary_display.showFullScreen()
     
     def _toggle_secondary_display(self):
-        """Toggle the secondary display window"""
-        # Ensure the handler is loaded
-        if not self.secondary_display_handler:
-            # Start a manual load of the secondary display handler
-            self.component_loader.get_component("secondary_display_handler", blocking=True)
+        """Toggle the secondary display window with lazy-loaded components"""
+        if not self._is_component_ready('secondary_display_handler'):
+            # Try to load the component
+            if hasattr(self, 'component_loader') and self.component_loader:
+                # Load with blocking to ensure it's available
+                self.component_loader.get_component('secondary_display_handler', blocking=True, timeout=5000)
             
-        if self.secondary_display_handler:
-            self.secondary_display_handler.toggle_display()
-            
-            # Update toggle action
-            settings = self.settings_controller.get_settings()
-            self.toggle_secondary_action.setChecked(settings.display.use_secondary_screen)
-            
-            # Update status label
-            is_active = settings.display.use_secondary_screen
-            self.secondary_display_label.setText(
-                "Secondary Display: Active" if is_active else "Secondary Display: Inactive"
-            )
+            # Check again if it's available
+            if not self._is_component_ready('secondary_display_handler'):
+                self.statusBar().showMessage("Secondary display component not available", 3000)
+                return
+        
+        # Now use the component
+        self.secondary_display_handler.toggle_display()
+        
+        # Update toggle action
+        settings = self.settings_controller.get_settings()
+        self.toggle_secondary_action.setChecked(settings.display.use_secondary_screen)
+        
+        # Update status label
+        is_active = settings.display.use_secondary_screen
+        self.secondary_display_label.setText(
+            "Secondary Display: Active" if is_active else "Secondary Display: Inactive"
+        )
     
     def _update_secondary_display(self):
         """Update secondary display based on settings"""
@@ -1576,17 +1661,17 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, lambda: QMessageBox.critical(self, "Error", message))
     
     def closeEvent(self, event):
-        """Handle window close event"""
+        """Handle window close event with lazy-loaded components"""
         # Clean up secondary display if it exists
-        if self.secondary_display_handler:
+        if self._is_component_ready('secondary_display_handler'):
             self.secondary_display_handler.cleanup()
             
         # Clean up network display
-        if self.network_display_manager:
+        if self._is_component_ready('network_display_manager'):
             self.network_display_manager.cleanup()
             
         # Clean up component loader
-        if hasattr(self, 'component_loader') and self.component_loader.loader:
+        if hasattr(self, 'component_loader') and self.component_loader and hasattr(self.component_loader, 'loader'):
             self.component_loader.loader.stop()
             
         # Save dock visibility state
