@@ -189,6 +189,9 @@ class MainWindow(QMainWindow):
         elif name == "network_manager":
             self.network_display_manager = component
             
+            # Now that we have the network display manager, connect its signals
+            self._connect_network_signals()
+            
         elif name == "network_widget":
             # Replace the placeholder in the dock tabs
             old_widget = self.dock_tabs.widget(0)
@@ -844,13 +847,18 @@ class MainWindow(QMainWindow):
         self.settings_controller.settings_changed.connect(self._settings_changed)
         self.settings_controller.display_mode_changed.connect(self._display_mode_changed)
         self.settings_controller.theme_changed.connect(self._theme_changed)
-        
-        # Connect network display manager signals
-        self.network_display_manager.display_started.connect(self._network_display_started)
-        self.network_display_manager.display_stopped.connect(self._network_display_stopped)
 
         # Connect settings_controller signal for secondary screen live change
         self.settings_controller.secondary_screen_changed.connect(self._on_secondary_screen_changed)
+        
+    def _connect_network_signals(self):
+        """Connect network display manager signals when component is available"""
+        if not hasattr(self, 'network_display_manager') or not self.network_display_manager:
+            return
+            
+        # Connect network display manager signals
+        self.network_display_manager.display_started.connect(self._network_display_started)
+        self.network_display_manager.display_stopped.connect(self._network_display_stopped)
 
     
     def _network_display_started(self, url):
