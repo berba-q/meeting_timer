@@ -88,7 +88,10 @@ class MainWindow(QMainWindow):
         # Apply minimal styling immediately
         self._apply_minimal_styling()
         
-        # Create UI components
+        # Create tools dock first (before menu bar)
+        self._create_empty_dock()
+        
+        # Now create other UI components
         self._create_menu_bar()
         self._create_tool_bar()
         self._create_central_widget()
@@ -99,9 +102,6 @@ class MainWindow(QMainWindow):
         
         # Initialize timer to show current time
         self._initialize_timer_display()
-        
-        # Create tools dock without components yet
-        self._create_empty_dock()
         
         # Start loading components in background
         QTimer.singleShot(100, self._start_component_loading)
@@ -739,6 +739,7 @@ class MainWindow(QMainWindow):
     
     def _create_central_widget(self):
         """Create the central widget with timer and a placeholder for meeting view"""
+        from PyQt6.QtWidgets import QProgressBar
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
