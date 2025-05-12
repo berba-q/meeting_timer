@@ -108,7 +108,7 @@
         startClock();
         
         // Create WebSocket connection
-        const socket = new WebSocket(`ws://${window.location.hostname}:{WS_PORT}`);
+        const socket = new WebSocket(`ws://${window.location.hostname}:${WS_PORT}`);
         
         // Connection opened
         socket.addEventListener('open', function(event) {
@@ -145,10 +145,17 @@
                 timerDisplay.className = timerState;
                 
                 // Store countdown message
-                receivedCountdownMessage = data.countdownMessage;
+                receivedCountdownMessage = data.countdown_message;
+
+                // If the broadcaster didn’t send an explicit message but we’re in a countdown
+                // state, build a simple default banner from the remaining time so the network
+                // display still shows something useful.
+                if ((!receivedCountdownMessage || receivedCountdownMessage === "") && timerState === 'countdown') {
+                    receivedCountdownMessage = `Meeting starts in ${data.time}`;
+                }
                 
                 // Handle meeting countdown display
-                if (timerState === 'stopped' && receivedCountdownMessage) {
+                if ((timerState === 'stopped' || timerState === 'countdown') && receivedCountdownMessage) {
                     // We're in pre-meeting countdown mode
                     countdownMsg.textContent = receivedCountdownMessage;
                     countdownMsg.style.display = 'block';

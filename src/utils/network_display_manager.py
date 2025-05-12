@@ -148,7 +148,7 @@ class NetworkDisplayManager(QObject):
         const status = document.getElementById('status');
         
         // Create WebSocket connection
-        const socket = new WebSocket(`ws://${window.location.hostname}:{WS_PORT}`);
+        const socket = new WebSocket(`ws://${window.location.hostname}:${WS_PORT}`);
         
         // Connection opened
         socket.addEventListener('open', function(event) {
@@ -380,7 +380,7 @@ class NetworkDisplayManager(QObject):
                 minutes = seconds // 60
                 secs = seconds % 60
                 time_str = f"{minutes:02d}:{secs:02d}"
-            
+
             # Map timer state to string representation
             state_map = {
                 TimerState.RUNNING: "running",
@@ -390,29 +390,43 @@ class NetworkDisplayManager(QObject):
                 TimerState.STOPPED: "stopped",
                 TimerState.COUNTDOWN: "running"
             }
-            
+
             state_str = state_map.get(self.timer_controller.timer.state, "stopped")
-            
+
+            # Compose a countdown message if the timer is actively counting down
+            if self.timer_controller.timer.state == TimerState.COUNTDOWN:
+                remaining = max(self.timer_controller.timer.remaining_seconds, 0)
+                if remaining > 0:
+                    hrs, rem = divmod(remaining, 3600)
+                    mins, secs = divmod(rem, 60)
+                    if hrs > 0:
+                        countdown_message = f"Meeting starts in {hrs}h {mins}m {secs}s"
+                    elif mins > 0:
+                        countdown_message = f"Meeting starts in {mins}m {secs}s"
+                    else:
+                        countdown_message = f"Meeting starts in {secs}s"
+
             # If timer is running and less than 60 seconds, use warning color
             if (self.timer_controller.timer.state == TimerState.RUNNING and 
                 0 < self.timer_controller.timer.remaining_seconds <= 60):
                 state_str = "warning"
-            
+
             # Get current part title
             if self.timer_controller.current_part_index >= 0 and self.timer_controller.parts_list:
                 current_part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
                 part_title = current_part.title
-            
+
             # Get next part title
             next_part_index = self.timer_controller.current_part_index + 1
             if self.timer_controller.parts_list and next_part_index < len(self.timer_controller.parts_list):
                 next_part = self.timer_controller.parts_list[next_part_index]
                 next_part_title = next_part.title
-            
+
             # Get predicted end time
             if hasattr(self.timer_controller, '_predicted_end_time') and self.timer_controller._predicted_end_time:
                 end_time_str = self.timer_controller._predicted_end_time.strftime("%H:%M")
-            
+
+
             # Get overtime seconds
             overtime_seconds = getattr(self.timer_controller, '_total_overtime_seconds', 0)
         
