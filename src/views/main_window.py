@@ -407,6 +407,9 @@ class MainWindow(QMainWindow):
         # Update status bar
         self.current_part_label.setText(f"Meeting: {meeting.title}")
         
+        # Re‑enable countdown on the secondary display for the newly selected meeting
+        if self.secondary_display:
+            self.secondary_display.show_countdown = True
         # Initialize meeting countdown
         self.timer_controller._initialize_meeting_countdown()
         
@@ -418,24 +421,33 @@ class MainWindow(QMainWindow):
         if seconds_remaining > 0:
             # Show countdown in status bar
             self.current_part_label.setText(message)
-            
-            # If the secondary display exists, update it too
+
+            # If the secondary display exists *and* it is currently allowed to
+            # show the countdown, update it as well.
+            secondary_display = None
             if self._is_component_ready('secondary_display_handler'):
                 secondary_display = self.secondary_display_handler.get_display()
-                if secondary_display:
-                    # Update the info label with just the countdown message
-                    secondary_display.info_label1.setText(message)
-                    secondary_display.info_label1.setStyleSheet("""
-                        color: #4a90e2; 
-                        font-size: 80px;
-                        font-weight: bold;
-                    """)
-                    # Clear the second label during countdown
-                    secondary_display.info_label2.setText("")
-                    # Set flag to track that we're showing countdown
-                    secondary_display.show_countdown = True
+
+            if secondary_display and getattr(secondary_display, "show_countdown", True):
+                # Update the info label with just the countdown message
+                secondary_display.info_label1.setText(message)
+                secondary_display.info_label1.setStyleSheet("""
+                    color: #4a90e2;
+                    font-size: 80px;
+                    font-weight: bold;
+                """)
+                # Clear the second label during countdown
+                secondary_display.info_label2.setText("")
+                # Set flag to track that we're currently showing the countdown
+                secondary_display.show_countdown = True
         else:
             # Reset status bar when countdown ends
+            # Disable further countdown updates on the secondary display until the
+            # countdown is explicitly re‑enabled (e.g. for the next meeting).
+            if self._is_component_ready('secondary_display_handler'):
+                sd = self.secondary_display_handler.get_display()
+                if sd:
+                    sd.show_countdown = False
             if self.meeting_controller.current_meeting:
                 meeting_title = self.meeting_controller.current_meeting.title
                 self.current_part_label.setText(f"Meeting: {meeting_title}")
