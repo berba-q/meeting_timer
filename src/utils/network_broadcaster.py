@@ -46,10 +46,10 @@ class NetworkBroadcaster(QObject):
             "time": current_time,
             "state": "stopped",
             "part": "",
-            "nextPart": "",
-            "endTime": "",
+            "next_part": "",
+            "end_time": "",
             "overtime": 0,
-            "countdownMessage": ""
+            "countdown_message": ""
         }
     
     def _get_local_ip(self) -> str:
@@ -263,10 +263,10 @@ class NetworkBroadcaster(QObject):
             "time": time_str,
             "state": state,
             "part": part_title,
-            "nextPart": next_part,
-            "endTime": end_time,
+            "next_part": next_part,
+            "end_time": end_time,
             "overtime": overtime_seconds,
-            "countdownMessage": countdown_message  # Include countdown message
+            "countdown_message": countdown_message  # Include countdown message
         }
         
         # Broadcast to clients if server is running

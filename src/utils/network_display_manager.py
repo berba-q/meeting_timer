@@ -45,6 +45,13 @@ class NetworkDisplayManager(QObject):
         self.status_timer = QTimer(self)
         self.status_timer.setInterval(5000)  # 5 seconds
         self.status_timer.timeout.connect(self._update_status)
+
+        # Timer for periodic display refresh even when no signal is emitted
+        self.display_refresh_timer = QTimer(self)
+        self.display_refresh_timer.setInterval(1000)  # every second
+        self.display_refresh_timer.timeout.connect(
+            lambda: self._on_time_updated(self.timer_controller.timer.remaining_seconds)
+        )
     
     def _setup_html_content(self):
         """Set up the HTML content for the network display"""
@@ -148,7 +155,7 @@ class NetworkDisplayManager(QObject):
         const status = document.getElementById('status');
         
         // Create WebSocket connection
-        const socket = new WebSocket(`ws://${window.location.hostname}:${WS_PORT}`);
+        const socket = new WebSocket(`ws://${window.location.hostname}:{WS_PORT}`);
         
         // Connection opened
         socket.addEventListener('open', function(event) {
@@ -267,6 +274,7 @@ class NetworkDisplayManager(QObject):
                 # Start only WebSocket broadcaster
                 self.broadcaster.start_broadcasting(ws_port)
                 self.status_timer.start()
+                self.display_refresh_timer.start()
                 self.network_ready.emit()
                 return True
                 
@@ -275,6 +283,7 @@ class NetworkDisplayManager(QObject):
                 self.http_server.start_server(http_port, ws_port)
                 self.broadcaster.start_broadcasting(ws_port)
                 self.status_timer.start()
+                self.display_refresh_timer.start()
                 self.network_ready.emit()
                 return True
 
@@ -294,6 +303,9 @@ class NetworkDisplayManager(QObject):
         
         # Stop the status timer
         self.status_timer.stop()
+
+        # Stop the periodic display refresh timer
+        self.display_refresh_timer.stop()
         
         # Emit signal
         self.display_stopped.emit()
@@ -420,11 +432,11 @@ class NetworkDisplayManager(QObject):
             next_part_index = self.timer_controller.current_part_index + 1
             if self.timer_controller.parts_list and next_part_index < len(self.timer_controller.parts_list):
                 next_part = self.timer_controller.parts_list[next_part_index]
-                next_part_title = next_part.title
+                #next_part_title = next_part.title
 
             # Get predicted end time
             if hasattr(self.timer_controller, '_predicted_end_time') and self.timer_controller._predicted_end_time:
-                end_time_str = self.timer_controller._predicted_end_time.strftime("%H:%M")
+                end_time = self.timer_controller._predicted_end_time.strftime("%H:%M")
 
 
             # Get overtime seconds
@@ -435,8 +447,8 @@ class NetworkDisplayManager(QObject):
             time_str=time_str,
             state=state_str,
             part_title=part_title,
-            next_part=next_part_title,
-            end_time=end_time_str,
+            next_part=next_part,
+            end_time=end_time,
             overtime_seconds=overtime_seconds,
             countdown_message=countdown_message
         )

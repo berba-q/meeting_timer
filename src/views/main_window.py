@@ -126,6 +126,13 @@ class MainWindow(QMainWindow):
                     border: 1px solid #2d6ebd;
                     padding: 5px;
                 }
+                QMessageBox QPushButton {
+                    background-color: #3d7ebd;
+                    color: white;
+                    border: 1px solid #2d6ebd;
+                    padding: 5px;
+                    min-width: 80px;
+                }
             """)
     
     def _create_empty_dock(self):
@@ -1423,25 +1430,44 @@ class MainWindow(QMainWindow):
             
     def _process_weekend_meeting_songs(self, meeting: Meeting):
         """Process weekend meeting to ensure songs are properly displayed"""
-        # Flag to track if we need to prompt the user
+        print(f">>> [SongCheck] Meeting title: {meeting.title}, type: {meeting.meeting_type}")
+        if meeting.meeting_type != MeetingType.WEEKEND:
+            print(">>> Skipping song prompt — not a weekend meeting")
+            return
+
         missing_songs = False
 
         for section in meeting.sections:
             for part in section.parts:
+                print(f"Part: {part.title}")
                 if "song" in part.title.lower() and "song" == part.title.strip().lower():
-                    # Found a generic song without a number
                     missing_songs = True
 
-        # If there are missing songs, prompt the user
         if missing_songs:
             def ask_and_edit():
-                reply = QMessageBox.question(
-                    self, "Update Weekend Songs",
-                    "Some weekend meeting songs need to be added manually. Would you like to edit them now?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                if reply == QMessageBox.StandardButton.Yes:
-                    # Show the meeting editor
+                print(">>> Dialog triggered — preparing QMessageBox")
+                msg_box = QMessageBox(self)
+                msg_box.setIcon(QMessageBox.Icon.Question)
+                msg_box.setWindowTitle("Update Weekend Songs")
+                msg_box.setText("Some weekend meeting songs need to be added manually.\nWould you like to edit them now?")
+                yes_btn = msg_box.addButton("Yes", QMessageBox.ButtonRole.YesRole)
+                no_btn = msg_box.addButton("No", QMessageBox.ButtonRole.NoRole)
+
+                yes_btn.setObjectName("Yes")
+                no_btn.setObjectName("No")
+
+                from PyQt6.QtGui import QFont
+                font = QFont("Arial", 14, QFont.Weight.Bold)
+                yes_btn.setFont(font)
+                no_btn.setFont(font)
+                yes_btn.setMinimumWidth(120)
+                no_btn.setMinimumWidth(120)
+
+                yes_btn.setStyleSheet("QPushButton#Yes { background-color: #4a90e2; color: white; font-size: 14px; padding: 10px 16px; }")
+                no_btn.setStyleSheet("QPushButton#No { background-color: #999999; color: white; font-size: 14px; padding: 10px 16px; }")
+
+                msg_box.exec()
+                if msg_box.clickedButton() == yes_btn:
                     self.meeting_controller.show_meeting_editor(self, meeting)
             QTimer.singleShot(0, ask_and_edit)
     
