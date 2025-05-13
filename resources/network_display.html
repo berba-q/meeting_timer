@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OnTime - Network Display</title>
+    <title>OnTime Meeting Timer Display</title>
     <style>
         body {
             background-color: #000000;
@@ -78,9 +78,7 @@
 <body>
     <div id="status">Connecting...</div>
     
-    <h2 id="meeting-title">OnTime</h2>
-    
-    <h1 id="timer-display" class="stopped">00:00:00</h1>
+    <h1 id="timer-display" class="stopped">00:00</h1>
     
     <div id="current-part">Waiting for connection...</div>
     
@@ -99,21 +97,18 @@
         const status = document.getElementById('status');
         const countdownMsg = document.getElementById('countdown-message');
         
-        // Track state for clock updates
-        let timerState = "stopped";
-        let clockInterval = null;
-        let receivedCountdownMessage = "";
-        
-        // Start clock immediately
-        startClock();
-        
         // Create WebSocket connection
-        const socket = new WebSocket(`ws://${window.location.hostname}:${WS_PORT}`);
+        const socket = new WebSocket(`ws://${window.location.hostname}:{WS_PORT}`);
         
         // Connection opened
         socket.addEventListener('open', function(event) {
             status.textContent = 'Connected';
             status.style.color = '#4caf50';
+            
+            // Request current state upon connection
+            socket.send(JSON.stringify({
+                type: 'request_state'
+            }));
         });
         
         // Connection closed
@@ -127,48 +122,36 @@
             }, 5000);
         });
         
+        // Update the clock while in stopped state
+        function updateClock() {
+            // Only update if the timer is in stopped state
+            if (timerDisplay.className === 'stopped') {
+                const now = new Date();
+                const timeString = now.toTimeString().split(' ')[0];
+                timerDisplay.textContent = timeString;
+            }
+        }
+        
         // Listen for messages
         socket.addEventListener('message', function(event) {
+            console.log('Message received:', event.data);
             try {
                 const data = JSON.parse(event.data);
                 
-                // Store the timer state
-                timerState = data.state;
-                
-                // Only update timer display if not in stopped state
-                // (we'll let the clock interval handle the display in stopped state)
-                if (timerState !== 'stopped') {
-                    timerDisplay.textContent = data.time;
-                }
+                // Update timer display
+                timerDisplay.textContent = data.time;
                 
                 // Set timer color based on state
-                timerDisplay.className = timerState;
-                
-                // Store countdown message
-                receivedCountdownMessage = data.countdown_message;
-
-                // If the broadcaster didn’t send an explicit message but we’re in a countdown
-                // state, build a simple default banner from the remaining time so the network
-                // display still shows something useful.
-                if ((!receivedCountdownMessage || receivedCountdownMessage === "") && timerState === 'countdown') {
-                    receivedCountdownMessage = `Meeting starts in ${data.time}`;
-                }
+                timerDisplay.className = data.state;
                 
                 // Handle meeting countdown display
-                if ((timerState === 'stopped' || timerState === 'countdown') && receivedCountdownMessage) {
+                if (data.state === 'stopped' && data.countdownMessage) {
                     // We're in pre-meeting countdown mode
-                    countdownMsg.textContent = receivedCountdownMessage;
+                    countdownMsg.textContent = data.countdownMessage;
                     countdownMsg.style.display = 'block';
                     nextPart.style.display = 'none';
                     endTime.style.display = 'none';
-                    
-                    // Hide part display when showing countdown
-                    if (data.part === "") {
-                        currentPart.style.display = 'none';
-                    } else {
-                        currentPart.style.display = 'block';
-                        currentPart.textContent = data.part;
-                    }
+                    currentPart.style.display = 'none';
                 } else {
                     // Regular meeting or part display
                     countdownMsg.style.display = 'none';
@@ -218,42 +201,11 @@
             }
         });
         
-        // Start the clock update interval
-        function startClock() {
-            // Clear any existing interval
-            if (clockInterval) {
-                clearInterval(clockInterval);
-            }
-            
-            // Update immediately
-            updateClock();
-            
-            // Set interval to update every second
-            clockInterval = setInterval(updateClock, 1000);
-        }
+        // Update clock every second when in stopped state
+        setInterval(updateClock, 1000);
         
-        // Update the clock while in stopped state
-        function updateClock() {
-            // Only update if the timer is in stopped state
-            if (timerState === 'stopped') {
-                const now = new Date();
-                const hours = now.getHours().toString().padStart(2, '0');
-                const minutes = now.getMinutes().toString().padStart(2, '0');
-                const seconds = now.getSeconds().toString().padStart(2, '0');
-                const timeString = `${hours}:${minutes}:${seconds}`;
-                
-                // Update the timer display
-                timerDisplay.textContent = timeString;
-                
-                // If we have a countdown message, make sure it's displayed
-                if (receivedCountdownMessage) {
-                    countdownMsg.textContent = receivedCountdownMessage;
-                    countdownMsg.style.display = 'block';
-                    nextPart.style.display = 'none';
-                    endTime.style.display = 'none';
-                }
-            }
-        }
+        // Load initial clock display
+        updateClock();
     </script>
 </body>
 </html>

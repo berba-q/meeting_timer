@@ -71,22 +71,31 @@ class NetworkBroadcaster(QObject):
         # Register new client
         self.connected_clients.add(websocket)
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
-        #print(f"Client connected: {client_id}")
+        print(f"Client connected: {client_id}")
         self.client_connected.emit(client_id)
         
         # Send current state immediately upon connection
         try:
             serialized = json.dumps(self.current_state)
-            #print(f"Sending to client {client_id}: {serialized}")
+            print(f"Sending to client {client_id}: {serialized}")
             await websocket.send(serialized)
         except (TypeError, ValueError) as e:
             traceback.print_exc()
         
         try:
-            # Keep connection open until client disconnects
+            # Keep connection open and handle messages from clients
             async for message in websocket:
-                # We don't expect messages from clients, but could handle commands here
-                pass
+                try:
+                    # Try to parse the message as JSON
+                    data = json.loads(message)
+                    
+                    # Handle 'request_state' message type
+                    if data.get('type') == 'request_state':
+                        # Re-send the current state
+                        await websocket.send(json.dumps(self.current_state))
+                        print(f"Re-sent state to client {client_id} after request")
+                except Exception as e:
+                    print(f"Error processing message from client {client_id}: {e}")
         except Exception as e:
             if isinstance(e, ConnectionResetError) or isinstance(e, websockets.exceptions.ConnectionClosed):
                 print(f"Client connection closed: {client_id}")

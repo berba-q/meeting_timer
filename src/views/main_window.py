@@ -26,6 +26,7 @@ from src.views.settings_view import SettingsDialog
 from src.views.secondary_display import SecondaryDisplay
 from src.views.weekend_song_editor import WeekendSongEditorDialog
 from src.utils.network_display_manager import NetworkDisplayManager
+from src.utils.network_broadcaster import NetworkBroadcaster
 from src.views.network_status_widget import NetworkStatusWidget, NetworkInfoDialog
 from src.models.settings import NetworkDisplayMode
 from src.utils.update_checker import check_for_updates
@@ -235,8 +236,9 @@ class MainWindow(QMainWindow):
                 component.set_meeting(self.meeting_controller.current_meeting)
                 
         elif name == "network_display_manager":
+            self.network_display_manager = component
             # Connect the network manager's signals
-            self._connect_network_signals()
+            self._connect_network_display_signals()
             
             # Process any pending actions for this component
             self._process_pending_actions(name, component)
@@ -273,6 +275,33 @@ class MainWindow(QMainWindow):
             mode = self.settings_controller.get_settings().network_display.mode
             if mode != NetworkDisplayMode.DISABLED and self.network_display_manager:
                 QTimer.singleShot(500, self._auto_start_network_display)
+                
+    def _connect_network_display_signals(self):
+        """Connect timer controller signals to network display manager after it's loaded"""
+        if self.network_display_manager:
+            print("Connecting network display manager signals")
+            
+            # Make sure the timer_controller is directly accessible
+            self.network_display_manager.timer_controller = self.timer_controller
+            
+            # Connect timer signals to network display manager
+            self.timer_controller.timer.time_updated.connect(self.network_display_manager._on_time_updated)
+            self.timer_controller.timer.state_changed.connect(self.network_display_manager._on_state_changed)
+            self.timer_controller.part_changed.connect(self.network_display_manager._on_part_changed)
+            self.timer_controller.predicted_end_time_updated.connect(self.network_display_manager._on_predicted_end_time_updated)
+            self.timer_controller.meeting_overtime.connect(self.network_display_manager._on_meeting_overtime)
+            
+            # Connect current time updates - use specific format for current time
+            # This connects directly to the broadcaster
+            self.timer_controller.timer.current_time_updated.connect(
+                lambda time_str: self.network_display_manager._on_time_updated(
+                    self.timer_controller.timer.remaining_seconds
+                ) if self.network_display_manager else None
+            )
+            
+            print("Network display manager signals connected successfully")
+        else:
+            print("WARNING: Cannot connect network display manager signals - component not loaded yet")
     
     def _check_for_updates(self, silent=False):
         """Check for application updates"""

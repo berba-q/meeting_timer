@@ -231,6 +231,11 @@ class NetworkHTTPServer(QObject):
         socket.addEventListener('open', function(event) {
             status.textContent = 'Connected';
             status.style.color = '#4caf50';
+            
+            // Request current state upon connection
+            socket.send(JSON.stringify({
+                type: 'request_state'
+            }));
         });
         
         // Connection closed
@@ -244,8 +249,19 @@ class NetworkHTTPServer(QObject):
             }, 5000);
         });
         
+        // Update the clock while in stopped state
+        function updateClock() {
+            // Only update if the timer is in stopped state
+            if (timerDisplay.className === 'stopped') {
+                const now = new Date();
+                const timeString = now.toTimeString().split(' ')[0];
+                timerDisplay.textContent = timeString;
+            }
+        }
+        
         // Listen for messages
         socket.addEventListener('message', function(event) {
+            console.log('Message received:', event.data);
             try {
                 const data = JSON.parse(event.data);
                 
@@ -312,18 +328,11 @@ class NetworkHTTPServer(QObject):
             }
         });
         
-        // Update the clock while in stopped state
-        function updateClock() {
-            // Only update if the timer is in stopped state
-            if (timerDisplay.className === 'stopped') {
-                const now = new Date();
-                const timeString = now.toTimeString().split(' ')[0];
-                timerDisplay.textContent = timeString;
-            }
-        }
-        
         // Update clock every second when in stopped state
         setInterval(updateClock, 1000);
+        
+        // Load initial clock display
+        updateClock();
     </script>
 </body>
 </html>
