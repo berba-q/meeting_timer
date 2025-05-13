@@ -140,7 +140,7 @@ class UpdateDialog(QDialog):
         """Download the update file"""
         # Determine the correct download URL based on platform
         system = platform.system().lower()
-        
+
         if system == 'windows':
             url_key = 'windows'
         elif system == 'darwin':
@@ -150,36 +150,39 @@ class UpdateDialog(QDialog):
         else:
             QMessageBox.warning(self, "Download Failed", "Unsupported platform.")
             return
-        
+
         # Get the download URL
         download_urls = self.version_info.get('downloadUrl', {})
         download_url = download_urls.get(url_key)
-        
+
         if not download_url:
             QMessageBox.warning(self, "Download Failed", "No download URL available for your platform.")
             return
-        
+
+        # Get expected SHA256 value if present
+        sha_expected = self.version_info.get("sha256", {}).get(url_key)
+
         # Show progress bar
         self.progress_bar.setVisible(True)
         self.download_button.setEnabled(False)
         self.remind_button.setEnabled(False)
         self.skip_button.setEnabled(False)
-        
+
         # Create a temporary file to download to
         with tempfile.NamedTemporaryFile(delete=False, suffix=self._get_file_extension()) as temp_file:
             self.downloaded_file = temp_file.name
-        
+
         # Create a thread for downloading
         self.download_thread = QThread()
-        self.download_worker = DownloadWorker(download_url, self.downloaded_file)
+        self.download_worker = DownloadWorker(download_url, self.downloaded_file, sha256_expected=sha_expected)
         self.download_worker.moveToThread(self.download_thread)
-        
+
         # Connect signals
         self.download_thread.started.connect(self.download_worker.start_download)
         self.download_worker.progress_updated.connect(self.progress_bar.setValue)
         self.download_worker.download_finished.connect(self._download_completed)
         self.download_worker.error_occurred.connect(self._download_error)
-        
+
         # Start download
         self.download_thread.start()
     
@@ -294,17 +297,26 @@ class UpdateDialog(QDialog):
 
 class DownloadWorker(QObject):
     """Worker for downloading the update file"""
-    
+
     # Signals
     progress_updated = pyqtSignal(int)
     download_finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
-    
-    def __init__(self, url, destination):
+
+    def __init__(self, url, destination, sha256_expected=None):
         super().__init__()
         self.url = url
         self.destination = destination
-    
+        self.sha256_expected = sha256_expected
+
+    def _compute_sha256(self, filepath):
+        import hashlib
+        sha256 = hashlib.sha256()
+        with open(filepath, "rb") as f:
+            for block in iter(lambda: f.read(4096), b""):
+                sha256.update(block)
+        return sha256.hexdigest()
+
     def start_download(self):
         """Start downloading the file"""
         try:
@@ -334,8 +346,15 @@ class DownloadWorker(QObject):
                             progress = int((downloaded_size / file_size) * 100)
                             self.progress_updated.emit(progress)
 
-                # Download complete
-                self.download_finished.emit()
+            # After download, verify SHA256 if expected
+            if self.sha256_expected:
+                actual_sha = self._compute_sha256(self.destination)
+                if actual_sha.lower() != self.sha256_expected.lower():
+                    self.error_occurred.emit("Downloaded file hash mismatch. Update aborted.")
+                    return
+
+            # Download complete
+            self.download_finished.emit()
 
         except Exception as e:
             self.error_occurred.emit(f"Download failed: {str(e)}")

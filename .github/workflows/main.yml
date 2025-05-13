@@ -103,6 +103,16 @@ jobs:
       - name: Build installer
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+
+      - name: Generate SHA256 for Windows installer
+        run: |
+          sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}-setup.exe > windows.sha256
+
+      - name: Upload SHA256 artifact (Windows)
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-sha
+          path: windows.sha256
         
       - name: Upload installer to release
         uses: actions/upload-release-asset@v1
@@ -158,6 +168,16 @@ jobs:
       - name: Build DMG
         run: |
           dmgbuild -s dmg_settings.py "OnTime Meeting Timer" "OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg"
+
+      - name: Generate SHA256 for DMG
+        run: |
+          sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg > macos.sha256
+
+      - name: Upload SHA256 artifact (macOS)
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-sha
+          path: macos.sha256
         
       - name: Upload DMG to release
         uses: actions/upload-release-asset@v1
@@ -239,6 +259,16 @@ jobs:
       - name: Build AppImage
         run: |
           VERSION=${{ needs.release-please.outputs.version }} ./appimagetool-x86_64.AppImage AppDir OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
+
+      - name: Generate SHA256 for AppImage
+        run: |
+          sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage > linux.sha256
+
+      - name: Upload SHA256 artifact (Linux)
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-sha
+          path: linux.sha256
         
       - name: Upload AppImage to release
         uses: actions/upload-release-asset@v1
@@ -256,6 +286,21 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+
+      - name: Download SHA256 artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: sha256
+
+      - name: Read SHA values
+        id: sha
+        run: |
+          WIN_SHA=$(cut -d ' ' -f1 sha256/windows-sha/windows.sha256)
+          MAC_SHA=$(cut -d ' ' -f1 sha256/macos-sha/macos.sha256)
+          LINUX_SHA=$(cut -d ' ' -f1 sha256/linux-sha/linux.sha256)
+          echo "win_sha=$WIN_SHA" >> $GITHUB_OUTPUT
+          echo "mac_sha=$MAC_SHA" >> $GITHUB_OUTPUT
+          echo "linux_sha=$LINUX_SHA" >> $GITHUB_OUTPUT
       
       - name: Generate version.json
         run: |
@@ -273,7 +318,12 @@ jobs:
               "macos": "https://github.com/${REPO}/releases/download/v${VERSION}/OnTimeMeetingTimer-${VERSION}.dmg",
               "linux": "https://github.com/${REPO}/releases/download/v${VERSION}/OnTimeMeetingTimer-${VERSION}.AppImage"
             },
-            "releaseNotes": ${RELEASE_NOTES@Q}
+            "releaseNotes": ${RELEASE_NOTES@Q},
+            "sha256": {
+              "windows": "${{ steps.sha.outputs.win_sha }}",
+              "macos": "${{ steps.sha.outputs.mac_sha }}",
+              "linux": "${{ steps.sha.outputs.linux_sha }}"
+            }
           }
           EOF
           
