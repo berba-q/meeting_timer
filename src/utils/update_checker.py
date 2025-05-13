@@ -11,6 +11,8 @@ import tempfile
 import subprocess
 from pathlib import Path
 import urllib.request
+import urllib.error
+import ssl
 from typing import Dict, Optional, Tuple, Any
 from datetime import datetime
 from PyQt6.QtWidgets import (
@@ -39,23 +41,33 @@ class UpdateChecker(QObject):
         
     def check_for_updates(self):
         """Check for updates - called from a worker thread"""
-        try:
-            # Add a random query parameter to avoid caching
-            cache_buster = f"?t={int(time.time())}"
-            url = UPDATE_CHECK_URL + cache_buster
-            
-            # Fetch the version info with a timeout
-            with urllib.request.urlopen(url, timeout=5) as response:
-                content = response.read().decode('utf-8')
-                version_info = json.loads(content)
-                
-                # Compare versions
-                if self._is_newer_version(version_info.get('version', '0.0.0')):
-                    self.update_available.emit(version_info)
+        # Add a random query parameter to avoid caching
+        cache_buster = f"?t={int(time.time())}"
+        url = UPDATE_CHECK_URL + cache_buster
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(url, timeout=15) as response:
+                    content = response.read().decode('utf-8')
+                    version_info = json.loads(content)
+
+                    if self._is_newer_version(version_info.get('version', '0.0.0')):
+                        self.update_available.emit(version_info)
+                    else:
+                        self.no_update_available.emit()
+                    return
+            except urllib.error.URLError as e:
+                if attempt == 2:
+                    if isinstance(e.reason, ssl.SSLError):
+                        self.error_occurred.emit("SSL handshake failed. Check your network or certificate settings.")
+                    else:
+                        self.error_occurred.emit(str(e))
                 else:
-                    self.no_update_available.emit()
-        except Exception as e:
-            self.error_occurred.emit(str(e))
+                    time.sleep(2 ** attempt)
+            except Exception as e:
+                if attempt == 2:
+                    self.error_occurred.emit(str(e))
+                else:
+                    time.sleep(2 ** attempt)
     
     def _is_newer_version(self, remote_version: str) -> bool:
         """Compare version strings to determine if remote is newer"""
@@ -253,26 +265,15 @@ class UpdateDialog(QDialog):
         """Skip this version for future update checks"""
         # Save the skipped version to settings
         from src.models.settings import SettingsManager
-        
         try:
             # Get the settings manager
             settings_file = os.path.join(os.path.expanduser("~"), ".ontime", "settings.json")
             settings_manager = SettingsManager(settings_file)
-            
-            # Add skipped version information
             settings = settings_manager.settings
-            if not hasattr(settings, 'skipped_version'):
-                # Add skipped_version attribute if it doesn't exist
-                from dataclasses import field
-                setattr(settings.__class__, 'skipped_version', field(default=''))
-                settings.skipped_version = ''
-            
-            # Set skipped version
+            # Set skipped version safely
             settings.skipped_version = self.version_info.get('version', '')
             settings_manager.save_settings()
-            
             self.accept()
-            
         except Exception as e:
             print(f"Failed to save skipped version: {e}")
             self.reject()
@@ -307,35 +308,35 @@ class DownloadWorker(QObject):
     def start_download(self):
         """Start downloading the file"""
         try:
-            # Create a request with timeout
-            request = urllib.request.Request(self.url)
-            
+            # Create a request with timeout and user-agent header
+            request = urllib.request.Request(self.url, headers={'User-Agent': 'Mozilla/5.0'})
+
             # Open the URL
             with urllib.request.urlopen(request, timeout=30) as response:
                 # Get file size
                 file_size = int(response.info().get('Content-Length', 0))
-                
+
                 # Download the file in chunks
                 downloaded_size = 0
                 chunk_size = 8192
-                
+
                 with open(self.destination, 'wb') as f:
                     while True:
                         chunk = response.read(chunk_size)
                         if not chunk:
                             break
-                        
+
                         f.write(chunk)
                         downloaded_size += len(chunk)
-                        
+
                         # Update progress
                         if file_size > 0:
                             progress = int((downloaded_size / file_size) * 100)
                             self.progress_updated.emit(progress)
-                
+
                 # Download complete
                 self.download_finished.emit()
-                
+
         except Exception as e:
             self.error_occurred.emit(f"Download failed: {str(e)}")
 
@@ -452,29 +453,3 @@ def check_for_updates(parent=None, silent=False):
     # Return thread so it doesn't get garbage collected
     return thread
 
-
-if __name__ == "__main__":
-    # Test the update checker
-    from PyQt6.QtWidgets import QApplication
-    
-    app = QApplication(sys.argv)
-    
-    # Create a simple window
-    window = QDialog()
-    window.setWindowTitle("Update Checker Test")
-    window.resize(300, 100)
-    
-    layout = QVBoxLayout(window)
-    label = QLabel("Testing update checker...")
-    layout.addWidget(label)
-    
-    button = QPushButton("Check for Updates")
-    button.clicked.connect(lambda: check_for_updates(window, False))
-    layout.addWidget(button)
-    
-    window.show()
-    
-    # Run the update check after 1 second
-    #QTimer.singleShot(1000, lambda: check_for_updates(window, False))
-    
-    sys.exit(app.exec())
