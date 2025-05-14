@@ -1748,28 +1748,24 @@ class MainWindow(QMainWindow):
                 
                 if self.secondary_display:
                     # Apply proper styling to ensure visibility
-                    QTimer.singleShot(0, self._apply_secondary_display_theme)
+                    self._apply_secondary_display_theme()
 
                     # Show and position on the correct screen
-                    QTimer.singleShot(0, self.secondary_display.show())
-                    QTimer.singleShot(0, self._position_secondary_display)
+                    self.secondary_display.show()
+                    self._position_secondary_display()
 
                 # Update toggle action
                 self.toggle_secondary_action.setChecked(True)
-            elif self.secondary_display:
+            elif hasattr(self, 'secondary_display') and self.secondary_display:
                 # Hide the secondary display
-                if hasattr(self.secondary_display, 'hide'):
-                    QTimer.singleShot(0, self.secondary_display.hide)
-                else:
-                    # Fall back to direct call if deferred call is problematic
+                try:
                     self.secondary_display.hide()
-                
-                # Update toggle action
-                self.toggle_secondary_action.setChecked(False)
-                
-                # Consider destroying the secondary display to avoid resource leaks
-                # This should be done safely to prevent issues
-                QTimer.singleShot(100, self._cleanup_secondary_display)
+                    # Update toggle action
+                    self.toggle_secondary_action.setChecked(False)
+                    # Clean up the secondary display to avoid resource leaks
+                    self._cleanup_secondary_display()
+                except Exception as e:
+                    print(f"Error hiding secondary display: {e}")
                 
         except Exception as e:
             print(f"Error updating secondary display: {e}")

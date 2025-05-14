@@ -224,7 +224,7 @@ class SettingsDialog(QDialog):
         
         # Secondary screen selection
         self.secondary_screen_combo = QComboBox()
-        self.secondary_screen_combo.clear()  # Clear any existing items
+        #self.secondary_screen_combo.clear()  # Clear any existing items
         self.secondary_screen_combo.addItem("None", None)
 
         # Add all screens to the secondary dropdown
@@ -359,8 +359,11 @@ class SettingsDialog(QDialog):
     
     def _secondary_screen_selection_changed(self, index):
         """Handle changes to the secondary screen selection"""
+        if index < 0:  # Invalid index
+            return
+            
         selected_value = self.secondary_screen_combo.currentData()
-        if selected_value is None:
+        if selected_value is None or selected_value == "None":  # Check both None and "None"
             # If "None" is selected, automatically uncheck the use_secondary_check
             self.use_secondary_check.setChecked(False)
             # Also disable the checkbox to make it clear that it can't be enabled without a screen
