@@ -1900,42 +1900,41 @@ class MainWindow(QMainWindow):
     def _show_error(self, message):
         """Show error message (thread-safe)"""
         QTimer.singleShot(0, lambda: QMessageBox.critical(self, "Error", message))
+        
     
+    # ------------------------------------------------------------------
+    # Ensure all child windows shut down cleanly when the main window
+    # is closed (especially the secondary display, which otherwise keeps
+    # running and may spawn duplicates next time).
+    # ------------------------------------------------------------------
     def closeEvent(self, event):
-        """Handle window close event with lazy-loaded components"""
-        
-        if hasattr(self, 'secondary_display') and self.secondary_display:
+        """Qt close handler – make sure secondary display and background
+        tasks are cleaned up before the application quits."""
+        try:
+            # Shut down the secondary display if it exists
+            if hasattr(self, "secondary_display") and self.secondary_display:
+                # Disconnect signals to avoid callbacks during teardown
+                try:
+                    self.timer_controller.timer.meeting_countdown_updated.disconnect(
+                        self.secondary_display._update_countdown
+                    )
+                except (TypeError, RuntimeError):
+                    pass
+                self.secondary_display.close()
+                self.secondary_display.deleteLater()
+                self.secondary_display = None
+        except Exception as e:
+            print(f"[MainWindow] Error while closing secondary display: {e}")
+
+        # Also make sure the network display stops broadcasting
+        if getattr(self, "network_display_manager", None):
             try:
-                # Make sure to disconnect all signals first
-                self._cleanup_secondary_display()
+                self.network_display_manager.stop_network_display()
             except Exception as e:
-                print(f"Error cleaning up secondary display during close: {e}")
-        
-        # Clean up secondary display if it exists
-        if self._is_component_ready('secondary_display_handler'):
-            try:
-                self.secondary_display_handler.cleanup()
-            except Exception as e:
-                print(f"Error cleaning up secondary display handler: {e}")
-            
-        # Clean up network display
-        if self._is_component_ready('network_display_manager'):
-            self.network_display_manager.cleanup()
-            
-        # Clean up component loader
-        if hasattr(self.component_loader, "loader"):
-            self.component_loader.loader.stop()
-            self.component_loader.loader.wait() 
-            
-        # Save dock visibility state
-        # Save dock visibility state if remember_tools_dock_state is enabled
-        settings = self.settings_controller.get_settings()
-        if settings.display.remember_tools_dock_state:
-            settings.display.show_tools_dock = self.tools_dock.isVisible()
-            self.settings_controller.save_settings()
-        
-        # Accept the event
-        event.accept()
+                print(f"[MainWindow] Error stopping network display: {e}")
+
+        # Finally proceed with the default close behavior
+        super().closeEvent(event)
         
     def _on_secondary_screen_changed(self, *_):
         """Handle live updates to the selected secondary screen"""
