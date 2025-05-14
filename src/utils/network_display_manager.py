@@ -355,7 +355,7 @@ class NetworkDisplayManager(QObject):
     
     def _handle_error(self, error_message: str):
         """Handle errors from components"""
-        print(f"Network display error: {error_message}")
+        #print(f"Network display error: {error_message}")
         self.status_updated.emit(f"Error: {error_message}", 0)
     
     def _on_time_updated(self, seconds: int):

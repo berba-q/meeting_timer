@@ -72,13 +72,13 @@ class NetworkBroadcaster(QObject):
         # Register new client
         self.connected_clients.add(websocket)
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
-        print(f"Client connected: {client_id}")
+        #print(f"Client connected: {client_id}")
         self.client_connected.emit(client_id)
         
         # Send current state immediately upon connection
         try:
             serialized = json.dumps(self.current_state)
-            print(f"Sending to client {client_id}: {serialized}")
+            #print(f"Sending to client {client_id}: {serialized}")
             await websocket.send(serialized)
         except (TypeError, ValueError) as e:
             traceback.print_exc()
@@ -94,7 +94,7 @@ class NetworkBroadcaster(QObject):
                     if data.get('type') == 'request_state':
                         # Re-send the current state
                         await websocket.send(json.dumps(self.current_state))
-                        print(f"Re-sent state to client {client_id} after request")
+                        #print(f"Re-sent state to client {client_id} after request")
                 except Exception as e:
                     print(f"Error processing message from client {client_id}: {e}")
         except Exception as e:
