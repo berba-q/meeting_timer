@@ -175,15 +175,10 @@ class SettingsDialog(QDialog):
         display_mode_layout = QVBoxLayout(display_mode_group)
         
         self.digital_mode_radio = QCheckBox("Digital")
-        #self.analog_mode_radio = QCheckBox("Analog")
-        
-        # Make checkboxes mutually exclusive
-        self.digital_mode_radio.toggled.connect(lambda checked: self.analog_mode_radio.setChecked(not checked))
-        #self.analog_mode_radio.toggled.connect(lambda checked: self.digital_mode_radio.setChecked(not checked))
-        
+        self.digital_mode_radio.setChecked(True)  # Always checked since it's the only option
+        self.digital_mode_radio.setEnabled(False)  # Disable it since there's no alternative
         display_mode_layout.addWidget(self.digital_mode_radio)
-        #display_mode_layout.addWidget(self.analog_mode_radio)
-        
+
         # Theme selection
         theme_layout = QHBoxLayout()
         theme_layout.addWidget(QLabel("Theme:"))
@@ -194,6 +189,14 @@ class SettingsDialog(QDialog):
         
         theme_layout.addWidget(self.theme_combo)
         display_mode_layout.addLayout(theme_layout)
+        
+        # Tools dock options
+        tools_dock_group = QGroupBox("Tools Dock")
+        tools_dock_layout = QVBoxLayout(tools_dock_group)
+        
+        self.remember_tools_dock_check = QCheckBox("Remember tools dock state between sessions")
+        self.remember_tools_dock_check.setToolTip("When enabled, the dock will be shown or hidden based on its state when you last closed the application")
+        tools_dock_layout.addWidget(self.remember_tools_dock_check)
         
         # Meeting timing options
         timing_group = QGroupBox("Meeting Timing")
@@ -240,6 +243,7 @@ class SettingsDialog(QDialog):
         
         # Add groups to layout
         layout.addWidget(display_mode_group)
+        layout.addWidget(tools_dock_group)
         layout.addWidget(timing_group)
         layout.addWidget(screen_group)
         layout.addStretch()
@@ -379,6 +383,9 @@ class SettingsDialog(QDialog):
         self.digital_mode_radio.setChecked(is_digital)
         #self.analog_mode_radio.setChecked(not is_digital)
         
+        if hasattr(self, 'remember_tools_dock_check'):
+            self.remember_tools_dock_check.setChecked(settings.display.remember_tools_dock_state)
+        
         # Theme setting
         theme_index = self.theme_combo.findData(settings.display.theme)
         if theme_index >= 0:
@@ -447,8 +454,9 @@ class SettingsDialog(QDialog):
         self.settings_controller.set_weekend_meeting(weekend_day, weekend_time)
         
         # Display settings
-        display_mode = TimerDisplayMode.DIGITAL if self.digital_mode_radio.isChecked() else TimerDisplayMode.ANALOG
-        self.settings_controller.set_display_mode(display_mode)
+        
+        if hasattr(self, 'remember_tools_dock_check'):
+            self.settings_controller.get_settings().display.remember_tools_dock_state = self.remember_tools_dock_check.isChecked()
         
         # Theme setting
         theme = self.theme_combo.currentData()

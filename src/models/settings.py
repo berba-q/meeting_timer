@@ -98,6 +98,7 @@ class DisplaySettings:
     show_predicted_end_time: bool = True
     theme: str = "light"  # 'light' or 'dark'
     show_tools_dock: bool = False
+    remember_tools_dock_state: bool = False  # Remember the state of the tools dock
     
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
@@ -109,7 +110,9 @@ class DisplaySettings:
             'secondary_screen_name': self.secondary_screen_name,
             'use_secondary_screen': self.use_secondary_screen,
             'show_predicted_end_time': self.show_predicted_end_time,
-            'theme': self.theme
+            'theme': self.theme,
+            'show_tools_dock': self.show_tools_dock,
+            'remember_tools_dock_state': self.remember_tools_dock_state
         }
     
     @classmethod
@@ -124,7 +127,9 @@ class DisplaySettings:
             secondary_screen_name=data.get('secondary_screen_name', ""),
             use_secondary_screen=use_secondary_screen,
             show_predicted_end_time=data.get('show_predicted_end_time', True),
-            theme=data.get('theme', 'light')
+            theme=data.get('theme', 'light'),
+            show_tools_dock=data.get('show_tools_dock', False),
+            remember_tools_dock_state=data.get('remember_tools_dock_state', False)
         )
 
 

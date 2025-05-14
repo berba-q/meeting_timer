@@ -121,9 +121,18 @@ class TimerView(QWidget):
         self.current_time = time_str
 
         # Show the clock only if (a) we are in STOPPED state and (b) the view
-        # isn’t currently suppressed by a running meeting.
+        # isn't currently suppressed by a running meeting.
         if self.timer_state == TimerState.STOPPED and self.show_clock:
-            self.timer_label.setText(time_str)
+            try:
+                # Check if timer_label still exists
+                if hasattr(self, "timer_label") and self.timer_label is not None:
+                    self.timer_label.setText(time_str)
+            except RuntimeError:
+                # The widget was deleted - just ignore the update
+                pass
+            except Exception as e:
+                # Log any other errors but don't crash
+                print(f"Error updating timer label: {e}")
     
     def _update_countdown(self, seconds_remaining: int, message: str):
         """Update the countdown message"""
@@ -143,6 +152,23 @@ class TimerView(QWidget):
         else:
             # Hide countdown when timer is running
             self.countdown_label.setVisible(False)
+    
+    def deleteLater(self):
+        """Override deleteLater to properly clean up signal connections"""
+        # Disconnect from timer signals
+        try:
+            if hasattr(self, "timer_controller") and self.timer_controller:
+                self.timer_controller.timer.time_updated.disconnect(self._update_time)
+                self.timer_controller.timer.state_changed.disconnect(self._update_state)
+                self.timer_controller.part_changed.disconnect(self._update_part)
+                self.timer_controller.timer.current_time_updated.disconnect(self._update_current_time)
+                self.timer_controller.timer.meeting_countdown_updated.disconnect(self._update_countdown)
+        except (TypeError, RuntimeError):
+            # Signal was not connected
+            pass
+        
+        # Call the parent implementation
+        super().deleteLater()
         
     
     def _create_analog_display(self):
@@ -230,29 +256,45 @@ class TimerView(QWidget):
             self.analog_clock.set_time(self.remaining_seconds, self.timer_state)
 
     def resizeEvent(self, event):
-        super().resizeEvent(event)
-        width = self.width()
+        try:
+            super().resizeEvent(event)
+            width = self.width()
 
-        # Resize timer label font
-        if hasattr(self, "timer_label"):
-            timer_font_size = max(24, min(160, width // 8))
-            timer_font = self.timer_label.font()
-            timer_font.setPointSize(timer_font_size)
-            self.timer_label.setFont(timer_font)
+            # Resize timer label font
+            if hasattr(self, "timer_label") and self.timer_label is not None:
+                try:
+                    timer_font_size = max(24, min(160, width // 8))
+                    timer_font = self.timer_label.font()
+                    timer_font.setPointSize(timer_font_size)
+                    self.timer_label.setFont(timer_font)
+                except RuntimeError:
+                    # Widget was deleted, ignore
+                    pass
 
-        # Resize part label font
-        if hasattr(self, "part_label"):
-            part_font_size = max(12, min(36, width // 30))
-            part_font = self.part_label.font()
-            part_font.setPointSize(part_font_size)
-            self.part_label.setFont(part_font)
+            # Resize part label font
+            if hasattr(self, "part_label") and self.part_label is not None:
+                try:
+                    part_font_size = max(12, min(36, width // 30))
+                    part_font = self.part_label.font()
+                    part_font.setPointSize(part_font_size)
+                    self.part_label.setFont(part_font)
+                except RuntimeError:
+                    # Widget was deleted, ignore
+                    pass
 
-        # Resize countdown label font
-        if hasattr(self, "countdown_label"):
-            countdown_font_size = max(12, min(32, width // 32))
-            countdown_font = self.countdown_label.font()
-            countdown_font.setPointSize(countdown_font_size)
-            self.countdown_label.setFont(countdown_font)
+            # Resize countdown label font
+            if hasattr(self, "countdown_label") and self.countdown_label is not None:
+                try:
+                    countdown_font_size = max(12, min(32, width // 32))
+                    countdown_font = self.countdown_label.font()
+                    countdown_font.setPointSize(countdown_font_size)
+                    self.countdown_label.setFont(countdown_font)
+                except RuntimeError:
+                    # Widget was deleted, ignore
+                    pass
+        except Exception as e:
+        # Catch any other exceptions to prevent crashes
+            print(f"Error in TimerView.resizeEvent: {e}")
 
 
 class AnalogClockWidget(QWidget):

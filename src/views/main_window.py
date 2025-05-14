@@ -98,6 +98,13 @@ class MainWindow(QMainWindow):
         # Create tools dock first (before menu bar)
         self._create_empty_dock()
         
+        # Show/hide the tools dock based on settings
+        settings = self.settings_controller.get_settings()
+        if settings.display.remember_tools_dock_state and settings.display.show_tools_dock:
+            self.tools_dock.show()
+        else:
+            self.tools_dock.hide()
+        
         # Now create other UI components
         self._create_menu_bar()
         self._create_tool_bar()
@@ -1305,12 +1312,17 @@ class MainWindow(QMainWindow):
     
     def _settings_changed(self):
         """Handle settings changes"""
-        # Update display mode label
-        self._update_display_mode_label()
         
-        # Update secondary display
-        self._update_secondary_display_label()
-        self._update_secondary_display()
+        # Get current settings
+        settings = self.settings_controller.get_settings()
+        # Defer UI updates to avoid potential widget destruction issues
+        QTimer.singleShot(0, self._update_display_mode_label)
+        QTimer.singleShot(0, self._update_secondary_display_label)
+        QTimer.singleShot(0, self._update_secondary_display)
+        
+        # Update tools dock visibility based on settings, but only if remember_tools_dock_state is true
+        if settings.display.remember_tools_dock_state:
+            QTimer.singleShot(0, lambda: self.tools_dock.setVisible(settings.display.show_tools_dock))
     
     def _display_mode_changed(self, mode):
         """Handle display mode change"""
@@ -1380,48 +1392,58 @@ class MainWindow(QMainWindow):
         if not self.secondary_display:
             return
         
-        # Always apply a black background with white text for maximum visibility
-        self.secondary_display.setStyleSheet("""
-            QMainWindow, QWidget {
-                background-color: #000000;
-                color: #ffffff;
-            }
-            
-            QLabel {
-                color: #ffffff;
-                font-weight: bold;
-            }
-            
-            QFrame {
-                background-color: rgba(50, 50, 50, 180);
-                border: 2px solid #ffffff;
-                border-radius: 15px;
-            }
-            
-            TimerView {
-                background-color: #000000;
-                border: 2px solid #333333;
-            }
-            
-            TimerView QLabel {
-                color: #ffffff;
-                font-weight: bold;
-            }
-        """)
-        
-        # Check if the attribute exists before trying to access it
-        if hasattr(self.secondary_display, 'timer_view'):
-            if hasattr(self.secondary_display.timer_view, 'timer_label'):
-                self.secondary_display.timer_view.timer_label.setStyleSheet("color: #ffffff; font-weight: bold;")
-        
-        # Check for direct timer_label attribute in newer implementation
-        if hasattr(self.secondary_display, 'timer_label'):
-            self.secondary_display.timer_label.setStyleSheet("""
-                color: #ffffff;
-                font-size: 380px;
-                font-weight: bold;
-                font-family: 'Courier New', monospace;
+        try:
+            # Always apply a black background with white text for maximum visibility
+            self.secondary_display.setStyleSheet("""
+                QMainWindow, QWidget {
+                    background-color: #000000;
+                    color: #ffffff;
+                }
+                
+                QLabel {
+                    color: #ffffff;
+                    font-weight: bold;
+                }
+                
+                QFrame {
+                    background-color: rgba(50, 50, 50, 180);
+                    border: 2px solid #ffffff;
+                    border-radius: 15px;
+                }
+                
+                TimerView {
+                    background-color: #000000;
+                    border: 2px solid #333333;
+                }
+                
+                TimerView QLabel {
+                    color: #ffffff;
+                    font-weight: bold;
+                }
             """)
+            
+            # Check if the attribute exists before trying to access it
+            if hasattr(self.secondary_display, 'timer_view'):
+                try:
+                    if hasattr(self.secondary_display.timer_view, 'timer_label'):
+                        self.secondary_display.timer_view.timer_label.setStyleSheet("color: #ffffff; font-weight: bold;")
+                except (RuntimeError, AttributeError):
+                    # Ignore errors if the component has been deleted
+                    pass
+            
+            # Check for direct timer_label attribute in newer implementation
+            if hasattr(self.secondary_display, 'timer_label'):
+                try:
+                    self.secondary_display.timer_label.setStyleSheet("""
+                        color: #ffffff;
+                        font-size: 380px;
+                        font-weight: bold;
+                        font-family: 'Courier New', monospace;
+                    """)
+                except (RuntimeError, AttributeError):
+                    pass
+        except Exception as e:
+            print(f"Error applying secondary display theme: {e}")
     
     def _start_meeting(self):
         """Start the current meeting"""
@@ -1716,28 +1738,31 @@ class MainWindow(QMainWindow):
     
     def _update_secondary_display(self):
         """Update secondary display based on settings"""
-        settings = self.settings_controller.get_settings()
-        
-        if settings.display.use_secondary_screen and settings.display.secondary_screen_index is not None:
-            # Create secondary window if it doesn't exist
-            if not self.secondary_display:
-                self.secondary_display = SecondaryDisplay(self.timer_controller, self.settings_controller)
+        try:
+            settings = self.settings_controller.get_settings()
             
-            # Apply proper styling to ensure visibility
-            self._apply_secondary_display_theme()
-            
-            # Show and position on the correct screen
-            self.secondary_display.show()
-            self._position_secondary_display()
-            
-            # Update toggle action
-            self.toggle_secondary_action.setChecked(True)
-        elif self.secondary_display:
-            # Hide the secondary display
-            self.secondary_display.hide()
-            
-            # Update toggle action
-            self.toggle_secondary_action.setChecked(False)
+            if settings.display.use_secondary_screen and settings.display.secondary_screen_index is not None:
+                # Create secondary window if it doesn't exist
+                if not self.secondary_display:
+                    self.secondary_display = SecondaryDisplay(self.timer_controller, self.settings_controller)
+                
+                # Apply proper styling to ensure visibility
+                QTimer.singleShot(0, self._apply_secondary_display_theme)
+                
+                # Show and position on the correct screen
+                QTimer.singleShot(0,self.secondary_display.show())
+                QTimer.singleShot(0, self._position_secondary_display)
+                
+                # Update toggle action
+                self.toggle_secondary_action.setChecked(True)
+            elif self.secondary_display:
+                # Hide the secondary display
+                QTimer.singleShot(0, self.secondary_display.hide)
+                
+                # Update toggle action
+                self.toggle_secondary_action.setChecked(False)
+        except Exception as e:
+            print(f"Error updating secondary display: {e}")
     
     def _position_secondary_display(self):
         """Position the secondary display on the correct screen"""
@@ -1842,9 +1867,11 @@ class MainWindow(QMainWindow):
             self.component_loader.loader.wait() 
             
         # Save dock visibility state
+        # Save dock visibility state if remember_tools_dock_state is enabled
         settings = self.settings_controller.get_settings()
-        settings.display.show_tools_dock = self.tools_dock.isVisible()
-        self.settings_controller.save_settings()
+        if settings.display.remember_tools_dock_state:
+            settings.display.show_tools_dock = self.tools_dock.isVisible()
+            self.settings_controller.save_settings()
         
         # Accept the event
         event.accept()
