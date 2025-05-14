@@ -250,6 +250,8 @@ class MainWindow(QMainWindow):
             # If the dock panel already exists, give it the manager reference
             if self.network_status_widget:
                 self.network_status_widget.set_network_manager(self.network_display_manager)
+                # Force sync with current state
+                self._sync_network_widget_state()
 
             # Process any pending actions for this component
             self._process_pending_actions(name, component)
@@ -264,6 +266,10 @@ class MainWindow(QMainWindow):
             # Hand over the manager reference (if it's already loaded)
             if self.network_display_manager:
                 self.network_status_widget.set_network_manager(self.network_display_manager)
+                # Force sync with current state
+                self._sync_network_widget_state()
+            else:
+                self.network_status_widget._display_stopped()
 
             # Sync widget with current broadcast state
             if self._last_network_url:
@@ -293,6 +299,39 @@ class MainWindow(QMainWindow):
                 
             # Process any pending actions for this component
             self._process_pending_actions(name, component)
+    
+    def _sync_network_widget_state(self):
+        """Explicitly synchronize the network widget with the actual network display state"""
+        if not self.network_status_widget or not self.network_display_manager:
+            return
+            
+        # Check if the network display is actually running
+        if (self.network_display_manager.broadcaster and 
+            self.network_display_manager.broadcaster.is_broadcasting):
+            # Get the current connection URL
+            url, client_count, _ = self.network_display_manager.get_connection_info()
+            if url:
+                # Force update the widget to active state
+                self.network_status_widget._display_started(url)
+                # Update status with client count
+                self.network_status_widget._status_updated(
+                    f"Network display running at: {url}",
+                    client_count
+                )
+            else:
+                # Fallback to inactive if no URL
+                self.network_status_widget._display_stopped()
+        else:
+            # Ensure widget shows inactive state
+            self.network_status_widget._display_stopped()
+            
+        # Update the toggle button text
+        if hasattr(self.network_status_widget, "toggle_button"):
+            if (self.network_display_manager.broadcaster and 
+                self.network_display_manager.broadcaster.is_broadcasting):
+                self.network_status_widget.toggle_button.setText("Stop")
+            else:
+                self.network_status_widget.toggle_button.setText("Start")
 
     
     def _on_all_components_ready(self):
@@ -897,6 +936,10 @@ class MainWindow(QMainWindow):
         if mode != NetworkDisplayMode.DISABLED:
             self.network_display_manager.start_network_display(mode, http_port, ws_port)
             self.toggle_network_action.setText("Stop Network Display")
+        
+            # Also sync the network widget if it exists
+            if self._is_component_ready('network_status_widget'):
+                QTimer.singleShot(500, self._sync_network_widget_state)
     
     def _create_central_widget(self):
         """Create the central widget with timer and a placeholder for meeting view"""
@@ -1033,6 +1076,13 @@ class MainWindow(QMainWindow):
         # network_status_widget is not None
         if self.network_status_widget:
             self.network_status_widget._display_started(url)
+            
+        # Update the network widget if it exists
+        if hasattr(self, "network_status_widget") and self.network_status_widget:
+            self.network_status_widget._display_started(url)
+            # Make sure the toggle button text is updated too
+            if hasattr(self.network_status_widget, "toggle_button"):
+                self.network_status_widget.toggle_button.setText("Stop")
 
     def _network_display_stopped(self):
         """Handle network display stopped"""
@@ -1044,6 +1094,9 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Network display stopped", 5000)
         if hasattr(self, "network_status_widget") and self.network_status_widget:
             self.network_status_widget._display_stopped()
+            # Make sure the toggle button text is updated too
+            if hasattr(self.network_status_widget, "toggle_button"):
+                self.network_status_widget.toggle_button.setText("Start")
 
     def _meetings_loaded(self, meetings):
         """Handle loaded meetings"""
