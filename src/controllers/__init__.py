@@ -1,3 +1,3 @@
 """
-Controllers package for the JW Meeting Timer application.
+Controllers package for the OnTime Meeting Timer application.
 """
