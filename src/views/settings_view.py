@@ -234,6 +234,9 @@ class SettingsDialog(QDialog):
                 screen['index']
             )
         
+        # Connect signal to handle selection changes
+        self.secondary_screen_combo.currentIndexChanged.connect(self._secondary_screen_selection_changed)
+        
         self.use_secondary_check = QCheckBox("Use Secondary Display")
         self.use_secondary_check.toggled.connect(self._toggle_secondary_screen)
         
@@ -354,6 +357,18 @@ class SettingsDialog(QDialog):
         else:
             self.weekend_songs_manual_check.setText("Include song placeholders in templates")
     
+    def _secondary_screen_selection_changed(self, index):
+        """Handle changes to the secondary screen selection"""
+        selected_value = self.secondary_screen_combo.currentData()
+        if selected_value is None:
+            # If "None" is selected, automatically uncheck the use_secondary_check
+            self.use_secondary_check.setChecked(False)
+            # Also disable the checkbox to make it clear that it can't be enabled without a screen
+            self.use_secondary_check.setEnabled(False)
+        else:
+            # Re-enable the checkbox if a valid screen is selected
+            self.use_secondary_check.setEnabled(True)
+    
     def _load_settings(self):
         """Load current settings into UI"""
         # Optionally, use load_settings() instead of get_settings() for freshness.
@@ -402,9 +417,23 @@ class SettingsDialog(QDialog):
         secondary_index = self.secondary_screen_combo.findData(settings.display.secondary_screen_index)
         if secondary_index >= 0:
             self.secondary_screen_combo.setCurrentIndex(secondary_index)
+        else:
+            # If secondary screen is not found (e.g., None), select "None"
+            none_index = self.secondary_screen_combo.findData(None)
+            if none_index >= 0:
+                self.secondary_screen_combo.setCurrentIndex(none_index)
         
-        self.use_secondary_check.setChecked(settings.display.use_secondary_screen)
+        # Ensure use_secondary_check is consistent with settings
+        use_secondary = settings.display.use_secondary_screen
+        secondary_screen = settings.display.secondary_screen_index
         
+        # If secondary_screen is None, use_secondary should be False
+        if secondary_screen is None:
+            use_secondary = False
+        
+        self.use_secondary_check.setChecked(use_secondary)
+        # Also set the enabled state based on whether a valid screen is selected
+        self.use_secondary_check.setEnabled(secondary_screen is not None)        
         self._toggle_secondary_screen(settings.display.use_secondary_screen)
         # Do NOT call toggle_secondary_screen on the controller here; only update UI.
         
@@ -470,9 +499,18 @@ class SettingsDialog(QDialog):
         self.settings_controller.set_primary_screen(primary_screen)
         
         secondary_screen = self.secondary_screen_combo.currentData()
-        self.settings_controller.set_secondary_screen(secondary_screen)
-        # Move toggle_secondary_screen to the end of display-related settings, after all screen and theme settings
-        self.settings_controller.toggle_secondary_screen(self.use_secondary_check.isChecked())
+        use_secondary = self.use_secondary_check.isChecked()
+        
+        # Make sure use_secondary is False if secondary_screen is None
+        if secondary_screen is None:
+            use_secondary = False
+        
+        # Set secondary screen first
+        if secondary_screen is not None:
+            self.settings_controller.set_secondary_screen(secondary_screen)
+        
+        # Then update use_secondary_screen
+        self.settings_controller.toggle_secondary_screen(use_secondary)
         
         # Meeting source settings
         for mode, radio in self.source_mode_radios.items():

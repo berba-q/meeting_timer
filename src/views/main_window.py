@@ -1746,39 +1746,72 @@ class MainWindow(QMainWindow):
                 if not self.secondary_display:
                     self.secondary_display = SecondaryDisplay(self.timer_controller, self.settings_controller)
                 
-                # Apply proper styling to ensure visibility
-                QTimer.singleShot(0, self._apply_secondary_display_theme)
-                
-                # Show and position on the correct screen
-                QTimer.singleShot(0,self.secondary_display.show())
-                QTimer.singleShot(0, self._position_secondary_display)
-                
+                if self.secondary_display:
+                    # Apply proper styling to ensure visibility
+                    QTimer.singleShot(0, self._apply_secondary_display_theme)
+
+                    # Show and position on the correct screen
+                    QTimer.singleShot(0, self.secondary_display.show())
+                    QTimer.singleShot(0, self._position_secondary_display)
+
                 # Update toggle action
                 self.toggle_secondary_action.setChecked(True)
             elif self.secondary_display:
                 # Hide the secondary display
-                QTimer.singleShot(0, self.secondary_display.hide)
+                if hasattr(self.secondary_display, 'hide'):
+                    QTimer.singleShot(0, self.secondary_display.hide)
+                else:
+                    # Fall back to direct call if deferred call is problematic
+                    self.secondary_display.hide()
                 
                 # Update toggle action
                 self.toggle_secondary_action.setChecked(False)
+                
+                # Consider destroying the secondary display to avoid resource leaks
+                # This should be done safely to prevent issues
+                QTimer.singleShot(100, self._cleanup_secondary_display)
+                
         except Exception as e:
             print(f"Error updating secondary display: {e}")
     
+    def _cleanup_secondary_display(self):
+        """Safely clean up the secondary display window"""
+        try:
+            if hasattr(self, 'secondary_display') and self.secondary_display:
+                # Disconnect any signals
+                try:
+                    self.timer_controller.timer.meeting_countdown_updated.disconnect(
+                        self.secondary_display._update_countdown
+                    )
+                except (TypeError, RuntimeError):
+                    # Signal might not be connected
+                    pass
+                
+                # Delete the window
+                self.secondary_display.deleteLater()
+                self.secondary_display = None
+        except Exception as e:
+            print(f"Error cleaning up secondary display: {e}")
+    
     def _position_secondary_display(self):
         """Position the secondary display on the correct screen"""
-        if not self.secondary_display:
+        if not hasattr(self, 'secondary_display') or not self.secondary_display:
             return
         
-        settings = self.settings_controller.get_settings()
-        screens = self.settings_controller.get_all_screens()
-        
-        if settings.display.secondary_screen_index is not None and 0 <= settings.display.secondary_screen_index < len(screens):
-            screen = QApplication.screens()[settings.display.secondary_screen_index]
-            geometry = screen.geometry()
+        try:
+            settings = self.settings_controller.get_settings()
+            screens = self.settings_controller.get_all_screens()
             
-            # Center on the selected screen
-            self.secondary_display.setGeometry(geometry)
-            self.secondary_display.showFullScreen()
+            if settings.display.secondary_screen_index is not None and 0 <= settings.display.secondary_screen_index < len(screens):
+                screen = QApplication.screens()[settings.display.secondary_screen_index]
+                geometry = screen.geometry()
+                
+                # Center on the selected screen
+                self.secondary_display.setGeometry(geometry)
+                self.secondary_display.showFullScreen()
+                QTimer.singleShot(1000, self._make_secondary_fullscreen)
+        except Exception as e:
+            print(f"Error positioning secondary display: {e}")
         
     def _toggle_display_mode(self):
         """Toggle between digital and analog display modes"""
