@@ -55,18 +55,23 @@ class NetworkDisplayManager(QObject):
     
     def _setup_html_content(self):
         """Set up the HTML content for the network display"""
-        # Get the path to the HTML file in our resources
-        html_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            'resources', 'network_display.html'
-        )
-        
+        # Look for the HTML file in the top‑level resources folder
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        html_path = os.path.join(project_root, 'resources', 'network_display.html')
+
         # Try to load HTML content from file
         if os.path.exists(html_path):
             self.http_server.load_html_content(html_path)
         else:
-            # Generate basic HTML content if file doesn't exist
-            html_content = """<!DOCTYPE html>
+            # File not found – fall back to an embedded template that matches the real HTML.
+            warning = (
+                f"[NetworkDisplayManager] WARNING: {html_path} not found. "
+                "Using built‑in fallback template for network display."
+            )
+            print(warning)
+            self.status_updated.emit("Using fallback network display template", 0)
+
+            fallback_html = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -76,7 +81,7 @@ class NetworkDisplayManager(QObject):
         body {
             background-color: #000000;
             color: #ffffff;
-            font-family: 'Segoe UI', 'Arial', sans-serif;
+            font-family: 'Segoe UI', 'Arial', 'sans-serif';
             margin: 0;
             padding: 0;
             display: flex;
@@ -87,7 +92,7 @@ class NetworkDisplayManager(QObject):
             text-align: center;
             overflow: hidden;
         }
-        
+
         #timer-display {
             font-family: 'Courier New', monospace;
             font-size: 25vmin;
@@ -95,15 +100,15 @@ class NetworkDisplayManager(QObject):
             margin: 0;
             line-height: 1;
         }
-        
-        #current-part {
+
+        #info-label {
             font-size: 7vmin;
             font-weight: bold;
             margin: 2vh 5vw;
             max-width: 90vw;
         }
-        
-        #next-part {
+
+        #end-time-label {
             font-size: 5vmin;
             margin: 1vh 5vw;
             padding: 2vh;
@@ -111,12 +116,7 @@ class NetworkDisplayManager(QObject):
             border-radius: 15px;
             max-width: 90vw;
         }
-        
-        #end-time {
-            font-size: 4vmin;
-            margin-top: 2vh;
-        }
-        
+
         #status {
             position: absolute;
             top: 10px;
@@ -126,110 +126,124 @@ class NetworkDisplayManager(QObject):
             border-radius: 5px;
             font-size: 14px;
         }
-        
-        .running { color: #4caf50; }
-        .warning { color: #ff9800; }
-        .danger { color: #f44336; }
-        .paused { color: #2196f3; }
-        .transition { color: #bb86fc; }
-        .stopped { color: #ffffff; }
+
+        .running   { color: #4caf50; }
+        .warning   { color: #ff9800; }
+        .danger    { color: #f44336; }
+        .paused    { color: #2196f3; }
+        .transition{ color: #bb86fc; }
+        .stopped   { color: #ffffff; }
     </style>
 </head>
 <body>
     <div id="status">Connecting...</div>
-    
+
     <h1 id="timer-display" class="stopped">00:00</h1>
-    
-    <div id="current-part">Waiting for connection...</div>
-    
-    <div id="next-part">Next Part: —</div>
-    
-    <div id="end-time"></div>
-    
+
+    <div id="info-label"></div>
+
+    <div id="end-time-label"></div>
+
     <script>
-        // Timer display elements
-        const timerDisplay = document.getElementById('timer-display');
-        const currentPart = document.getElementById('current-part');
-        const nextPart = document.getElementById('next-part');
-        const endTime = document.getElementById('end-time');
-        const status = document.getElementById('status');
-        
-        // Create WebSocket connection
+        // Elements
+        const timerDisplay  = document.getElementById('timer-display');
+        const infoLabel     = document.getElementById('info-label');
+        const endTimeLabel  = document.getElementById('end-time-label');
+        const status        = document.getElementById('status');
+
+        // WebSocket connection (port substituted by HTTP server)
         const socket = new WebSocket(`ws://${window.location.hostname}:{WS_PORT}`);
-        
-        // Connection opened
-        socket.addEventListener('open', function(event) {
+
+        socket.addEventListener('open', () => {
             status.textContent = 'Connected';
             status.style.color = '#4caf50';
         });
-        
-        // Connection closed
-        socket.addEventListener('close', function(event) {
+
+        socket.addEventListener('close', () => {
             status.textContent = 'Disconnected';
             status.style.color = '#f44336';
-            
-            // Try to reconnect after 5 seconds
-            setTimeout(function() {
-                window.location.reload();
-            }, 5000);
+            setTimeout(() => window.location.reload(), 5000);
         });
-        
-        // Listen for messages
-        socket.addEventListener('message', function(event) {
+
+        socket.addEventListener('message', (event) => {
             try {
                 const data = JSON.parse(event.data);
-                
-                // Update timer display
+
+                /* --- TIMER --- */
                 timerDisplay.textContent = data.time;
-                
-                // Set timer color based on state
-                timerDisplay.className = data.state;
-                
-                // Update part information
-                if (data.part) {
-                    currentPart.textContent = data.part;
+                timerDisplay.className   = data.state;
+
+                /* --- INFO & PREDICTED END --- */
+                if (data.state === 'stopped' && data.countdownMessage) {
+                    // Pre‑meeting countdown
+                    infoLabel.textContent      = 'MEETING STARTING SOON';
+                    infoLabel.style.color      = '#4a90e2';
+
+                    endTimeLabel.textContent   = data.countdownMessage;
+                    endTimeLabel.style.color   = '#4a90e2';
+                    endTimeLabel.style.display = 'block';
+
+                } else if (data.meetingEnded) {
+                    // Meeting finished
+                    infoLabel.textContent      = 'MEETING COMPLETED';
+                    infoLabel.style.color      = '#ffffff';
+                    endTimeLabel.style.display = 'none';
+
+                } else if (data.state === 'transition') {
+                    // Chairman transition
+                    infoLabel.textContent = data.part;
+                    infoLabel.style.color = '#bb86fc';
+                    endTimeLabel.style.display = data.endTime ? 'block' : 'none';
+
                 } else {
-                    currentPart.textContent = 'No active part';
-                }
-                
-                // Update next part if available
-                if (data.nextPart) {
-                    nextPart.textContent = `Next Part: ${data.nextPart}`;
-                } else {
-                    nextPart.textContent = 'Next Part: —';
-                }
-                
-                // Update end time if available
-                if (data.endTime) {
-                    endTime.textContent = `Predicted End: ${data.endTime}`;
-                    
-                    // Add overtime information if available
-                    if (data.overtime > 0) {
-                        const minutes = Math.floor(data.overtime / 60);
-                        const seconds = data.overtime % 60;
-                        
-                        if (minutes > 0) {
-                            endTime.textContent += ` (+${minutes}m ${seconds}s)`;
-                        } else {
-                            endTime.textContent += ` (+${seconds}s)`;
-                        }
-                        
-                        endTime.style.color = '#f44336';
+                    // Regular meeting
+                    if (data.nextPart) {
+                        infoLabel.textContent = `NEXT PART: ${data.nextPart}`;
+                    } else if (data.part) {
+                        infoLabel.textContent = data.part;
                     } else {
-                        endTime.style.color = '#4caf50';
+                        infoLabel.textContent = '—';
                     }
-                } else {
-                    endTime.textContent = '';
+                    infoLabel.style.color = '#ffffff';
+
+                    if (data.endTime) {
+                        endTimeLabel.textContent = `PREDICTED END: ${data.endTime}`;
+
+                        if (data.overtime && data.overtime > 0) {
+                            const mins = Math.floor(data.overtime / 60);
+                            endTimeLabel.textContent += ` (+${mins} MIN)`;
+                            endTimeLabel.style.color = '#f44336';
+                        } else {
+                            endTimeLabel.style.color = '#4caf50';
+                        }
+                        endTimeLabel.style.display = 'block';
+                    } else {
+                        endTimeLabel.style.display = 'none';
+                    }
                 }
-            } catch (error) {
-                console.error('Error parsing message:', error);
+
+                /* --- LIVE CLOCK WHEN STOPPED --- */
+                if (data.state === 'stopped' && !data.countdownMessage) {
+                    const updateClock = () => {
+                        const now = new Date();
+                        timerDisplay.textContent = now.toTimeString().split(' ')[0];
+                    };
+                    updateClock();
+                    clearInterval(window._clockInterval);
+                    window._clockInterval = setInterval(updateClock, 1000);
+                } else {
+                    clearInterval(window._clockInterval);
+                }
+
+            } catch (err) {
+                console.error('WS message error:', err);
             }
         });
     </script>
 </body>
 </html>
 """
-            self.http_server.set_html_content(html_content)
+            self.http_server.set_html_content(fallback_html)
     
     def _connect_signals(self):
         """Connect signals between components"""
@@ -346,11 +360,8 @@ class NetworkDisplayManager(QObject):
     
     def _on_time_updated(self, seconds: int):
         """Handle timer time updates with proper current time and countdown display"""
-        # Skip if broadcaster isn't initialized
-        if not hasattr(self, 'broadcaster') or not self.broadcaster:
-            return
-            
         # Initialize variables
+        current_time = datetime.now()
         time_str = "00:00"
         state_str = "stopped"
         part_title = ""
@@ -358,6 +369,7 @@ class NetworkDisplayManager(QObject):
         end_time_str = ""
         overtime_seconds = 0
         countdown_message = ""
+        meeting_ended = False
         
         # Check if we're in STOPPED state with no active part (pre-meeting)
         if (self.timer_controller.timer.state == TimerState.STOPPED and 
@@ -382,9 +394,16 @@ class NetworkDisplayManager(QObject):
                             countdown_message = f"Meeting starts in {hours}h {minutes}m {seconds}s"
                         else:
                             countdown_message = f"Meeting starts in {minutes}m {seconds}s"
+        
+        # Check if meeting has ended (after last part completed)
+        elif (self.timer_controller.timer.state == TimerState.STOPPED and 
+            self.timer_controller.current_part_index >= 0 and
+            len(self.timer_controller.parts_list) > 0 and
+            self.timer_controller.current_part_index >= len(self.timer_controller.parts_list) - 1):
             
-            # In pre-meeting state, don't show next part
-            next_part_title = ""
+            meeting_ended = True
+            time_str = current_time.strftime("%H:%M:%S")
+            
         else:
             # Normal timer operation (during meeting)
             if seconds < 0:  # Overtime
@@ -413,14 +432,24 @@ class NetworkDisplayManager(QObject):
                 0 < self.timer_controller.timer.remaining_seconds <= 60):
                 state_str = "warning"
             
-            # Get current part title
-            if self.timer_controller.current_part_index >= 0 and self.timer_controller.parts_list:
+            # If in transition state, get the transition message
+            if self.timer_controller.timer.state == TimerState.TRANSITION:
+                # Try to get the current transition message from the timer controller
+                if hasattr(self.timer_controller, '_transition_message'):
+                    part_title = self.timer_controller._transition_message
+                else:
+                    # Fallback to generic message if not stored
+                    part_title = "Chairman transition"
+            
+            # Get current part title - only used in transition state
+            elif self.timer_controller.current_part_index >= 0 and self.timer_controller.parts_list:
                 current_part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
                 part_title = current_part.title
             
-            # Get next part title
+            # Get next part title (for "Next Part:" display)
             next_part_index = self.timer_controller.current_part_index + 1
-            if self.timer_controller.parts_list and next_part_index < len(self.timer_controller.parts_list):
+            if (self.timer_controller.parts_list and 
+                next_part_index < len(self.timer_controller.parts_list)):
                 next_part = self.timer_controller.parts_list[next_part_index]
                 next_part_title = next_part.title
             
@@ -431,10 +460,7 @@ class NetworkDisplayManager(QObject):
             # Get overtime seconds
             overtime_seconds = getattr(self.timer_controller, '_total_overtime_seconds', 0)
         
-        # Debug the data before sending
-        print(f"Network update: time={time_str}, state={state_str}, part={part_title}")
-        
-        # Use the broadcaster's update_timer_data method directly
+        # Update broadcaster with current state
         self.broadcaster.update_timer_data(
             time_str=time_str,
             state=state_str,
@@ -442,7 +468,8 @@ class NetworkDisplayManager(QObject):
             next_part=next_part_title,
             end_time=end_time_str,
             overtime_seconds=overtime_seconds,
-            countdown_message=countdown_message
+            countdown_message=countdown_message,
+            meeting_ended=meeting_ended
         )
     
     def _on_state_changed(self, state: TimerState):

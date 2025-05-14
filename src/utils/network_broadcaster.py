@@ -46,10 +46,11 @@ class NetworkBroadcaster(QObject):
             "time": current_time,
             "state": "stopped",
             "part": "",
-            "next_part": "",
-            "end_time": "",
+            "nextPart": "",
+            "endTime": "",
             "overtime": 0,
-            "countdown_message": ""
+            "countdownMessage": "",
+            "meetingEnded": False
         }
     
     def _get_local_ip(self) -> str:
@@ -264,18 +265,19 @@ class NetworkBroadcaster(QObject):
                     pass  # Client might not have remote_address anymore
     
     def update_timer_data(self, time_str: str, state: str, part_title: str, 
-                    next_part: str = "", end_time: str = "", overtime_seconds: int = 0,
-                    countdown_message: str = ""):
+                next_part: str = "", end_time: str = "", overtime_seconds: int = 0,
+                countdown_message: str = "", meeting_ended: bool = False):
         """Update the current timer data and broadcast to clients"""
         # Update current state
         self.current_state = {
             "time": time_str,
             "state": state,
             "part": part_title,
-            "next_part": next_part,
-            "end_time": end_time,
+            "nextPart": next_part,
+            "endTime": end_time,
             "overtime": overtime_seconds,
-            "countdown_message": countdown_message  # Include countdown message
+            "countdownMessage": countdown_message,
+            "meetingEnded": meeting_ended
         }
         
         # Broadcast to clients if server is running
