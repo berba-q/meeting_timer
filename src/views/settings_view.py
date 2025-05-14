@@ -175,14 +175,14 @@ class SettingsDialog(QDialog):
         display_mode_layout = QVBoxLayout(display_mode_group)
         
         self.digital_mode_radio = QCheckBox("Digital")
-        self.analog_mode_radio = QCheckBox("Analog")
+        #self.analog_mode_radio = QCheckBox("Analog")
         
         # Make checkboxes mutually exclusive
         self.digital_mode_radio.toggled.connect(lambda checked: self.analog_mode_radio.setChecked(not checked))
-        self.analog_mode_radio.toggled.connect(lambda checked: self.digital_mode_radio.setChecked(not checked))
+        #self.analog_mode_radio.toggled.connect(lambda checked: self.digital_mode_radio.setChecked(not checked))
         
         display_mode_layout.addWidget(self.digital_mode_radio)
-        display_mode_layout.addWidget(self.analog_mode_radio)
+        #display_mode_layout.addWidget(self.analog_mode_radio)
         
         # Theme selection
         theme_layout = QHBoxLayout()
@@ -377,7 +377,7 @@ class SettingsDialog(QDialog):
         # Display settings
         is_digital = settings.display.display_mode == TimerDisplayMode.DIGITAL
         self.digital_mode_radio.setChecked(is_digital)
-        self.analog_mode_radio.setChecked(not is_digital)
+        #self.analog_mode_radio.setChecked(not is_digital)
         
         # Theme setting
         theme_index = self.theme_combo.findData(settings.display.theme)

@@ -39,6 +39,7 @@ class UpdateCheckWorker(QObject):
     def __init__(self, silent=False):
         super().__init__()
         self.silent = silent
+        self._last_network_url = None
     
     def run(self):
         """Run the update check"""
@@ -62,6 +63,9 @@ class MainWindow(QMainWindow):
     
     def __init__(self, meeting_controller: MeetingController, settings_controller: SettingsController):
         super().__init__()
+        
+        # Cache the last network URL so late‑loaded widgets can sync
+        self._last_network_url = None
         
         # Initialize controllers
         self.meeting_controller = meeting_controller
@@ -239,7 +243,14 @@ class MainWindow(QMainWindow):
             self.network_display_manager = component
             # Connect the network manager's signals
             self._connect_network_display_signals()
-            
+
+            # connect the network signals to the network status widget
+            self._connect_network_signals()
+
+            # If the dock panel already exists, give it the manager reference
+            if self.network_status_widget:
+                self.network_status_widget.set_network_manager(self.network_display_manager)
+
             # Process any pending actions for this component
             self._process_pending_actions(name, component)
             
@@ -248,13 +259,32 @@ class MainWindow(QMainWindow):
             old_widget = self.dock_tabs.widget(0)
             self.dock_tabs.removeTab(0)
             self.dock_tabs.insertTab(0, component, "Network")
-            
+            self.network_status_widget = component  # keep a reference
+
+            # Hand over the manager reference (if it's already loaded)
+            if self.network_display_manager:
+                self.network_status_widget.set_network_manager(self.network_display_manager)
+
+            # Sync widget with current broadcast state
+            if self._last_network_url:
+                self.network_status_widget._display_started(self._last_network_url)
+            else:
+                self.network_status_widget._display_stopped()
+
             # Clean up the old widget
             if old_widget:
                 old_widget.deleteLater()
-                
+
             # Process any pending actions for this component
             self._process_pending_actions(name, component)
+            # Sync widget with current broadcast state
+            if self.network_display_manager and self.network_display_manager.broadcaster:
+                if self.network_display_manager.broadcaster.is_broadcasting:
+                    url, _, _ = self.network_display_manager.get_connection_info()
+                    if url:
+                        self.network_status_widget._display_started(url)
+                else:
+                    self.network_status_widget._display_stopped()
                 
         elif name == "secondary_display_handler":
             # If secondary display is enabled, update it
@@ -667,10 +697,12 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.toggle_secondary_action)
         
         # Switch display mode
+        """ 
         switch_display_mode_action = QAction("Switch Display &Mode", self)
         switch_display_mode_action.setShortcut("F9")
         switch_display_mode_action.triggered.connect(self._toggle_display_mode)
-        view_menu.addAction(switch_display_mode_action)
+        view_menu.addAction(switch_display_mode_action) 
+        """
         
         # Switch theme
         self.theme_menu = view_menu.addMenu("&Theme")
@@ -989,19 +1021,29 @@ class MainWindow(QMainWindow):
     
     def _network_display_started(self, url):
         """Handle network display started"""
+        self._last_network_url = url # Store the URL for later use
         # Update menu action text
         self.toggle_network_action.setText("Stop Network Display")
         
         # Update status bar
         self.statusBar().showMessage(f"Network display started at {url}", 5000)
+        if hasattr(self, "network_status_widget") and self.network_status_widget:
+            self.network_status_widget._display_started(url)
+        
+        # network_status_widget is not None
+        if self.network_status_widget:
+            self.network_status_widget._display_started(url)
 
     def _network_display_stopped(self):
         """Handle network display stopped"""
+        self._last_network_url = None # Clear the URL
         # Update menu action text
         self.toggle_network_action.setText("Start Network Display")
         
         # Update status bar
         self.statusBar().showMessage("Network display stopped", 5000)
+        if hasattr(self, "network_status_widget") and self.network_status_widget:
+            self.network_status_widget._display_stopped()
 
     def _meetings_loaded(self, meetings):
         """Handle loaded meetings"""
