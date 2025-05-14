@@ -542,16 +542,27 @@ class MainWindow(QMainWindow):
 
             if secondary_display and getattr(secondary_display, "show_countdown", True):
                 # Update the info label with just the countdown message
-                secondary_display.info_label1.setText(message)
-                secondary_display.info_label1.setStyleSheet("""
-                    color: #4a90e2;
-                    font-size: 80px;
-                    font-weight: bold;
-                """)
-                # Clear the second label during countdown
-                secondary_display.info_label2.setText("")
-                # Set flag to track that we're currently showing the countdown
-                secondary_display.show_countdown = True
+                try:
+                    secondary_display = self.secondary_display_handler.get_display()
+                    try:
+                        if hasattr(secondary_display, "info_label1") and secondary_display.info_label1 is not None:
+                            secondary_display.info_label1.setText(message)
+                            secondary_display.info_label1.setStyleSheet("""
+                                color: #4a90e2;
+                                font-size: 80px;
+                                font-weight: bold;
+                            """)
+                            # Clear the second label during countdown
+                            secondary_display.info_label2.setText("")
+                            # Set flag to track that we're currently showing the countdown
+                            secondary_display.show_countdown = True
+                    except RuntimeError as e:
+                        print(f"Error updating secondary display: {e}")
+                    except Exception as e:
+                        print(f"Unexpected error updating secondary display: {e}")
+                except Exception as e:
+                    print(f"Error accessing secondary display: {e}")
+                
         else:
             # Reset status bar when countdown ends
             # Disable further countdown updates on the secondary display until the
@@ -1315,6 +1326,16 @@ class MainWindow(QMainWindow):
         
         # Get current settings
         settings = self.settings_controller.get_settings()
+        
+        # Check if we need to force cleanup of the secondary display
+        if settings.display.force_secondary_cleanup:
+            # Clean up secondary display
+            if hasattr(self, 'secondary_display') and self.secondary_display:
+                self._cleanup_secondary_display()
+                
+            # Reset the flag
+            settings.display.force_secondary_cleanup = False
+            self.settings_controller.save_settings()
         # Defer UI updates to avoid potential widget destruction issues
         QTimer.singleShot(0, self._update_display_mode_label)
         QTimer.singleShot(0, self._update_secondary_display_label)
@@ -1882,9 +1903,20 @@ class MainWindow(QMainWindow):
     
     def closeEvent(self, event):
         """Handle window close event with lazy-loaded components"""
+        
+        if hasattr(self, 'secondary_display') and self.secondary_display:
+            try:
+                # Make sure to disconnect all signals first
+                self._cleanup_secondary_display()
+            except Exception as e:
+                print(f"Error cleaning up secondary display during close: {e}")
+        
         # Clean up secondary display if it exists
         if self._is_component_ready('secondary_display_handler'):
-            self.secondary_display_handler.cleanup()
+            try:
+                self.secondary_display_handler.cleanup()
+            except Exception as e:
+                print(f"Error cleaning up secondary display handler: {e}")
             
         # Clean up network display
         if self._is_component_ready('network_display_manager'):

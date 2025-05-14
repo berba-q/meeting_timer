@@ -99,6 +99,7 @@ class DisplaySettings:
     theme: str = "light"  # 'light' or 'dark'
     show_tools_dock: bool = False
     remember_tools_dock_state: bool = False  # Remember the state of the tools dock
+    force_secondary_cleanup: bool = False  # Force cleanup of secondary screen on exit
     
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""

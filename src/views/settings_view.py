@@ -507,6 +507,11 @@ class SettingsDialog(QDialog):
         # Make sure use_secondary is False if secondary_screen is None
         if secondary_screen is None:
             use_secondary = False
+            # Immediately clean up the secondary display if it exists
+            self.settings_controller.get_settings().display.force_secondary_cleanup = True
+            
+        else:
+            self.settings_controller.get_settings().display.force_secondary_cleanup = False
         
         # Set secondary screen first
         if secondary_screen is not None:

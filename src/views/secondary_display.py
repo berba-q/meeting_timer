@@ -26,6 +26,7 @@ class SecondaryDisplay(QMainWindow):
         self.next_part = None
         self._show_countdown = False
         
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         # Set window flags for presentation display - fullscreen with no chrome
         self.setWindowFlags(
             Qt.WindowType.Window | 
