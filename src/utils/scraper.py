@@ -8,10 +8,18 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional, Set
 from dateutil.parser import parse as parse_date
 
+
 import json
 import hashlib
 import time
 from pathlib import Path
+
+# Platformdirs support for cache directory
+try:
+    from platformdirs import user_cache_dir
+except ImportError:
+    def user_cache_dir(appname, appauthor=None):
+        return str(Path.home() / ".meeting_timer_cache")
 
 from src.models.meeting import Meeting, MeetingSection, MeetingPart, MeetingType
 
@@ -21,7 +29,7 @@ class MeetingScraper:
     BASE_URL = "https://wol.jw.org"
 
     # ---------- simple on‑disk cache ----------
-    CACHE_DIR = Path.home() / ".meeting_timer_cache"
+    CACHE_DIR = Path(user_cache_dir("MeetingTimer"))
     LINKS_TTL = 60 * 60 * 12      # 12 hours
     PAGE_TTL  = 60 * 60 * 24 * 7  # 7 days
     
