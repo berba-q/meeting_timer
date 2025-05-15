@@ -30,7 +30,7 @@ class MeetingScraper:
 
     # ---------- simple on‑disk cache ----------
     CACHE_DIR = Path(user_cache_dir("MeetingTimer"))
-    LINKS_TTL = 60 * 60 * 12      # 12 hours
+    LINKS_TTL = 60 * 60 * 24 * 7  # 7 days
     PAGE_TTL  = 60 * 60 * 24 * 7  # 7 days
     
     def __init__(self, language: str = "en"):
@@ -44,7 +44,9 @@ class MeetingScraper:
     
     def get_current_meeting_urls(self) -> Dict[MeetingType, str]:
         """Get URLs for the current week's meetings"""
-        cache_file = self.CACHE_DIR / f"{self.language}_meeting_links.json"
+        from datetime import date
+        week_id = f"{date.today().isocalendar().year}_W{date.today().isocalendar().week}"
+        cache_file = self.CACHE_DIR / f"{self.language}_{week_id}_meeting_links.json"
         cached = self._cache_load(cache_file, self.LINKS_TTL)
         if cached:
             raw_links = json.loads(cached)
