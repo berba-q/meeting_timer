@@ -119,6 +119,10 @@ class MainWindow(QMainWindow):
         
         # Start loading components in background
         QTimer.singleShot(100, self._start_component_loading)
+
+    def _restore_window_size(self):
+        self.setMinimumSize(600, 400)
+        self.resize(600, 400)
         
     def _apply_minimal_styling(self):
         """Apply minimal styling for fast initial display"""
@@ -525,6 +529,9 @@ class MainWindow(QMainWindow):
         # Initialize meeting countdown
         self.timer_controller._initialize_meeting_countdown()
         
+        # Check for missing songs if this is a weekend meeting
+        if meeting.meeting_type == MeetingType.WEEKEND:
+            self._process_weekend_meeting_songs(meeting)
         #print(f"Current meeting set to: {meeting.title}, Type: {meeting.meeting_type.value}")
             
     def _update_countdown(self, seconds_remaining: int, message: str):
@@ -1118,6 +1125,14 @@ class MainWindow(QMainWindow):
 
     def _meetings_loaded(self, meetings):
         """Handle loaded meetings"""
+        print(">>> [_meetings_loaded] Triggered.")
+        print(f">>> Meetings received: {list(meetings.keys())}")
+        # Check for missing songs in weekend meeting
+        if MeetingType.WEEKEND in meetings:
+            print(">>> Weekend meeting found. Checking songs...")
+            weekend_meeting = meetings[MeetingType.WEEKEND]
+            self._process_weekend_meeting_songs(weekend_meeting)
+
         # Update meeting selector
         self.meeting_selector.clear()
         
@@ -1601,42 +1616,85 @@ class MainWindow(QMainWindow):
         if meeting.meeting_type != MeetingType.WEEKEND:
             print(">>> Skipping song prompt — not a weekend meeting")
             return
-
+        # Check for missing songs in the meeting
+        import re
         missing_songs = False
 
         for section in meeting.sections:
             for part in section.parts:
                 print(f"Part: {part.title}")
-                if "song" in part.title.lower() and "song" == part.title.strip().lower():
+                title = part.title.lower().strip()
+                if "song" in title and not re.search(r'song\s+\d+', title):
                     missing_songs = True
 
         if missing_songs:
             def ask_and_edit():
-                print(">>> Dialog triggered — preparing QMessageBox")
-                msg_box = QMessageBox(self)
-                msg_box.setIcon(QMessageBox.Icon.Question)
-                msg_box.setWindowTitle("Update Weekend Songs")
-                msg_box.setText("Some weekend meeting songs need to be added manually.\nWould you like to edit them now?")
-                yes_btn = msg_box.addButton("Yes", QMessageBox.ButtonRole.YesRole)
-                no_btn = msg_box.addButton("No", QMessageBox.ButtonRole.NoRole)
+                from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
+                from PyQt6.QtCore import Qt
+                print(">>> Showing custom song edit dialog")
+                dialog = QDialog(self)
+                dialog.setWindowTitle("Song Entry Required")
+                dialog.setMinimumWidth(450)
+                dialog.setModal(True)
+                dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
 
-                yes_btn.setObjectName("Yes")
-                no_btn.setObjectName("No")
+                layout = QVBoxLayout(dialog)
 
-                from PyQt6.QtGui import QFont
-                font = QFont("Arial", 14, QFont.Weight.Bold)
-                yes_btn.setFont(font)
-                no_btn.setFont(font)
-                yes_btn.setMinimumWidth(120)
-                no_btn.setMinimumWidth(120)
+                info_label = QLabel(
+                    "<b>Some meeting songs are missing.</b><br><br>"
+                    "Would you like to edit them now?"
+                )
+                info_label.setWordWrap(True)
+                layout.addWidget(info_label)
 
-                yes_btn.setStyleSheet("QPushButton#Yes { background-color: #4a90e2; color: white; font-size: 14px; padding: 10px 16px; }")
-                no_btn.setStyleSheet("QPushButton#No { background-color: #999999; color: white; font-size: 14px; padding: 10px 16px; }")
+                buttons_layout = QHBoxLayout()
+                edit_now_button = QPushButton("Edit Now")
+                edit_now_button.clicked.connect(lambda: dialog.accept())
+                buttons_layout.addWidget(edit_now_button)
 
-                msg_box.exec()
-                if msg_box.clickedButton() == yes_btn:
-                    self.meeting_controller.show_meeting_editor(self, meeting)
+                skip_button = QPushButton("Skip")
+                skip_button.clicked.connect(dialog.reject)
+                buttons_layout.addWidget(skip_button)
+
+                layout.addLayout(buttons_layout)
+
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    from src.views.weekend_song_editor import WeekendSongEditorDialog
+                    # Save window state before opening the editor dialog
+                    was_maximized = self.isMaximized()
+                    was_fullscreen = self.isFullScreen()
+
+                    editor_dialog = WeekendSongEditorDialog(meeting, self)
+                    if editor_dialog.exec() == QDialog.DialogCode.Accepted:
+                        self.meeting_controller.save_meeting(meeting)
+                        if self._is_component_ready('meeting_view'):
+                            self.meeting_view.set_meeting(meeting)
+                        else:
+                            self._store_pending_action('meeting_view', 'set_meeting', meeting)
+
+                    # Restore the window state after the dialog closes
+                    if was_maximized:
+                        self.showMaximized()
+                    elif was_fullscreen:
+                        self.showFullScreen()
+                    else:
+                        QTimer.singleShot(200, self._force_normal_window_state)
             QTimer.singleShot(0, ask_and_edit)
+
+    def _force_normal_window_state(self):
+        self.showNormal()
+
+        # Only resize if the window is unusually large
+        if self.width() > 1000 or self.height() > 800:
+            self.resize(800, 600)
+
+        # Center the window on the primary screen
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+            window_geometry = self.frameGeometry()
+            window_geometry.moveCenter(screen_geometry.center())
+            self.move(window_geometry.topLeft())
     
     def _edit_current_meeting(self):
         """Edit the currently selected meeting"""

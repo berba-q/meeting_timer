@@ -79,68 +79,35 @@ class MeetingController(QObject):
         try:
             # Update scraper language
             self.scraper.language = self.settings_manager.settings.language
-            
+
             # Fetch meetings
             meetings = self.scraper.update_meetings()
-            
+
             # Handle weekend songs manual entry if enabled
             if self.settings_manager.settings.meeting_source.weekend_songs_manual:
                 if MeetingType.WEEKEND in meetings:
                     weekend_meeting = meetings[MeetingType.WEEKEND]
-                    needs_song_update = self.process_weekend_meeting_songs(weekend_meeting)
-                    
-                    # If weekend meeting needs manual song entry and we have a parent widget,
-                    # prompt to edit songs now
-                    if needs_song_update:
-        
-                        parent = QApplication.activeWindow()
-                        if parent:
-                            reply = QMessageBox.question(
-                                parent, 
-                                "Update Weekend Songs", 
-                                "Some weekend meeting songs need to be added manually. Would you like to edit them now?",
-                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                            )
-                            
-                            if reply == QMessageBox.StandardButton.Yes:
-                                self._show_weekend_song_editor(weekend_meeting)
-                    
-                    #Check if weekend songs need to be cleared
-                    # First check if all songs have numbers
-                    all_songs_have_numbers = True
-                    for section in weekend_meeting.sections:
-                        for part in section.parts:
-                            part_title_lower = part.title.lower()
-                            if "song" in part_title_lower:
-                                # Check if it has a song number
-                                song_match = re.search(r'song\s+(\d+)', part_title_lower)
-                                if not song_match:
-                                    all_songs_have_numbers = False
-                                    break
-                    # Only clear songs if manual entry is needed AND songs don't already have numbers
-                    if not all_songs_have_numbers:
-                        self._clear_weekend_songs(weekend_meeting)
-                    
-            
+                    self.process_weekend_meeting_songs(weekend_meeting)
+
             # Save scraped meetings as templates if option enabled
             if self.settings_manager.settings.meeting_source.save_scraped_as_template:
                 self._save_meetings_as_templates(meetings)
-            
+
             # Update current meetings
             self.current_meetings = meetings
-            
+
             # Save fetched meetings
             for meeting_type, meeting in meetings.items():
                 self.save_meeting(meeting)
-            
+
             # Emit signal
             self.meetings_loaded.emit(self.current_meetings)
-            
+
         except Exception as e:
             error_message = f"Failed to update meetings: {str(e)}"
             print(error_message)
             self.error_occurred.emit(error_message)
-            
+
             # If update fails, try loading from local files
             self._load_local_meetings()
     
