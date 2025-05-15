@@ -1042,9 +1042,11 @@ class MainWindow(QMainWindow):
         status_bar.addPermanentWidget(self.meeting_overtime_label)
         
         # Display mode indicator
+        """
         self.display_mode_label = QLabel()
         self._update_display_mode_label()
         status_bar.addPermanentWidget(self.display_mode_label)
+        """
         
         # Secondary display indicator
         self.secondary_display_label = QLabel()
@@ -1071,7 +1073,7 @@ class MainWindow(QMainWindow):
         
         # Settings controller signals
         self.settings_controller.settings_changed.connect(self._settings_changed)
-        self.settings_controller.display_mode_changed.connect(self._display_mode_changed)
+        #self.settings_controller.display_mode_changed.connect(self._display_mode_changed)
         self.settings_controller.theme_changed.connect(self._theme_changed)
 
         # Connect settings_controller signal for secondary screen live change
@@ -1125,8 +1127,6 @@ class MainWindow(QMainWindow):
 
     def _meetings_loaded(self, meetings):
         """Handle loaded meetings"""
-        print(">>> [_meetings_loaded] Triggered.")
-        print(f">>> Meetings received: {list(meetings.keys())}")
         # Check for missing songs in weekend meeting
         if MeetingType.WEEKEND in meetings:
             print(">>> Weekend meeting found. Checking songs...")
@@ -1166,13 +1166,16 @@ class MainWindow(QMainWindow):
         """Handle part change with lazy-loaded components"""
         # Update status bar
         self.current_part_label.setText(f"Current part: {part.title} ({part.duration_minutes} min)")
-        
+
         # Highlight the current part in the meeting view
         if self._is_component_ready('meeting_view'):
             self.meeting_view.highlight_part(index)
         else:
             self._store_pending_action('meeting_view', 'highlight_part', index)
-        
+
+        # Display part information in widget
+        self.timer_view.part_label.setText(f"{part.title} ({part.duration_minutes} min)")
+
         # Update secondary display if available
         if self._is_component_ready('secondary_display_handler'):
             secondary_display = self.secondary_display_handler.get_display()
@@ -1360,8 +1363,8 @@ class MainWindow(QMainWindow):
         if settings.display.remember_tools_dock_state:
             QTimer.singleShot(0, lambda: self.tools_dock.setVisible(settings.display.show_tools_dock))
     
+    """
     def _display_mode_changed(self, mode):
-        """Handle display mode change"""
         self.timer_view.set_display_mode(mode)
         
         # Check if secondary display exists before trying to update it
@@ -1376,12 +1379,13 @@ class MainWindow(QMainWindow):
                 pass
                 
         self._update_display_mode_label()
-    
+    """
+    """
     def _update_display_mode_label(self):
-        """Update the display mode indicator in the status bar"""
         mode = self.settings_controller.get_settings().display.display_mode
         mode_text = "Digital" if mode == TimerDisplayMode.DIGITAL else "Analog"
         self.display_mode_label.setText(f"Display Mode: {mode_text}")
+    """
     
     def _update_secondary_display_label(self):
         """Update the secondary display indicator in the status bar"""
@@ -1630,7 +1634,7 @@ class MainWindow(QMainWindow):
         if missing_songs:
             def ask_and_edit():
                 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
-                from PyQt6.QtCore import Qt
+                from PyQt6.QtCore import Qt, QTimer
                 print(">>> Showing custom song edit dialog")
                 dialog = QDialog(self)
                 dialog.setWindowTitle("Song Entry Required")
@@ -1653,7 +1657,10 @@ class MainWindow(QMainWindow):
                 buttons_layout.addWidget(edit_now_button)
 
                 skip_button = QPushButton("Skip")
-                skip_button.clicked.connect(dialog.reject)
+                def handle_skip():
+                    dialog.reject()
+                    QTimer.singleShot(200, self._force_normal_window_state)
+                skip_button.clicked.connect(handle_skip)
                 buttons_layout.addWidget(skip_button)
 
                 layout.addLayout(buttons_layout)
@@ -1887,9 +1894,8 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(1000, self._make_secondary_fullscreen)
         except Exception as e:
             print(f"Error positioning secondary display: {e}")
-        
+    """  
     def _toggle_display_mode(self):
-        """Toggle between digital and analog display modes"""
         settings = self.settings_controller.get_settings()
         current_mode = settings.display.display_mode
         
@@ -1897,6 +1903,7 @@ class MainWindow(QMainWindow):
             self.settings_controller.set_display_mode(TimerDisplayMode.ANALOG)
         else:
             self.settings_controller.set_display_mode(TimerDisplayMode.DIGITAL)
+    """ 
     
     def _meeting_overtime(self, total_overtime_seconds):
         """Handle meeting overtime notification"""
@@ -1951,7 +1958,6 @@ class MainWindow(QMainWindow):
             "About OnTime Meeting Timer",
             "OnTime Meeting Timer\n\n"
             "A cross-platform timer application for managing JW meeting schedules.\n\n"
-            "Version 1.0.0\n"
             "© 2025 Open Source"
         )
     
