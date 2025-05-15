@@ -17,3 +17,6 @@ Pillow>=11.2.1  # Required by qrcode
 
 # For JSON handling and data processing
 jsonschema>=4.23.0
+
+# For cache directory
+platformdirs>=4.3.7
