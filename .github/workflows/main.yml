@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*' # Run workflow on version tags, e.g., v1.0.0
+      - 'timerV*'
     paths-ignore:
       - version.json
 
@@ -41,6 +42,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+
+      - name: Generate meeting cache
+        run: python -c "from src.utils.scraper import MeetingScraper; MeetingScraper().update_meetings()"
+
+      - name: Copy cache for build
+        run: |
+          mkdir -p src/prebuilt_cache
+          cp -r ~/.cache/MeetingTimer/* src/prebuilt_cache/ || true
           
       - name: Build with PyInstaller
         run: |
@@ -149,6 +158,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller dmgbuild
+
+      - name: Generate meeting cache
+        run: python -c "from src.utils.scraper import MeetingScraper; MeetingScraper().update_meetings()"
+
+      - name: Copy cache for build
+        run: |
+          mkdir -p src/prebuilt_cache
+          cp -r ~/.cache/MeetingTimer/* src/prebuilt_cache/ || true
           
       - name: Build with PyInstaller
         run: |
@@ -158,7 +175,7 @@ jobs:
         run: |
           echo 'app = defines.get("app", "dist/OnTime Meeting Timer.app")' > dmg_settings.py
           echo 'appname = defines.get("appname", "OnTime Meeting Timer")' >> dmg_settings.py
-          echo 'background = "assets/dmg_background.png"' >> dmg_settings.py
+          echo 'background = "assets/icons/dmg_background.png"' >> dmg_settings.py
           echo 'volume_name = "OnTime Meeting Timer"' >> dmg_settings.py
           echo 'window_rect = ((100, 100), (640, 400))' >> dmg_settings.py
           echo 'icon_size = 128' >> dmg_settings.py
@@ -216,6 +233,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+
+      - name: Generate meeting cache
+        run: python -c "from src.utils.scraper import MeetingScraper; MeetingScraper().update_meetings()"
+
+      - name: Copy cache for build
+        run: |
+          mkdir -p src/prebuilt_cache
+          cp -r ~/.cache/MeetingTimer/* src/prebuilt_cache/ || true
           
       - name: Build with PyInstaller
         run: |
@@ -232,10 +257,10 @@ jobs:
           echo "Type=Application" >> ontime.desktop
           echo "Categories=Utility;" >> ontime.desktop
       
-      - name: Download AppImage tools
+      - name: Download AppImage tool (non-AppImage version)
         run: |
-          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
+          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64 -O appimagetool
+          chmod +x appimagetool
       
       - name: Prepare AppDir
         run: |
@@ -263,7 +288,7 @@ jobs:
 
       - name: Build AppImage
         run: |
-          VERSION=${{ needs.release-please.outputs.version }} ./appimagetool-x86_64.AppImage AppDir OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
+          VERSION=${{ needs.release-please.outputs.version }} ./appimagetool AppDir OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
 
       - name: Generate SHA256 for AppImage
         run: |
