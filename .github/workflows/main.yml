@@ -15,6 +15,7 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       version: ${{ steps.release.outputs.version }}
       upload_url: ${{ steps.release.outputs.upload_url }}
+      release_notes: ${{ steps.release.outputs.release_notes }}
     steps:
       - name: Release Please
         id: release
@@ -334,19 +335,23 @@ jobs:
       
       - name: Generate version.json
         run: |
-          VERSION=${{ needs.release-please.outputs.version }}
+          VERSION_RAW="${{ needs.release-please.outputs.version }}"
+          VERSION=$(echo "$VERSION_RAW" | sed 's/^timerV//;s/^v//')
           TODAY=$(date +"%Y-%m-%d")
           REPO="${GITHUB_REPOSITORY}"
-          RELEASE_NOTES="${{ needs.release-please.outputs.release_notes }}"
+          RELEASE_NOTES="${{needs.release-please.outputs.release_notes}}"
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="No release notes available."
+          fi
           
           cat > version.json << EOF
           {
             "version": "${VERSION}",
             "releaseDate": "${TODAY}",
             "downloadUrl": {
-              "windows": "https://github.com/${REPO}/releases/download/v${VERSION}/OnTimeMeetingTimer-${VERSION}-setup.exe",
-              "macos": "https://github.com/${REPO}/releases/download/v${VERSION}/OnTimeMeetingTimer-${VERSION}.dmg",
-              "linux": "https://github.com/${REPO}/releases/download/v${VERSION}/OnTimeMeetingTimer-${VERSION}.AppImage"
+              "windows": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}-setup.exe",
+              "macos": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.dmg",
+              "linux": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.AppImage"
             },
             "releaseNotes": ${RELEASE_NOTES@Q},
             "sha256": {
