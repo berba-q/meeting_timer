@@ -32,15 +32,15 @@ class SettingsDialog(QDialog):
         
         # Available languages
         self.available_languages = {
-            "en": "English",
-            "es": "Español",
-            "fr": "Français",
-            "de": "Deutsch",
-            "pt": "Português",
-            "it": "Italiano",
-            "ja": "日本語",
-            "ko": "한국어",
-            "zh": "中文"
+            "en": "English"
+           # "es": "Español",
+           # "fr": "Français",
+           # "de": "Deutsch",
+           # "pt": "Português",
+           # "it": "Italiano",
+           # "ja": "日本語",
+            #"ko": "한국어",
+            #"zh": "中文"
         }
         
         # Setup UI
