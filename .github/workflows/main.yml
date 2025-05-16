@@ -52,7 +52,9 @@ jobs:
       - name: Copy cache for build
         run: |
           mkdir -p src/prebuilt_cache
-          cp -r ~/.cache/MeetingTimer/* src/prebuilt_cache/ || true
+          if (Test-Path "$env:USERPROFILE\.cache\MeetingTimer") {
+            Copy-Item "$env:USERPROFILE\.cache\MeetingTimer\*" "src\prebuilt_cache\" -Recurse -Force
+          }
           
       - name: Build with PyInstaller
         run: |
@@ -197,7 +199,7 @@ jobs:
 
       - name: Generate SHA256 for DMG
         run: |
-          sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg > macos.sha256
+          shasum -a 256 OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg > macos.sha256
 
       - name: Upload SHA256 artifact (macOS)
         uses: actions/upload-artifact@v4
@@ -266,9 +268,9 @@ jobs:
           echo "Categories=Utility;" >> ontime.desktop
 
       
-      - name: Download AppImage tool (non-AppImage version)
+      - name: Download AppImage tool
         run: |
-          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64 -O appimagetool
+          wget https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage -O appimagetool
           chmod +x appimagetool
       
       - name: Prepare AppDir
