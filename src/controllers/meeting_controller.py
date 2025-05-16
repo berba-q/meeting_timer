@@ -110,6 +110,7 @@ class MeetingController(QObject):
 
             # If update fails, try loading from local files
             self._load_local_meetings()
+        return self.current_meetings
     
     def process_weekend_meeting_songs(self, meeting: Meeting):
         """
