@@ -24,6 +24,11 @@ jobs:
           release-type: simple
           skip-github-release: false
           skip-labeling: true
+      - name: Debug release-please outputs
+        run: |
+          echo "Release created: ${{ steps.release.outputs.release_created }}"
+          echo "Version: ${{ steps.release.outputs.version }}"
+          echo "Upload URL: ${{ steps.release.outputs.upload_url }}"
           
   build-windows:
     needs: release-please
@@ -31,6 +36,12 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+
+      - name: Check if version exists
+        if: ${{ !needs.release-please.outputs.version }}
+        run: |
+          echo "No release version found. Skipping build."
+          exit 1
 
       - name: Show release version
         run: echo "Building version ${{ needs.release-please.outputs.version }}"
@@ -149,6 +160,12 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
+      - name: Check if version exists
+        if: ${{ !needs.release-please.outputs.version }}
+        run: |
+          echo "No release version found. Skipping build."
+          exit 1
+
       - name: Show release version
         run: echo "Building version ${{ needs.release-please.outputs.version }}"
         
@@ -226,6 +243,12 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+
+      - name: Check if version exists
+        if: ${{ !needs.release-please.outputs.version }}
+        run: |
+          echo "No release version found. Skipping build."
+          exit 1
 
       - name: Show release version
         run: echo "Building version ${{ needs.release-please.outputs.version }}"
