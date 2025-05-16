@@ -22,7 +22,7 @@ jobs:
         uses: googleapis/release-please-action@v4
         with:
           release-type: simple
-
+          
   build-windows:
     needs: release-please
     runs-on: windows-latest
@@ -55,7 +55,6 @@ jobs:
       - name: Build with PyInstaller
         run: |
           pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --collect-data src
-          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --collect-data src
 
       - name: Download and Install Inno Setup
         run: |
@@ -70,12 +69,12 @@ jobs:
           $version = "${{ needs.release-please.outputs.version }}"
           $iss = @"
           #define MyAppName "OnTime Meeting Timer"
-          #define MyAppName "OnTime Meeting Timer"
+
           #define MyAppVersion "$version"
           #define MyAppPublisher "Your Name"
           #define MyAppURL "https://github.com/berb-q/meeting_timer"
           #define MyAppExeName "OnTime Meeting Timer.exe"
-          #define MyAppExeName "OnTime Meeting Timer.exe"
+
 
           [Setup]
           AppId={{F9A6E8D8-3B2F-4A8A-B5D1-57A7F2E7BAC7}
@@ -89,7 +88,7 @@ jobs:
           DisableProgramGroupPage=yes
           OutputDir=.
           OutputBaseFilename=OnTimeMeetingTimer-{#MyAppVersion}-setup
-          OutputBaseFilename=OnTimeMeetingTimer-{#MyAppVersion}-setup
+
           Compression=lzma
           SolidCompression=yes
           WizardStyle=modern
@@ -102,7 +101,6 @@ jobs:
           Name: "startupitem"; Description: "Run at system startup"; GroupDescription: "Startup Options"
 
           [Files]
-          Source: "dist\OnTime Meeting Timer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
           Source: "dist\OnTime Meeting Timer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
           [Icons]
@@ -137,6 +135,7 @@ jobs:
           upload_url: ${{ needs.release-please.outputs.upload_url }}
           asset_path: ./OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}-setup.exe
           asset_name: OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}-setup.exe
+
           asset_content_type: application/octet-stream
 
   build-macos:
@@ -170,7 +169,9 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
+        
           pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.icns --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
+
       
       - name: Create DMG settings file
         run: |
@@ -201,15 +202,18 @@ jobs:
         with:
           name: macos-sha
           path: macos.sha256
+
         
       - name: Upload DMG to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+
           upload_url: ${{ needs.release-please.outputs.upload_url }}
           asset_path: ./OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg
           asset_name: OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg
+
           asset_content_type: application/octet-stream
 
   build-linux:
@@ -245,6 +249,7 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
+
           pyinstaller --name "ontime" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
       
       - name: Create .desktop file
@@ -257,6 +262,7 @@ jobs:
           echo "Terminal=false" >> ontime.desktop
           echo "Type=Application" >> ontime.desktop
           echo "Categories=Utility;" >> ontime.desktop
+
       
       - name: Download AppImage tool (non-AppImage version)
         run: |
@@ -269,19 +275,23 @@ jobs:
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           
+
           cp -r dist/ontime/* AppDir/usr/bin/
           cp ontime.desktop AppDir/usr/share/applications/
           cp assets/icons/app-icon.png AppDir/usr/share/icons/hicolor/256x256/apps/ontime.png
           
           ln -s usr/share/applications/ontime.desktop AppDir/ontime.desktop
           ln -s usr/share/icons/hicolor/256x256/apps/ontime.png AppDir/ontime.png
+
           
           # Create AppRun script
           echo '#!/bin/bash' > AppDir/AppRun
           echo 'SELF=$(readlink -f "$0")' >> AppDir/AppRun
           echo 'HERE=${SELF%/*}' >> AppDir/AppRun
           echo 'export PATH="${HERE}/usr/bin:${PATH}"' >> AppDir/AppRun
+
           echo 'exec "${HERE}/usr/bin/ontime" "$@"' >> AppDir/AppRun
+
           chmod +x AppDir/AppRun
       
       - name: Install libfuse2
@@ -300,15 +310,18 @@ jobs:
         with:
           name: linux-sha
           path: linux.sha256
+
         
       - name: Upload AppImage to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+
           upload_url: ${{ needs.release-please.outputs.upload_url }}
           asset_path: ./OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
           asset_name: OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
+
           asset_content_type: application/octet-stream
 
   update-version-json:
@@ -349,6 +362,7 @@ jobs:
             "version": "${VERSION}",
             "releaseDate": "${TODAY}",
             "downloadUrl": {
+
               "windows": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}-setup.exe",
               "macos": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.dmg",
               "linux": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.AppImage"
@@ -359,6 +373,7 @@ jobs:
               "macos": "${{ steps.sha.outputs.mac_sha }}",
               "linux": "${{ steps.sha.outputs.linux_sha }}"
             }
+
           }
           EOF
           
