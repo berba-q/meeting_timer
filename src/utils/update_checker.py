@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QTimer
 
 # Current version - this should match __version__ in src/__init__.py
-CURRENT_VERSION = "1.0.1"
+CURRENT_VERSION = "1.0.2"
 
 # URL to check for updates
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/berba-q/meeting_timer/main/version.json"
@@ -71,6 +71,7 @@ class UpdateChecker(QObject):
     
     def _is_newer_version(self, remote_version: str) -> bool:
         """Compare version strings to determine if remote is newer"""
+        remote_version = remote_version.lstrip('v')
         # Parse versions into tuples of integers
         current = [int(x) for x in CURRENT_VERSION.split('.')]
         remote = [int(x) for x in remote_version.split('.')]
