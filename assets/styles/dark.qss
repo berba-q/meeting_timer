@@ -398,3 +398,47 @@ QMenuBar::item:pressed {
     background-color: #2d6ebd;
     color: #f0f0f0;
 }
+/* QMessageBox styling override */
+QMessageBox {
+    background-color: #2d2d2d;
+    color: #f0f0f0;
+    border: 1px solid #1d1d1d;
+    font-weight: normal;
+}
+
+QMessageBox QLabel {
+    color: #f0f0f0;
+    font-weight: normal;
+}
+
+QMessageBox QPushButton {
+    background-color: #4a90e2;
+    color: white;
+    border: 1px solid #3a80d2;
+    border-radius: 4px;
+    padding: 6px 12px;
+    min-width: 80px;
+    font-weight: bold;
+}
+
+QMessageBox QPushButton:hover {
+    background-color: #5aa0f2;
+}
+
+QMessageBox QPushButton:pressed {
+    background-color: #357ab8;
+}
+
+QMessageBox QPushButton:disabled {
+    background-color: #555555;
+    color: #999999;
+    border: 1px solid #444444;
+}
+
+/* Global font color override for dark mode */
+QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTimeEdit,
+QCheckBox, QRadioButton, QGroupBox::title, QTabBar::tab, QTreeWidget,
+QHeaderView::section, QStatusBar QLabel, QMessageBox QLabel {
+    color: #f0f0f0;
+    font-weight: normal;
+}

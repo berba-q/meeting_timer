@@ -30,6 +30,13 @@ class NetworkStatusWidget(QWidget):
         
         # Connect signals
         self._connect_signals()
+
+        # Sync UI with the current manager state (in case the display was started before the widget was created)
+        url, client_count, _ = self.network_manager.get_connection_info()
+        if url:
+            self._display_started(url)
+        else:
+            self._display_stopped()
     
     def _setup_ui(self):
         """Setup the UI components"""
@@ -108,11 +115,49 @@ class NetworkStatusWidget(QWidget):
         self.network_manager.status_updated.connect(self._status_updated)
         self.network_manager.client_connected.connect(self._client_connected)
         self.network_manager.client_disconnected.connect(self._client_disconnected)
+        
+    
+    def set_network_manager(self, manager):
+        """
+        Attach a NetworkDisplayManager instance so the dock can reflect its
+        state even if the network display was started before this widget
+        existed.
+        """
+        if manager is None:
+            return
+
+        self.network_manager = manager
+
+        # (Re-)connect manager signals to our own slots
+        try:
+            manager.display_started.disconnect(self._display_started)
+        except (TypeError, RuntimeError):
+            pass
+        manager.display_started.connect(self._display_started)
+
+        try:
+            manager.display_stopped.disconnect(self._display_stopped)
+        except (TypeError, RuntimeError):
+            pass
+        manager.display_stopped.connect(self._display_stopped)
+
+        # Immediate sync
+        if manager.broadcaster and manager.broadcaster.is_broadcasting:
+            url, _, _ = manager.get_connection_info()
+            if url:
+                self._display_started(url)
+                # Also update the client count
+                _, client_count, _ = manager.get_connection_info()
+                client_text = f"{client_count} client{'s' if client_count != 1 else ''} connected"
+                self.info_label.setText(f"Network display running at:\n{url}\n{client_text}")
+        else:
+            self._display_stopped()
     
     def _toggle_network_display(self):
         """Toggle network display on/off"""
         if self.is_active:
             self.network_manager.stop_network_display()
+            self.toggle_button.setText("Start")
         else:
             # Start network display with current settings
             from src.models.settings import NetworkDisplayMode
@@ -121,6 +166,7 @@ class NetworkStatusWidget(QWidget):
             ws_port = self.network_manager.settings_manager.settings.network_display.ws_port
             
             self.network_manager.start_network_display(mode, http_port, ws_port)
+            self.toggle_button.setText("Stop")
     
     def _display_started(self, url: str):
         """Handle network display started"""

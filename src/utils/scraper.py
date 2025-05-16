@@ -8,16 +8,35 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional, Set
 from dateutil.parser import parse as parse_date
 
+
+import json
+import hashlib
+import time
+from pathlib import Path
+
+# Platformdirs support for cache directory
+try:
+    from platformdirs import user_cache_dir
+except ImportError:
+    def user_cache_dir(appname, appauthor=None):
+        return str(Path.home() / ".meeting_timer_cache")
+
 from src.models.meeting import Meeting, MeetingSection, MeetingPart, MeetingType
 
 class MeetingScraper:
     """Scraper for fetching meeting data from wol.jw.org"""
     
     BASE_URL = "https://wol.jw.org"
+
+    # ---------- simple on‑disk cache ----------
+    CACHE_DIR = Path(user_cache_dir("MeetingTimer"))
+    LINKS_TTL = 60 * 60 * 24 * 7  # 7 days
+    PAGE_TTL  = 60 * 60 * 24 * 7  # 7 days
     
     def __init__(self, language: str = "en"):
         self.language = language
         self.session = requests.Session()
+        self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
         
         # Set language in URL
         lang_code = "r1/lp-e" if language == "en" else language
@@ -25,6 +44,15 @@ class MeetingScraper:
     
     def get_current_meeting_urls(self) -> Dict[MeetingType, str]:
         """Get URLs for the current week's meetings"""
+        from datetime import date
+        week_id = f"{date.today().isocalendar().year}_W{date.today().isocalendar().week}"
+        cache_file = self.CACHE_DIR / f"{self.language}_{week_id}_meeting_links.json"
+        cached = self._cache_load(cache_file, self.LINKS_TTL)
+        if cached:
+            raw_links = json.loads(cached)
+            # convert string keys back to MeetingType
+            return {MeetingType(k): v for k, v in raw_links.items()}
+
         response = self.session.get(self.meetings_url)
         if response.status_code != 200:
             raise Exception(f"Failed to fetch meetings page: {response.status_code}")
@@ -116,16 +144,27 @@ class MeetingScraper:
                     
                 if is_weekend and MeetingType.WEEKEND not in meeting_links:
                     meeting_links[MeetingType.WEEKEND] = href
-        
+        # save to cache
+        try:
+            json_links = {k.value: v for k, v in meeting_links.items()}
+            self._cache_save(cache_file, json.dumps(json_links))
+        except Exception:
+            pass
         return meeting_links
     
     def scrape_meeting(self, url: str, meeting_type: MeetingType) -> Meeting:
         """Scrape meeting data from a specific URL"""
-        response = self.session.get(url)
-        if response.status_code != 200:
-            raise Exception(f"Failed to fetch meeting page: {response.status_code}")
-        
-        soup = BeautifulSoup(response.text, "html.parser")
+        # page‑cache key: md5(url)
+        key = hashlib.md5(url.encode()).hexdigest() + ".html"
+        page_path = self.CACHE_DIR / key
+        html = self._cache_load(page_path, self.PAGE_TTL)
+        if html is None:
+            response = self.session.get(url)
+            if response.status_code != 200:
+                raise Exception(f"Failed to fetch meeting page: {response.status_code}")
+            html = response.text
+            self._cache_save(page_path, html)
+        soup = BeautifulSoup(html, "html.parser")
         
         # Extract date information
         date_text = self._extract_date(soup)
@@ -170,6 +209,21 @@ class MeetingScraper:
         )
         
         return meeting
+
+    # ---------- cache helpers ----------
+    def _cache_load(self, path: Path, ttl: int) -> Optional[str]:
+        if path.exists() and (time.time() - path.stat().st_mtime) < ttl:
+            try:
+                return path.read_text(encoding="utf‑8")
+            except Exception:
+                pass
+        return None
+
+    def _cache_save(self, path: Path, data: str) -> None:
+        try:
+            path.write_text(data, encoding="utf‑8")
+        except Exception:
+            pass
     
     def _extract_date(self, soup: BeautifulSoup) -> str:
         """Extract date information from the page"""

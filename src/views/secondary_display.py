@@ -21,9 +21,12 @@ class SecondaryDisplay(QMainWindow):
         super().__init__(parent, Qt.WindowType.Window)
         self.timer_controller = timer_controller
         self.settings_controller = settings_controller
+        # Controls whether the live clock is allowed to update the label
+        self.show_clock: bool = True
         self.next_part = None
         self._show_countdown = False
         
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         # Set window flags for presentation display - fullscreen with no chrome
         self.setWindowFlags(
             Qt.WindowType.Window | 
@@ -36,6 +39,8 @@ class SecondaryDisplay(QMainWindow):
 
         # Connect signals
         self._connect_signals()
+        # Show the pre‑meeting countdown right from the start
+        self.show_countdown = True
 
         # Connect settings changed signal
         self.settings_controller.settings_changed.connect(self._on_settings_updated)
@@ -167,7 +172,7 @@ class SecondaryDisplay(QMainWindow):
         
     def _update_current_time(self, time_str: str):
         """Update the current time display when in stopped state"""
-        if self.timer_controller.timer.state == TimerState.STOPPED or self.show_countdown:
+        if (self.timer_controller.timer.state == TimerState.STOPPED or self.show_countdown) and self.show_clock:
             # Update with current time when in stopped state
             self.timer_label.setText(time_str)
             
@@ -381,14 +386,16 @@ class SecondaryDisplay(QMainWindow):
         
     def _meeting_started(self):
         """Handle meeting start event"""
+        # Suppress the real‑time clock while the meeting is running
+        self.show_clock = False
         # Meeting started, switch from countdown to part info
         self.show_countdown = False
-        # Immediately clear countdown labels
-        self.info_label1.setText("")
-        self.info_label2.setText("")
+        # Make absolutely sure any countdown text disappears as soon as the
+        # meeting begins.
+        self.info_label1.clear()
+        self.info_label2.clear()
         try:
             self.timer_controller.timer.meeting_countdown_updated.disconnect(self._update_countdown)
-            
         except TypeError:
             print("[DEBUG] Signal already disconnected or not connected")
 
@@ -406,12 +413,33 @@ class SecondaryDisplay(QMainWindow):
             # No next part (only one part in the meeting)
             self.info_label1.setText("LAST PART")
             self.info_label2.setVisible(True)
+
+        # Force‑refresh the “next part” panel in case the part‑changed signal
+        # was emitted before we connected to it.
+        current_index = self.timer_controller.current_part_index
+        if current_index < 0 and self.timer_controller.parts_list:
+            # Meeting just started, so part 0 is active.
+            current_index = 0
+        if 0 <= current_index < len(self.timer_controller.parts_list):
+            self._part_changed(self.timer_controller.parts_list[current_index],
+                               current_index)
     
     def _meeting_ended(self):
         """Handle meeting end"""
+        # Re‑enable the clock after the meeting ends
+        self.show_clock = True
+        self.show_countdown = False
         # Show meeting completed message
         self.info_label1.setText("MEETING COMPLETED")
         self.info_label2.setText("")
+        # Re‑enable the countdown signal for the next meeting
+        try:
+            self.timer_controller.timer.meeting_countdown_updated.connect(
+                self._update_countdown,  # type: ignore[arg-type]
+            )
+        except TypeError:
+            # Already connected
+            pass
         
     
     def show(self):
@@ -511,7 +539,31 @@ class SecondaryDisplay(QMainWindow):
 
     @show_countdown.setter
     def show_countdown(self, value):
-        if self.timer_controller.timer.state != TimerState.STOPPED or self.timer_controller.current_part_index >= 0:
-            
+        """
+        Enable/disable the pre-meeting countdown.
+
+        - Countdown is allowed only while the timer is STOPPED **and**
+          no part has started (current_part_index == -1).
+        - When the countdown is turned off we blank the info labels so the
+          “next part / predicted end” text can appear immediately.
+        """
+        # Don’t allow countdown once the meeting is running
+        if value and (
+            self.timer_controller.timer.state != TimerState.STOPPED
+            or self.timer_controller.current_part_index >= 0
+        ):
             return
+
+        # Nothing to do if the state isn’t changing
+        if value == self._show_countdown:
+            return
+
         self._show_countdown = value
+
+        if not value:
+            # Countdown just switched off – clear any left-over text
+            self.info_label1.setText("")
+            self.info_label2.setText("")
+        else:
+            # Countdown switched on – ensure second line is empty
+            self.info_label2.setText("")

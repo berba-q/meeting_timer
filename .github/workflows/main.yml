@@ -3,44 +3,35 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'        # e.g. v1.0.0
-      - 'timerV*'   # e.g. timerV1.0.0
+      - 'v*' # Run workflow on version tags, e.g., v1.0.0
+      - 'timerV*'
+    paths-ignore:
+      - version.json
 
 jobs:
-  create-release:
+  release-please:
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
+      release_created: ${{ steps.release.outputs.release_created }}
+      version: ${{ steps.release.outputs.version }}
+      upload_url: ${{ steps.release.outputs.upload_url }}
+      release_notes: ${{ steps.release.outputs.release_notes }}
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-      
-      - name: Get version from tag
-        id: get_version
-        run: |
-          ref=${GITHUB_REF#refs/tags/}
-          # Strip allowed prefixes (v or timerV)
-          version=${ref#v}
-          version=${version#timerV}
-          echo "version=${version}" >> $GITHUB_OUTPUT
-      
-      - name: Create Release with Auto Notes
-        id: create_release
-        uses: softprops/action-gh-release@v1
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
         with:
-          tag_name: ${{ github.ref }}
-          name: OnTime Meeting Timer ${{ steps.get_version.outputs.version }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          release-type: simple
+          
   build-windows:
-    needs: create-release
+    needs: release-please
     runs-on: windows-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+
+      - name: Show release version
+        run: echo "Building version ${{ needs.release-please.outputs.version }}"
         
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -52,6 +43,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+
+      - name: Generate meeting cache
+        run: python -c "from src.utils.scraper import MeetingScraper; MeetingScraper().update_meetings()"
+
+      - name: Copy cache for build
+        run: |
+          mkdir -p src/prebuilt_cache
+          cp -r ~/.cache/MeetingTimer/* src/prebuilt_cache/ || true
           
       - name: Build with PyInstaller
         run: |
@@ -62,15 +61,20 @@ jobs:
           Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "is.exe"
           Start-Process -FilePath "is.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
 
+      - name: Verify Inno Setup installation
+        run: if (!(Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { Write-Error "ISCC.exe not found!" }
+
       - name: Create Inno Setup script
         run: |
-          $version = "${{ needs.create-release.outputs.version }}"
+          $version = "${{ needs.release-please.outputs.version }}"
           $iss = @"
           #define MyAppName "OnTime Meeting Timer"
+
           #define MyAppVersion "$version"
           #define MyAppPublisher "Your Name"
           #define MyAppURL "https://github.com/berb-q/meeting_timer"
           #define MyAppExeName "OnTime Meeting Timer.exe"
+
 
           [Setup]
           AppId={{F9A6E8D8-3B2F-4A8A-B5D1-57A7F2E7BAC7}
@@ -84,6 +88,7 @@ jobs:
           DisableProgramGroupPage=yes
           OutputDir=.
           OutputBaseFilename=OnTimeMeetingTimer-{#MyAppVersion}-setup
+
           Compression=lzma
           SolidCompression=yes
           WizardStyle=modern
@@ -111,23 +116,37 @@ jobs:
       - name: Build installer
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+
+      - name: Generate SHA256 for Windows installer
+        run: |
+          sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}-setup.exe > windows.sha256
+
+      - name: Upload SHA256 artifact (Windows)
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-sha
+          path: windows.sha256
         
       - name: Upload installer to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./OntimeMeetingTimer-${{ needs.create-release.outputs.version }}-setup.exe
-          asset_name: OntimeMeetingTimer-${{ needs.create-release.outputs.version }}-setup.exe
+          upload_url: ${{ needs.release-please.outputs.upload_url }}
+          asset_path: ./OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}-setup.exe
+          asset_name: OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}-setup.exe
+
           asset_content_type: application/octet-stream
 
   build-macos:
-    needs: create-release
+    needs: release-please
     runs-on: macos-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+
+      - name: Show release version
+        run: echo "Building version ${{ needs.release-please.outputs.version }}"
         
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -139,45 +158,73 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller dmgbuild
+
+      - name: Generate meeting cache
+        run: python -c "from src.utils.scraper import MeetingScraper; MeetingScraper().update_meetings()"
+
+      - name: Copy cache for build
+        run: |
+          mkdir -p src/prebuilt_cache
+          cp -r ~/.cache/MeetingTimer/* src/prebuilt_cache/ || true
           
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name "Ontime Meeting Timer" --windowed --icon=assets/icons/app-icon.icns --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
+        
+          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.icns --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
+
       
       - name: Create DMG settings file
         run: |
           echo 'app = defines.get("app", "dist/OnTime Meeting Timer.app")' > dmg_settings.py
           echo 'appname = defines.get("appname", "OnTime Meeting Timer")' >> dmg_settings.py
-          echo 'window_rect = ((100, 100), (640, 480))' >> dmg_settings.py
+          echo 'background = "assets/icons/dmg_background.png"' >> dmg_settings.py
+          echo 'volume_name = "OnTime Meeting Timer"' >> dmg_settings.py
+          echo 'window_rect = ((100, 100), (640, 400))' >> dmg_settings.py
           echo 'icon_size = 128' >> dmg_settings.py
           echo 'text_size = 12' >> dmg_settings.py
           echo 'icon_locations = {' >> dmg_settings.py
-          echo '    appname: (160, 240),' >> dmg_settings.py
-          echo '    "Applications": (480, 240),' >> dmg_settings.py
+          echo '    appname: (140, 120),' >> dmg_settings.py
+          echo '    "Applications": (500, 120),' >> dmg_settings.py
           echo '}' >> dmg_settings.py
           echo 'files = [app]' >> dmg_settings.py
           echo 'symlinks = {"Applications": "/Applications"}' >> dmg_settings.py
       
       - name: Build DMG
         run: |
-          dmgbuild -s dmg_settings.py "OnTime Meeting Timer" "OnTimeMeetingTimer-${{ needs.create-release.outputs.version }}.dmg"
+          dmgbuild -s dmg_settings.py "OnTime Meeting Timer" "OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg"
+
+      - name: Generate SHA256 for DMG
+        run: |
+          sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg > macos.sha256
+
+      - name: Upload SHA256 artifact (macOS)
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-sha
+          path: macos.sha256
+
         
       - name: Upload DMG to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./OnTimeMeetingTimer-${{ needs.create-release.outputs.version }}.dmg
-          asset_name: OnTimeMeetingTimer-${{ needs.create-release.outputs.version }}.dmg
+
+          upload_url: ${{ needs.release-please.outputs.upload_url }}
+          asset_path: ./OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg
+          asset_name: OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg
+
           asset_content_type: application/octet-stream
 
   build-linux:
-    needs: create-release
+    needs: release-please
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+
+      - name: Show release version
+        run: echo "Building version ${{ needs.release-please.outputs.version }}"
         
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -191,26 +238,36 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+
+      - name: Generate meeting cache
+        run: python -c "from src.utils.scraper import MeetingScraper; MeetingScraper().update_meetings()"
+
+      - name: Copy cache for build
+        run: |
+          mkdir -p src/prebuilt_cache
+          cp -r ~/.cache/MeetingTimer/* src/prebuilt_cache/ || true
           
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name "ontimemeetingtimer" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
+
+          pyinstaller --name "ontime" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
       
       - name: Create .desktop file
         run: |
-          echo "[Desktop Entry]" > ontimemeetingtimer.desktop
-          echo "Name=OnTime Meeting Timer" >> ontimemeetingtimer.desktop
-          echo "Comment=Timer application for managing meeting schedules" >> ontimemeetingtimer.desktop
-          echo "Exec=ontimemeetingtimer" >> ontimemeetingtimer.desktop
-          echo "Icon=ontimemeetingtimer" >> ontimemeetingtimer.desktop
-          echo "Terminal=false" >> ontimemeetingtimer.desktop
-          echo "Type=Application" >> ontimemeetingtimer.desktop
-          echo "Categories=Utility;" >> ontimemeetingtimer.desktop
+          echo "[Desktop Entry]" > ontime.desktop
+          echo "Name=OnTime Meeting Timer" >> ontime.desktop
+          echo "Comment=Timer application for managing meeting schedules" >> ontime.desktop
+          echo "Exec=ontime" >> ontime.desktop
+          echo "Icon=ontime" >> ontime.desktop
+          echo "Terminal=false" >> ontime.desktop
+          echo "Type=Application" >> ontime.desktop
+          echo "Categories=Utility;" >> ontime.desktop
+
       
-      - name: Download AppImage tools
+      - name: Download AppImage tool (non-AppImage version)
         run: |
-          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
+          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64 -O appimagetool
+          chmod +x appimagetool
       
       - name: Prepare AppDir
         run: |
@@ -218,58 +275,105 @@ jobs:
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           
-          cp -r dist/ontimemeetingtimer/* AppDir/usr/bin/
-          cp ontimemeetingtimer.desktop AppDir/usr/share/applications/
-          cp assets/icons/app-icon.png AppDir/usr/share/icons/hicolor/256x256/apps/ontimemeetingtimer.png
+
+          cp -r dist/ontime/* AppDir/usr/bin/
+          cp ontime.desktop AppDir/usr/share/applications/
+          cp assets/icons/app-icon.png AppDir/usr/share/icons/hicolor/256x256/apps/ontime.png
           
-          ln -s usr/share/applications/ontimemeetingtimer.desktop AppDir/ontimemeetingtimer.desktop
-          ln -s usr/share/icons/hicolor/256x256/apps/ontimemeetingtimer.png AppDir/ontimemeetingtimer.png
+          ln -s usr/share/applications/ontime.desktop AppDir/ontime.desktop
+          ln -s usr/share/icons/hicolor/256x256/apps/ontime.png AppDir/ontime.png
+
           
           # Create AppRun script
           echo '#!/bin/bash' > AppDir/AppRun
           echo 'SELF=$(readlink -f "$0")' >> AppDir/AppRun
           echo 'HERE=${SELF%/*}' >> AppDir/AppRun
           echo 'export PATH="${HERE}/usr/bin:${PATH}"' >> AppDir/AppRun
-          echo 'exec "${HERE}/usr/bin/ontimemeetingtimer" "$@"' >> AppDir/AppRun
+
+          echo 'exec "${HERE}/usr/bin/ontime" "$@"' >> AppDir/AppRun
+
           chmod +x AppDir/AppRun
       
+      - name: Install libfuse2
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
       - name: Build AppImage
         run: |
-          VERSION=${{ needs.create-release.outputs.version }} ./appimagetool-x86_64.AppImage AppDir ontimemeetingtimer-${{ needs.create-release.outputs.version }}.AppImage
+          VERSION=${{ needs.release-please.outputs.version }} ./appimagetool AppDir OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
+
+      - name: Generate SHA256 for AppImage
+        run: |
+          sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage > linux.sha256
+
+      - name: Upload SHA256 artifact (Linux)
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-sha
+          path: linux.sha256
+
         
       - name: Upload AppImage to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./ontimemeetingtimer-${{ needs.create-release.outputs.version }}.AppImage
-          asset_name: ontimemeetingtimer-${{ needs.create-release.outputs.version }}.AppImage
+
+          upload_url: ${{ needs.release-please.outputs.upload_url }}
+          asset_path: ./OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
+          asset_name: OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
+
           asset_content_type: application/octet-stream
 
   update-version-json:
-    needs: [create-release, build-windows, build-macos, build-linux]
+    needs: [release-please, build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+
+      - name: Download SHA256 artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: sha256
+
+      - name: Read SHA values
+        id: sha
+        run: |
+          WIN_SHA=$(cut -d ' ' -f1 sha256/windows-sha/windows.sha256)
+          MAC_SHA=$(cut -d ' ' -f1 sha256/macos-sha/macos.sha256)
+          LINUX_SHA=$(cut -d ' ' -f1 sha256/linux-sha/linux.sha256)
+          echo "win_sha=$WIN_SHA" >> $GITHUB_OUTPUT
+          echo "mac_sha=$MAC_SHA" >> $GITHUB_OUTPUT
+          echo "linux_sha=$LINUX_SHA" >> $GITHUB_OUTPUT
       
       - name: Generate version.json
         run: |
-          VERSION=${{ needs.create-release.outputs.version }}
+          VERSION_RAW="${{ needs.release-please.outputs.version }}"
+          VERSION=$(echo "$VERSION_RAW" | sed 's/^timerV//;s/^v//')
           TODAY=$(date +"%Y-%m-%d")
           REPO="${GITHUB_REPOSITORY}"
+          RELEASE_NOTES="${{needs.release-please.outputs.release_notes}}"
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="No release notes available."
+          fi
           
           cat > version.json << EOF
           {
             "version": "${VERSION}",
             "releaseDate": "${TODAY}",
             "downloadUrl": {
-              "windows": "https://github.com/${REPO}/releases/download/v${VERSION}/ontimemeetingtimer-${VERSION}-setup.exe",
-              "macos": "https://github.com/${REPO}/releases/download/v${VERSION}/ontimemeetingtimer-${VERSION}.dmg",
-              "linux": "https://github.com/${REPO}/releases/download/v${VERSION}/ontimemeetingtimer-${VERSION}.AppImage"
+
+              "windows": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}-setup.exe",
+              "macos": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.dmg",
+              "linux": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.AppImage"
             },
-            "releaseNotes": "Version ${VERSION} of OnTime Meeting Timer. See GitHub for full release notes."
+            "releaseNotes": ${RELEASE_NOTES@Q},
+            "sha256": {
+              "windows": "${{ steps.sha.outputs.win_sha }}",
+              "macos": "${{ steps.sha.outputs.mac_sha }}",
+              "linux": "${{ steps.sha.outputs.linux_sha }}"
+            }
+
           }
           EOF
           
@@ -280,5 +384,5 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add version.json
-          git commit -m "Update version.json to ${{ needs.create-release.outputs.version }}"
+          git commit -m "Update version.json to ${{ needs.release-please.outputs.version }}" || echo "No changes to commit"
           git push origin main

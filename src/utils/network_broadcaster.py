@@ -49,7 +49,8 @@ class NetworkBroadcaster(QObject):
             "nextPart": "",
             "endTime": "",
             "overtime": 0,
-            "countdownMessage": ""
+            "countdownMessage": "",
+            "meetingEnded": False
         }
     
     def _get_local_ip(self) -> str:
@@ -83,10 +84,19 @@ class NetworkBroadcaster(QObject):
             traceback.print_exc()
         
         try:
-            # Keep connection open until client disconnects
+            # Keep connection open and handle messages from clients
             async for message in websocket:
-                # We don't expect messages from clients, but could handle commands here
-                pass
+                try:
+                    # Try to parse the message as JSON
+                    data = json.loads(message)
+                    
+                    # Handle 'request_state' message type
+                    if data.get('type') == 'request_state':
+                        # Re-send the current state
+                        await websocket.send(json.dumps(self.current_state))
+                        #print(f"Re-sent state to client {client_id} after request")
+                except Exception as e:
+                    print(f"Error processing message from client {client_id}: {e}")
         except Exception as e:
             if isinstance(e, ConnectionResetError) or isinstance(e, websockets.exceptions.ConnectionClosed):
                 print(f"Client connection closed: {client_id}")
@@ -255,8 +265,8 @@ class NetworkBroadcaster(QObject):
                     pass  # Client might not have remote_address anymore
     
     def update_timer_data(self, time_str: str, state: str, part_title: str, 
-                    next_part: str = "", end_time: str = "", overtime_seconds: int = 0,
-                    countdown_message: str = ""):
+                next_part: str = "", end_time: str = "", overtime_seconds: int = 0,
+                countdown_message: str = "", meeting_ended: bool = False):
         """Update the current timer data and broadcast to clients"""
         # Update current state
         self.current_state = {
@@ -266,7 +276,8 @@ class NetworkBroadcaster(QObject):
             "nextPart": next_part,
             "endTime": end_time,
             "overtime": overtime_seconds,
-            "countdownMessage": countdown_message  # Include countdown message
+            "countdownMessage": countdown_message,
+            "meetingEnded": meeting_ended
         }
         
         # Broadcast to clients if server is running

@@ -13,9 +13,9 @@ from src.models.timer import Timer, TimerState
 
 class TransitionType(Enum):
     """Types of chairman transitions"""
-    MIDWEEK = "Chairman counsel and transition"
-    WEEKEND = "Chairman introduction"
-    GENERIC = "Chairman transition"
+    MIDWEEK = "Chairman Counsel and Transition"
+    WEEKEND = "Chairman Introduction"
+    GENERIC = "Chairman Transition"
 
 
 class TimerController(QObject):
@@ -320,21 +320,19 @@ class TimerController(QObject):
         """Check if we should add a chairman transition between parts"""
         if not self.current_meeting or not self.parts_list:
             return False
-            
+
         # Don't add transition if we're at the last part
         if self.current_part_index < 0 or self.current_part_index >= len(self.parts_list) - 1:
             return False
-        
-        # Get the current part and the next part
-        current_part = self.parts_list[self.current_part_index]
-        next_part = self.parts_list[self.current_part_index + 1] if self.current_part_index + 1 < len(self.parts_list) else None
-        
-        if (self.current_meeting.meeting_type == MeetingType.WEEKEND and
-                "Watchtower" in current_part.title and
-                ("Song" in next_part.title or "Prayer" in next_part.title)):
+
+        if self.current_meeting.meeting_type == MeetingType.WEEKEND:
+            # Add transition only before part at index 1 or 2
+            next_index = self.current_part_index + 1
+            if next_index in [1, 2]:
+                return True
             return False
-        
-        # Always add transition between all parts
+
+        # Default: allow transition
         return True
     
     def _start_chairman_transition(self):
@@ -497,21 +495,6 @@ class TimerController(QObject):
         elif state == TimerState.STOPPED:
             # Timer was stopped, check if we need to advance
             pass
-        
-        elif state == TimerState.TRANSITION:
-            # In transition mode
-            self._in_transition = True
-            
-            # Determine if it's midweek or weekend meeting
-            transition_msg = "Chairman transition"
-            if self.current_meeting:
-                if self.current_meeting.meeting_type == MeetingType.MIDWEEK:
-                    transition_msg = "Chairman counsel and transition"
-                elif self.current_meeting.meeting_type == MeetingType.WEEKEND:
-                    transition_msg = "Chairman introduction"
-            
-            # Emit transition started signal
-            self.transition_started.emit(transition_msg)
     
     def _handle_time_update(self, seconds: int):
         """Handle timer time updates to track meeting progress"""

@@ -11,6 +11,8 @@ import tempfile
 import subprocess
 from pathlib import Path
 import urllib.request
+import urllib.error
+import ssl
 from typing import Dict, Optional, Tuple, Any
 from datetime import datetime
 from PyQt6.QtWidgets import (
@@ -39,23 +41,33 @@ class UpdateChecker(QObject):
         
     def check_for_updates(self):
         """Check for updates - called from a worker thread"""
-        try:
-            # Add a random query parameter to avoid caching
-            cache_buster = f"?t={int(time.time())}"
-            url = UPDATE_CHECK_URL + cache_buster
-            
-            # Fetch the version info with a timeout
-            with urllib.request.urlopen(url, timeout=5) as response:
-                content = response.read().decode('utf-8')
-                version_info = json.loads(content)
-                
-                # Compare versions
-                if self._is_newer_version(version_info.get('version', '0.0.0')):
-                    self.update_available.emit(version_info)
+        # Add a random query parameter to avoid caching
+        cache_buster = f"?t={int(time.time())}"
+        url = UPDATE_CHECK_URL + cache_buster
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(url, timeout=15) as response:
+                    content = response.read().decode('utf-8')
+                    version_info = json.loads(content)
+
+                    if self._is_newer_version(version_info.get('version', '0.0.0')):
+                        self.update_available.emit(version_info)
+                    else:
+                        self.no_update_available.emit()
+                    return
+            except urllib.error.URLError as e:
+                if attempt == 2:
+                    if isinstance(e.reason, ssl.SSLError):
+                        self.error_occurred.emit("SSL handshake failed. Check your network or certificate settings.")
+                    else:
+                        self.error_occurred.emit(str(e))
                 else:
-                    self.no_update_available.emit()
-        except Exception as e:
-            self.error_occurred.emit(str(e))
+                    time.sleep(2 ** attempt)
+            except Exception as e:
+                if attempt == 2:
+                    self.error_occurred.emit(str(e))
+                else:
+                    time.sleep(2 ** attempt)
     
     def _is_newer_version(self, remote_version: str) -> bool:
         """Compare version strings to determine if remote is newer"""
@@ -128,7 +140,7 @@ class UpdateDialog(QDialog):
         """Download the update file"""
         # Determine the correct download URL based on platform
         system = platform.system().lower()
-        
+
         if system == 'windows':
             url_key = 'windows'
         elif system == 'darwin':
@@ -138,36 +150,39 @@ class UpdateDialog(QDialog):
         else:
             QMessageBox.warning(self, "Download Failed", "Unsupported platform.")
             return
-        
+
         # Get the download URL
         download_urls = self.version_info.get('downloadUrl', {})
         download_url = download_urls.get(url_key)
-        
+
         if not download_url:
             QMessageBox.warning(self, "Download Failed", "No download URL available for your platform.")
             return
-        
+
+        # Get expected SHA256 value if present
+        sha_expected = self.version_info.get("sha256", {}).get(url_key)
+
         # Show progress bar
         self.progress_bar.setVisible(True)
         self.download_button.setEnabled(False)
         self.remind_button.setEnabled(False)
         self.skip_button.setEnabled(False)
-        
+
         # Create a temporary file to download to
         with tempfile.NamedTemporaryFile(delete=False, suffix=self._get_file_extension()) as temp_file:
             self.downloaded_file = temp_file.name
-        
+
         # Create a thread for downloading
         self.download_thread = QThread()
-        self.download_worker = DownloadWorker(download_url, self.downloaded_file)
+        self.download_worker = DownloadWorker(download_url, self.downloaded_file, sha256_expected=sha_expected)
         self.download_worker.moveToThread(self.download_thread)
-        
+
         # Connect signals
         self.download_thread.started.connect(self.download_worker.start_download)
         self.download_worker.progress_updated.connect(self.progress_bar.setValue)
         self.download_worker.download_finished.connect(self._download_completed)
         self.download_worker.error_occurred.connect(self._download_error)
-        
+
         # Start download
         self.download_thread.start()
     
@@ -253,26 +268,15 @@ class UpdateDialog(QDialog):
         """Skip this version for future update checks"""
         # Save the skipped version to settings
         from src.models.settings import SettingsManager
-        
         try:
             # Get the settings manager
             settings_file = os.path.join(os.path.expanduser("~"), ".ontime", "settings.json")
             settings_manager = SettingsManager(settings_file)
-            
-            # Add skipped version information
             settings = settings_manager.settings
-            if not hasattr(settings, 'skipped_version'):
-                # Add skipped_version attribute if it doesn't exist
-                from dataclasses import field
-                setattr(settings.__class__, 'skipped_version', field(default=''))
-                settings.skipped_version = ''
-            
-            # Set skipped version
+            # Set skipped version safely
             settings.skipped_version = self.version_info.get('version', '')
             settings_manager.save_settings()
-            
             self.accept()
-            
         except Exception as e:
             print(f"Failed to save skipped version: {e}")
             self.reject()
@@ -293,49 +297,65 @@ class UpdateDialog(QDialog):
 
 class DownloadWorker(QObject):
     """Worker for downloading the update file"""
-    
+
     # Signals
     progress_updated = pyqtSignal(int)
     download_finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
-    
-    def __init__(self, url, destination):
+
+    def __init__(self, url, destination, sha256_expected=None):
         super().__init__()
         self.url = url
         self.destination = destination
-    
+        self.sha256_expected = sha256_expected
+
+    def _compute_sha256(self, filepath):
+        import hashlib
+        sha256 = hashlib.sha256()
+        with open(filepath, "rb") as f:
+            for block in iter(lambda: f.read(4096), b""):
+                sha256.update(block)
+        return sha256.hexdigest()
+
     def start_download(self):
         """Start downloading the file"""
         try:
-            # Create a request with timeout
-            request = urllib.request.Request(self.url)
-            
+            # Create a request with timeout and user-agent header
+            request = urllib.request.Request(self.url, headers={'User-Agent': 'Mozilla/5.0'})
+
             # Open the URL
             with urllib.request.urlopen(request, timeout=30) as response:
                 # Get file size
                 file_size = int(response.info().get('Content-Length', 0))
-                
+
                 # Download the file in chunks
                 downloaded_size = 0
                 chunk_size = 8192
-                
+
                 with open(self.destination, 'wb') as f:
                     while True:
                         chunk = response.read(chunk_size)
                         if not chunk:
                             break
-                        
+
                         f.write(chunk)
                         downloaded_size += len(chunk)
-                        
+
                         # Update progress
                         if file_size > 0:
                             progress = int((downloaded_size / file_size) * 100)
                             self.progress_updated.emit(progress)
-                
-                # Download complete
-                self.download_finished.emit()
-                
+
+            # After download, verify SHA256 if expected
+            if self.sha256_expected:
+                actual_sha = self._compute_sha256(self.destination)
+                if actual_sha.lower() != self.sha256_expected.lower():
+                    self.error_occurred.emit("Downloaded file hash mismatch. Update aborted.")
+                    return
+
+            # Download complete
+            self.download_finished.emit()
+
         except Exception as e:
             self.error_occurred.emit(f"Download failed: {str(e)}")
 
@@ -452,29 +472,3 @@ def check_for_updates(parent=None, silent=False):
     # Return thread so it doesn't get garbage collected
     return thread
 
-
-if __name__ == "__main__":
-    # Test the update checker
-    from PyQt6.QtWidgets import QApplication
-    
-    app = QApplication(sys.argv)
-    
-    # Create a simple window
-    window = QDialog()
-    window.setWindowTitle("Update Checker Test")
-    window.resize(300, 100)
-    
-    layout = QVBoxLayout(window)
-    label = QLabel("Testing update checker...")
-    layout.addWidget(label)
-    
-    button = QPushButton("Check for Updates")
-    button.clicked.connect(lambda: check_for_updates(window, False))
-    layout.addWidget(button)
-    
-    window.show()
-    
-    # Run the update check after 1 second
-    #QTimer.singleShot(1000, lambda: check_for_updates(window, False))
-    
-    sys.exit(app.exec())

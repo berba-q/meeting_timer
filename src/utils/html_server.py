@@ -155,33 +155,20 @@ class NetworkHTTPServer(QObject):
             line-height: 1;
         }
         
-        #current-part {
+        #info-label {
             font-size: 7vmin;
             font-weight: bold;
             margin: 2vh 5vw;
             max-width: 90vw;
         }
         
-        #next-part {
+        #end-time-label {
             font-size: 5vmin;
             margin: 1vh 5vw;
             padding: 2vh;
             background-color: rgba(50, 50, 50, 0.8);
             border-radius: 15px;
             max-width: 90vw;
-        }
-        
-        #countdown-message {
-            font-size: 7vmin;
-            font-weight: bold;
-            color: #4a90e2;
-            margin: 2vh 5vw;
-            max-width: 90vw;
-        }
-        
-        #end-time {
-            font-size: 4vmin;
-            margin-top: 2vh;
         }
         
         #status {
@@ -200,6 +187,7 @@ class NetworkHTTPServer(QObject):
         .paused { color: #2196f3; }
         .transition { color: #bb86fc; }
         .stopped { color: #ffffff; }
+        .countdown { color: #4a90e2; }
     </style>
 </head>
 <body>
@@ -207,22 +195,16 @@ class NetworkHTTPServer(QObject):
     
     <h1 id="timer-display" class="stopped">00:00</h1>
     
-    <div id="current-part">Waiting for connection...</div>
+    <div id="info-label"></div>
     
-    <div id="countdown-message" style="display: none;"></div>
-    
-    <div id="next-part">Next Part: —</div>
-    
-    <div id="end-time"></div>
+    <div id="end-time-label"></div>
     
     <script>
         // Timer display elements
         const timerDisplay = document.getElementById('timer-display');
-        const currentPart = document.getElementById('current-part');
-        const nextPart = document.getElementById('next-part');
-        const endTime = document.getElementById('end-time');
+        const infoLabel = document.getElementById('info-label');
+        const endTimeLabel = document.getElementById('end-time-label');
         const status = document.getElementById('status');
-        const countdownMsg = document.getElementById('countdown-message');
         
         // Create WebSocket connection
         const socket = new WebSocket(`ws://${window.location.hostname}:{WS_PORT}`);
@@ -258,72 +240,78 @@ class NetworkHTTPServer(QObject):
                 // Handle meeting countdown display
                 if (data.state === 'stopped' && data.countdownMessage) {
                     // We're in pre-meeting countdown mode
-                    countdownMsg.textContent = data.countdownMessage;
-                    countdownMsg.style.display = 'block';
-                    nextPart.style.display = 'none';
-                    endTime.style.display = 'none';
-                    currentPart.style.display = 'none';
-                } else {
-                    // Regular meeting or part display
-                    countdownMsg.style.display = 'none';
-                    nextPart.style.display = 'block';
-                    endTime.style.display = 'block';
-                    currentPart.style.display = 'block';
+                    infoLabel.textContent = "MEETING STARTING SOON";
+                    infoLabel.style.color = "#4a90e2";
                     
-                    // Update part information
-                    if (data.part) {
-                        currentPart.textContent = data.part;
+                    endTimeLabel.textContent = data.countdownMessage;
+                    endTimeLabel.style.color = "#4a90e2";
+                    endTimeLabel.style.display = "block";
+                } 
+                else if (data.state === 'transition') {
+                    // Show chairman transition message
+                    infoLabel.textContent = data.part;
+                    infoLabel.style.color = "#bb86fc"; // Purple for transitions
+                    
+                    // Keep showing end time if available
+                    if (data.endTime) {
+                        endTimeLabel.style.display = "block";
                     } else {
-                        currentPart.textContent = 'No active part';
+                        endTimeLabel.style.display = "none";
+                    }
+                }
+                else if (data.meetingEnded) {
+                    // Meeting ended
+                    infoLabel.textContent = "MEETING COMPLETED";
+                    infoLabel.style.color = "#ffffff";
+                    endTimeLabel.style.display = "none";
+                }
+                else {
+                    // Regular meeting or part display
+                    if (data.nextPart) {
+                        infoLabel.textContent = `NEXT PART: ${data.nextPart}`;
+                        infoLabel.style.color = "#ffffff";
+                    } else {
+                        infoLabel.textContent = "LAST PART";
+                        infoLabel.style.color = "#ffffff";
                     }
                     
-                    // Update next part if available
-                    if (data.nextPart) {
-                        nextPart.textContent = `Next Part: ${data.nextPart}`;
+                    // Update end time if available
+                    if (data.endTime) {
+                        endTimeLabel.textContent = `PREDICTED END: ${data.endTime}`;
+                        
+                        // Add overtime information if available
+                        if (data.overtime > 0) {
+                            const minutes = Math.floor(data.overtime / 60);
+                            endTimeLabel.textContent += ` (+${minutes} MIN)`;
+                            endTimeLabel.style.color = '#f44336';
+                        } else {
+                            endTimeLabel.style.color = '#4caf50';
+                        }
+                        
+                        endTimeLabel.style.display = "block";
                     } else {
-                        nextPart.textContent = 'Next Part: —';
+                        endTimeLabel.style.display = "none";
                     }
                 }
                 
-                // Update end time if available
-                if (data.endTime) {
-                    endTime.textContent = `Predicted End: ${data.endTime}`;
-                    
-                    // Add overtime information if available
-                    if (data.overtime > 0) {
-                        const minutes = Math.floor(data.overtime / 60);
-                        const seconds = data.overtime % 60;
-                        
-                        if (minutes > 0) {
-                            endTime.textContent += ` (+${minutes}m ${seconds}s)`;
-                        } else {
-                            endTime.textContent += ` (+${seconds}s)`;
-                        }
-                        
-                        endTime.style.color = '#f44336';
-                    } else {
-                        endTime.style.color = '#4caf50';
+                // Update current time when in stopped state
+                if (data.state === 'stopped' && !data.countdownMessage) {
+                    // Use the browser's clock to update every second
+                    function updateClock() {
+                        const now = new Date();
+                        timerDisplay.textContent = now.toTimeString().split(' ')[0];
                     }
+                    updateClock();
+                    clearInterval(window.clockInterval);
+                    window.clockInterval = setInterval(updateClock, 1000);
                 } else {
-                    endTime.textContent = '';
+                    clearInterval(window.clockInterval);
                 }
+                
             } catch (error) {
                 console.error('Error parsing message:', error);
             }
         });
-        
-        // Update the clock while in stopped state
-        function updateClock() {
-            // Only update if the timer is in stopped state
-            if (timerDisplay.className === 'stopped') {
-                const now = new Date();
-                const timeString = now.toTimeString().split(' ')[0];
-                timerDisplay.textContent = timeString;
-            }
-        }
-        
-        // Update clock every second when in stopped state
-        setInterval(updateClock, 1000);
     </script>
 </body>
 </html>

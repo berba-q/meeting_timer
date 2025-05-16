@@ -32,15 +32,15 @@ class SettingsDialog(QDialog):
         
         # Available languages
         self.available_languages = {
-            "en": "English",
-            "es": "Español",
-            "fr": "Français",
-            "de": "Deutsch",
-            "pt": "Português",
-            "it": "Italiano",
-            "ja": "日本語",
-            "ko": "한국어",
-            "zh": "中文"
+            "en": "English"
+           # "es": "Español",
+           # "fr": "Français",
+           # "de": "Deutsch",
+           # "pt": "Português",
+           # "it": "Italiano",
+           # "ja": "日本語",
+            #"ko": "한국어",
+            #"zh": "中文"
         }
         
         # Setup UI
@@ -109,7 +109,8 @@ class SettingsDialog(QDialog):
         layout.addWidget(button_box)
         
         # Enforce reasonable size
-        self.resize(600, 600)
+        self.resize(720, 720)
+        self.setSizeGripEnabled(True)
     
     def _setup_general_tab(self):
         """Setup general settings tab"""
@@ -169,77 +170,77 @@ class SettingsDialog(QDialog):
     def _setup_display_tab(self):
         """Setup display settings tab"""
         layout = QVBoxLayout(self.display_tab)
-        
+
         # Timer display mode
         display_mode_group = QGroupBox("Timer Display")
         display_mode_layout = QVBoxLayout(display_mode_group)
-        
-        self.digital_mode_radio = QCheckBox("Digital")
-        self.analog_mode_radio = QCheckBox("Analog")
-        
-        # Make checkboxes mutually exclusive
-        self.digital_mode_radio.toggled.connect(lambda checked: self.analog_mode_radio.setChecked(not checked))
-        self.analog_mode_radio.toggled.connect(lambda checked: self.digital_mode_radio.setChecked(not checked))
-        
-        display_mode_layout.addWidget(self.digital_mode_radio)
-        display_mode_layout.addWidget(self.analog_mode_radio)
-        
+        # Digital is the only supported mode, so no need for a checkbox.
+
         # Theme selection
         theme_layout = QHBoxLayout()
         theme_layout.addWidget(QLabel("Theme:"))
-        
+
         self.theme_combo = QComboBox()
         self.theme_combo.addItem("Light Theme", "light")
         self.theme_combo.addItem("Dark Theme", "dark")
-        
+
         theme_layout.addWidget(self.theme_combo)
         display_mode_layout.addLayout(theme_layout)
-        
+
+        # Tools dock options
+        tools_dock_group = QGroupBox("Tools Dock")
+        tools_dock_layout = QVBoxLayout(tools_dock_group)
+
+        self.remember_tools_dock_check = QCheckBox("Remember tools dock state between sessions")
+        self.remember_tools_dock_check.setToolTip("When enabled, the dock will be shown or hidden based on its state when you last closed the application")
+        tools_dock_layout.addWidget(self.remember_tools_dock_check)
+
         # Meeting timing options
         timing_group = QGroupBox("Meeting Timing")
         timing_layout = QVBoxLayout(timing_group)
-        
+
         self.show_end_time_check = QCheckBox("Show predicted meeting end time")
         self.show_end_time_check.setToolTip("Display the predicted meeting end time based on current progress")
         timing_layout.addWidget(self.show_end_time_check)
-        
+
         # Screen selection
         screen_group = QGroupBox("Screen Selection")
         screen_layout = QFormLayout(screen_group)
-        
+
         # Get available screens
         self.available_screens = ScreenHandler.get_all_screens()
-        
+
         # Primary screen selection
         self.primary_screen_combo = QComboBox()
         for screen in self.available_screens:
             primary_text = " (Primary)" if screen['primary'] else ""
             self.primary_screen_combo.addItem(
-                f"{screen['name']} ({screen['width']}x{screen['height']}){primary_text}", 
+                f"{screen['name']} ({screen['width']}x{screen['height']}){primary_text}",
                 screen['index']
             )
-        
+
         # Secondary screen selection
         self.secondary_screen_combo = QComboBox()
-        self.secondary_screen_combo.clear()  # Clear any existing items
         self.secondary_screen_combo.addItem("None", None)
-
-        # Add all screens to the secondary dropdown
         for screen in self.available_screens:
             self.secondary_screen_combo.addItem(
-                f"{screen['name']} ({screen['width']}x{screen['height']})", 
+                f"{screen['name']} ({screen['width']}x{screen['height']})",
                 screen['index']
             )
-        
+
+        # Connect signal to handle selection changes
+        self.secondary_screen_combo.currentIndexChanged.connect(self._secondary_screen_selection_changed)
+
         self.use_secondary_check = QCheckBox("Use Secondary Display")
         self.use_secondary_check.toggled.connect(self._toggle_secondary_screen)
-        
+
         screen_layout.addRow("Primary Screen:", self.primary_screen_combo)
         screen_layout.addRow("Secondary Screen:", self.secondary_screen_combo)
         screen_layout.addRow("", self.use_secondary_check)
-        
+
         # Add groups to layout
         layout.addWidget(display_mode_group)
+        layout.addWidget(tools_dock_group)
         layout.addWidget(timing_group)
         layout.addWidget(screen_group)
         layout.addStretch()
@@ -350,6 +351,21 @@ class SettingsDialog(QDialog):
         else:
             self.weekend_songs_manual_check.setText("Include song placeholders in templates")
     
+    def _secondary_screen_selection_changed(self, index):
+        """Handle changes to the secondary screen selection"""
+        if index < 0:  # Invalid index
+            return
+            
+        selected_value = self.secondary_screen_combo.currentData()
+        if selected_value is None or selected_value == "None":  # Check both None and "None"
+            # If "None" is selected, automatically uncheck the use_secondary_check
+            self.use_secondary_check.setChecked(False)
+            # Also disable the checkbox to make it clear that it can't be enabled without a screen
+            self.use_secondary_check.setEnabled(False)
+        else:
+            # Re-enable the checkbox if a valid screen is selected
+            self.use_secondary_check.setEnabled(True)
+    
     def _load_settings(self):
         """Load current settings into UI"""
         # Optionally, use load_settings() instead of get_settings() for freshness.
@@ -375,9 +391,10 @@ class SettingsDialog(QDialog):
         ))
         
         # Display settings
-        is_digital = settings.display.display_mode == TimerDisplayMode.DIGITAL
-        self.digital_mode_radio.setChecked(is_digital)
-        self.analog_mode_radio.setChecked(not is_digital)
+        # Digital is the only supported mode; nothing to update here.
+        
+        if hasattr(self, 'remember_tools_dock_check'):
+            self.remember_tools_dock_check.setChecked(settings.display.remember_tools_dock_state)
         
         # Theme setting
         theme_index = self.theme_combo.findData(settings.display.theme)
@@ -395,9 +412,23 @@ class SettingsDialog(QDialog):
         secondary_index = self.secondary_screen_combo.findData(settings.display.secondary_screen_index)
         if secondary_index >= 0:
             self.secondary_screen_combo.setCurrentIndex(secondary_index)
+        else:
+            # If secondary screen is not found (e.g., None), select "None"
+            none_index = self.secondary_screen_combo.findData(None)
+            if none_index >= 0:
+                self.secondary_screen_combo.setCurrentIndex(none_index)
         
-        self.use_secondary_check.setChecked(settings.display.use_secondary_screen)
+        # Ensure use_secondary_check is consistent with settings
+        use_secondary = settings.display.use_secondary_screen
+        secondary_screen = settings.display.secondary_screen_index
         
+        # If secondary_screen is None, use_secondary should be False
+        if secondary_screen is None:
+            use_secondary = False
+        
+        self.use_secondary_check.setChecked(use_secondary)
+        # Also set the enabled state based on whether a valid screen is selected
+        self.use_secondary_check.setEnabled(secondary_screen is not None)        
         self._toggle_secondary_screen(settings.display.use_secondary_screen)
         # Do NOT call toggle_secondary_screen on the controller here; only update UI.
         
@@ -426,6 +457,7 @@ class SettingsDialog(QDialog):
 
         # Update UI state based on current settings
         self._update_network_display_ui_state()
+        self._update_qr_code_preview()
     
     def _apply_settings(self):
         """Apply settings changes"""
@@ -447,8 +479,9 @@ class SettingsDialog(QDialog):
         self.settings_controller.set_weekend_meeting(weekend_day, weekend_time)
         
         # Display settings
-        display_mode = TimerDisplayMode.DIGITAL if self.digital_mode_radio.isChecked() else TimerDisplayMode.ANALOG
-        self.settings_controller.set_display_mode(display_mode)
+        
+        if hasattr(self, 'remember_tools_dock_check'):
+            self.settings_controller.get_settings().display.remember_tools_dock_state = self.remember_tools_dock_check.isChecked()
         
         # Theme setting
         theme = self.theme_combo.currentData()
@@ -462,9 +495,23 @@ class SettingsDialog(QDialog):
         self.settings_controller.set_primary_screen(primary_screen)
         
         secondary_screen = self.secondary_screen_combo.currentData()
-        self.settings_controller.set_secondary_screen(secondary_screen)
-        # Move toggle_secondary_screen to the end of display-related settings, after all screen and theme settings
-        self.settings_controller.toggle_secondary_screen(self.use_secondary_check.isChecked())
+        use_secondary = self.use_secondary_check.isChecked()
+        
+        # Make sure use_secondary is False if secondary_screen is None
+        if secondary_screen is None:
+            use_secondary = False
+            # Immediately clean up the secondary display if it exists
+            self.settings_controller.get_settings().display.force_secondary_cleanup = True
+            
+        else:
+            self.settings_controller.get_settings().display.force_secondary_cleanup = False
+        
+        # Set secondary screen first
+        if secondary_screen is not None:
+            self.settings_controller.set_secondary_screen(secondary_screen)
+        
+        # Then update use_secondary_screen
+        self.settings_controller.toggle_secondary_screen(use_secondary)
         
         # Meeting source settings
         for mode, radio in self.source_mode_radios.items():
@@ -501,106 +548,107 @@ class SettingsDialog(QDialog):
     def _setup_network_display_tab(self):
         """Setup network display tab in the settings dialog"""
         layout = QVBoxLayout(self.network_display_tab)
-        
+
         # Network Display Mode group
         mode_group = QGroupBox("Network Display Mode")
         mode_layout = QVBoxLayout(mode_group)
-        
+        mode_layout.setSpacing(8)
+        mode_layout.setContentsMargins(10, 10, 10, 10)
+
         # Create radio buttons for each mode
         self.network_mode_radios = {}
         self.network_mode_group = QButtonGroup(self)
-        
+
         # Disabled mode
         self.disabled_radio = QRadioButton("Disabled (No network display)")
         self.network_mode_radios[NetworkDisplayMode.DISABLED] = self.disabled_radio
         self.network_mode_group.addButton(self.disabled_radio)
         mode_layout.addWidget(self.disabled_radio)
-        
+        self.disabled_radio.setToolTip("No network display is provided.")
+
         # WebSocket only mode
         self.ws_only_radio = QRadioButton("WebSocket Only (Use your own web page)")
         self.network_mode_radios[NetworkDisplayMode.WEB_SOCKET_ONLY] = self.ws_only_radio
         self.network_mode_group.addButton(self.ws_only_radio)
         mode_layout.addWidget(self.ws_only_radio)
-        
+        self.ws_only_radio.setToolTip("Broadcasts timer data over WebSocket only. Use this if you have your own HTML/JS client.")
+
         # HTTP and WebSocket mode
         self.http_ws_radio = QRadioButton("HTTP and WebSocket (Complete solution)")
         self.network_mode_radios[NetworkDisplayMode.HTTP_AND_WS] = self.http_ws_radio
         self.network_mode_group.addButton(self.http_ws_radio)
         mode_layout.addWidget(self.http_ws_radio)
-        
-        # Add description about each mode
-        mode_desc = QLabel(
-            "Disabled: No network display is provided.\n\n"
-            "WebSocket Only: Broadcasts timer data over WebSocket only. "
-            "Use this if you have your own HTML/JS client.\n\n"
-            "HTTP and WebSocket: Provides both a WebSocket server for the data "
-            "and an HTTP server to serve the display page to clients."
-        )
-        mode_desc.setWordWrap(True)
-        mode_layout.addWidget(mode_desc)
-        
+        self.http_ws_radio.setToolTip("Provides both a WebSocket server and an HTTP server to serve a built-in display page.")
+
         # Ports group
         ports_group = QGroupBox("Network Ports")
         ports_layout = QFormLayout(ports_group)
-        
+        ports_layout.setSpacing(8)
+        ports_layout.setContentsMargins(10, 10, 10, 10)
+
         # HTTP port
         self.http_port_spin = QSpinBox()
         self.http_port_spin.setRange(1024, 65535)  # Common non-privileged port range
         self.http_port_spin.setValue(8080)
         self.http_port_spin.setToolTip("Port for the HTTP server (client web page)")
         ports_layout.addRow("HTTP Port:", self.http_port_spin)
-        
+
         # WebSocket port
         self.ws_port_spin = QSpinBox()
         self.ws_port_spin.setRange(1024, 65535)
         self.ws_port_spin.setValue(8765)
         self.ws_port_spin.setToolTip("Port for the WebSocket server (timer data)")
         ports_layout.addRow("WebSocket Port:", self.ws_port_spin)
-        
+
         # Options group
         options_group = QGroupBox("Network Options")
         options_layout = QVBoxLayout(options_group)
-        
+        options_layout.setSpacing(8)
+        options_layout.setContentsMargins(10, 10, 10, 10)
+
         # Auto-start option
         self.auto_start_check = QCheckBox("Auto-start network display when application launches")
         self.auto_start_check.setToolTip("Automatically start the network display when the application starts")
         options_layout.addWidget(self.auto_start_check)
-        
+
         # QR code option
         self.qr_code_check = QCheckBox("Show QR code for easy connection")
         self.qr_code_check.setToolTip("Display a QR code in the main window for easy connection from mobile devices")
         options_layout.addWidget(self.qr_code_check)
-        
-        # Connection help
-        help_group = QGroupBox("Connection Help")
-        help_layout = QVBoxLayout(help_group)
-        
-        help_label = QLabel(
+
+        # Help button for connection help
+        help_button = QPushButton("Connection Help")
+        help_button.setToolTip("Click to view connection instructions for the network display")
+        help_button.clicked.connect(self._show_network_help_dialog)
+        layout.addWidget(help_button, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        # QR code preview (will be populated when network display is active)
+        self.qr_placeholder = QLabel("QR Code will be shown here when network display is active")
+        self.qr_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.qr_placeholder.setMinimumHeight(150)
+
+        # Add groups to layout
+        layout.addWidget(mode_group)
+        layout.addWidget(ports_group)
+        layout.addWidget(options_group)
+        layout.addWidget(self.qr_placeholder)
+        layout.addStretch()
+
+        # Connect signals to update UI state
+        for mode, radio in self.network_mode_radios.items():
+            radio.toggled.connect(self._update_network_display_ui_state)
+
+    def _show_network_help_dialog(self):
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.information(
+            self,
+            "Network Display Help",
             "To connect to the network display:\n\n"
             "1. Make sure all devices are on the same network (LAN/WiFi)\n"
             "2. Start the network display from the main window\n"
             "3. On client devices, open a web browser and enter the URL shown\n"
             "4. For easy connection from mobile devices, scan the QR code"
         )
-        help_label.setWordWrap(True)
-        help_layout.addWidget(help_label)
-        
-        # QR code preview (will be populated when network display is active)
-        self.qr_placeholder = QLabel("QR Code will be shown here when network display is active")
-        self.qr_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.qr_placeholder.setMinimumHeight(150)
-        help_layout.addWidget(self.qr_placeholder)
-        
-        # Add groups to layout
-        layout.addWidget(mode_group)
-        layout.addWidget(ports_group)
-        layout.addWidget(options_group)
-        layout.addWidget(help_group)
-        layout.addStretch()
-        
-        # Connect signals to update UI state
-        for mode, radio in self.network_mode_radios.items():
-            radio.toggled.connect(self._update_network_display_ui_state)
     
     def _update_network_display_ui_state(self):
         """Update enabled state of network display UI elements based on selected mode"""
@@ -635,3 +683,19 @@ class SettingsDialog(QDialog):
         """Handle dialog acceptance"""
         self._apply_settings()
         super().accept()
+    def _update_qr_code_preview(self):
+        """Update QR code display in the settings dialog"""
+        from src.utils.qr_code_utility import generate_qr_code
+        from PyQt6.QtGui import QPixmap, QImage
+
+        settings = self.settings_controller.get_settings()
+
+        if (settings.network_display.qr_code_enabled and 
+            settings.network_display.mode != NetworkDisplayMode.DISABLED):
+            host = getattr(settings.network_display, "host", "localhost")
+            url = f"http://{host}:{settings.network_display.http_port}"
+            qr_image = generate_qr_code(url)
+            pixmap = QPixmap.fromImage(QImage(qr_image))
+            self.qr_placeholder.setPixmap(pixmap.scaled(150, 150, Qt.AspectRatioMode.KeepAspectRatio))
+        else:
+            self.qr_placeholder.setText("QR Code will be shown here when network display is active")
