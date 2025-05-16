@@ -2,28 +2,55 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
-    paths-ignore:
-      - version.json
+    tags:
+      - 'v*' # Run workflow on version tags, e.g., v1.0.0
+      - 'timerV*'
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
-      version: ${{ steps.release.outputs.version }}
+      version: ${{ steps.release.outputs.version || github.ref_name }}
       upload_url: ${{ steps.release.outputs.upload_url }}
       release_notes: ${{ steps.release.outputs.release_notes }}
     steps:
-      - name: Release Please
-        id: release
-        uses: googleapis/release-please-action@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
-          release-type: simple
-          skip-github-release: false
-          skip-labeling: true
-      - name: Debug release-please outputs
+          fetch-depth: 0
+      
+      - name: Extract version from tag
+        id: extract_version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          # Remove 'v' or 'timerV' prefix to get clean version
+          VERSION=${TAG_NAME#v}
+          VERSION=${VERSION#timerV}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+      
+      - name: Set outputs
+        id: release
+        run: |
+          echo "release_created=true" >> $GITHUB_OUTPUT
+          echo "version=${{ steps.extract_version.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "upload_url=${{ steps.create_release.outputs.upload_url }}" >> $GITHUB_OUTPUT
+          echo "release_notes=Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
+      - name: Debug release outputs
         run: |
           echo "Release created: ${{ steps.release.outputs.release_created }}"
           echo "Version: ${{ steps.release.outputs.version }}"
@@ -35,12 +62,6 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
-
-      - name: Check if version exists
-        if: ${{ !needs.release-please.outputs.version }}
-        run: |
-          echo "No release version found. Skipping build."
-          exit 1
 
       - name: Show release version
         run: echo "Building version ${{ needs.release-please.outputs.version }}"
@@ -149,7 +170,6 @@ jobs:
           upload_url: ${{ needs.release-please.outputs.upload_url }}
           asset_path: ./OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}-setup.exe
           asset_name: OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}-setup.exe
-
           asset_content_type: application/octet-stream
 
   build-macos:
