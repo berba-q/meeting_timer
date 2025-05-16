@@ -1631,6 +1631,9 @@ class MainWindow(QMainWindow):
             try:
                 # Use web scraping
                 meetings = self.meeting_controller.update_meetings_from_web()
+                # Insert check for no meetings returned
+                if not meetings:
+                    raise ValueError("No meetings were returned from the update process.")
 
                 # Process weekend meeting to ensure songs are properly displayed
                 if MeetingType.WEEKEND in meetings:
