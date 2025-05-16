@@ -232,23 +232,26 @@ class MainWindow(QMainWindow):
         if name == "meeting_view":
             # Get the splitter from the central widget
             splitter = self.centralWidget().layout().itemAt(0).widget()
-            
+
             # Get the second widget in the splitter (current placeholder)
             old_widget = splitter.widget(1)
-            
+
             # Replace with the new meeting view
             splitter.replaceWidget(1, component)
-            
+
             # Clean up the old widget
             if old_widget:
                 old_widget.deleteLater()
-                
+
             # Process any pending actions for this component
             self._process_pending_actions(name, component)
-                
+
             # If we have a current meeting, update the view
             if self.meeting_controller.current_meeting:
-                component.set_meeting(self.meeting_controller.current_meeting)
+                meeting = self.meeting_controller.current_meeting
+                if meeting.meeting_type == MeetingType.WEEKEND:
+                    meeting.title = f"Public Talk and Watchtower Study"
+                component.set_meeting(meeting)
                 
         elif name == "network_display_manager":
             self.network_display_manager = component
@@ -433,7 +436,10 @@ class MainWindow(QMainWindow):
                 self._store_pending_action('meeting_view', 'set_meeting', meeting)
             
             # Ensure the status bar shows the correct meeting
-            self.current_part_label.setText(f"Meeting: {meeting.title}")
+            if meeting.meeting_type == MeetingType.WEEKEND:
+                self.current_meeting_label.setText(f"Current Meeting: Public Talk and Watchtower Study ({meeting.date.strftime('%Y-%m-%d')})")
+            else:
+                self.current_meeting_label.setText(f"Current Meeting: {meeting.title}")
             
             # Debug output
             #print(f"Selected meeting in _initialize_timer_display: {meeting.title}, Type: {meeting.meeting_type.value}")
@@ -521,7 +527,10 @@ class MainWindow(QMainWindow):
             self._store_pending_action('meeting_view', 'set_meeting', meeting)
         
         # Update status bar
-        self.current_part_label.setText(f"Meeting: {meeting.title}")
+        if meeting.meeting_type == MeetingType.WEEKEND:
+            self.current_meeting_label.setText(f"Current Meeting: Public Talk and Watchtower Study ({meeting.date.strftime('%Y-%m-%d')})")
+        else:
+            self.current_meeting_label.setText(f"Current Meeting: {meeting.title}")
         
         # Re‑enable countdown on the secondary display for the newly selected meeting
         if self.secondary_display:
@@ -579,10 +588,13 @@ class MainWindow(QMainWindow):
                 if sd:
                     sd.show_countdown = False
             if self.meeting_controller.current_meeting:
-                meeting_title = self.meeting_controller.current_meeting.title
-                self.current_part_label.setText(f"Meeting: {meeting_title}")
+                meeting = self.meeting_controller.current_meeting
+                if meeting.meeting_type == MeetingType.WEEKEND:
+                    self.current_meeting_label.setText(f"Current Meeting: Public Talk and Watchtower Study ({meeting.date.strftime('%Y-%m-%d')})")
+                else:
+                    self.current_meeting_label.setText(f"Current Meeting: {meeting.title}")
             else:
-                self.current_part_label.setText("No meeting selected")
+                self.current_meeting_label.setText("No meeting selected")
     
     def _update_meeting_selector(self):
         """Update the meeting selector dropdown with available meetings"""
@@ -593,10 +605,18 @@ class MainWindow(QMainWindow):
             self.meeting_selector.addItem("No meetings available")
             return
         
-        # Add each meeting to the selector
+        # Avoid duplicate entries for the same meeting type
+        seen_meeting_types = set()
         for meeting_type, meeting in meetings.items():
+            if meeting_type in seen_meeting_types:
+                continue
+            seen_meeting_types.add(meeting_type)
             date_str = meeting.date.strftime("%Y-%m-%d")
-            self.meeting_selector.addItem(f"{meeting.title} ({date_str})", meeting)
+            if meeting_type == MeetingType.WEEKEND:
+                display_title = f"Public Talk and Watchtower Study ({date_str})"
+            else:
+                display_title = f"{meeting.title} ({date_str})"
+            self.meeting_selector.addItem(display_title, meeting)
         
         # Select the first item
         if self.meeting_selector.count() > 0:
@@ -869,7 +889,8 @@ class MainWindow(QMainWindow):
         # Meeting selector
         self.meeting_selector = QComboBox()
         self.meeting_selector.currentIndexChanged.connect(self._meeting_selected)
-        tool_bar.addWidget(QLabel("Current Meeting:"))
+        self.current_meeting_label = QLabel("No meeting selected")
+        #tool_bar.addWidget("Current Meeting:")
         tool_bar.addWidget(self.meeting_selector)
         
         # Settings button
@@ -1142,7 +1163,11 @@ class MainWindow(QMainWindow):
         
         for meeting_type, meeting in meetings.items():
             date_str = meeting.date.strftime("%Y-%m-%d")
-            self.meeting_selector.addItem(f"{meeting.title} ({date_str})", meeting)
+            if meeting_type == MeetingType.WEEKEND:
+                display_title = f"Public Talk and Watchtower Study ({date_str})"
+            else:
+                display_title = f"{meeting.title} ({date_str})"
+            self.meeting_selector.addItem(display_title, meeting)
     
     def _meeting_selected(self, index):
         """Handle meeting selection from the dropdown"""
@@ -1173,7 +1198,7 @@ class MainWindow(QMainWindow):
         else:
             self._store_pending_action('meeting_view', 'highlight_part', index)
 
-        # Display part information in widget
+        # Display part information in the central widget
         self.timer_view.part_label.setText(f"{part.title} ({part.duration_minutes} min)")
 
         # Update secondary display if available
@@ -1355,7 +1380,6 @@ class MainWindow(QMainWindow):
             settings.display.force_secondary_cleanup = False
             self.settings_controller.save_settings()
         # Defer UI updates to avoid potential widget destruction issues
-        QTimer.singleShot(0, self._update_display_mode_label)
         QTimer.singleShot(0, self._update_secondary_display_label)
         QTimer.singleShot(0, self._update_secondary_display)
         
