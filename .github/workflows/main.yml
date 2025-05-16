@@ -31,11 +31,15 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
             echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
       - name: Generate Release Notes from Conventional Commits
         id: generate_notes
-        uses: docker://ghcr.io/conventional-changelog/conventional-changelog-cli:latest
-        with:
-          args: -p angular -r 2  # Generate release notes since the second-to-last release
+        run: |
+          npx --yes conventional-changelog-cli -p angular -r 2 > release_notes.md
 
       - name: Save Release Notes
         id: save_notes
