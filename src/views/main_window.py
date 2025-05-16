@@ -547,8 +547,7 @@ class MainWindow(QMainWindow):
         """Update the countdown message with lazy-loaded components"""
         # Update status bar with countdown message
         if seconds_remaining > 0:
-            print(f"[DEBUG] Countdown active: {seconds_remaining} seconds remaining - updating label to: {message}")
-            print(f"[DEBUG] _update_countdown setting label to: {message}")
+            
             # Show countdown in status bar
             self.current_part_label.setText(message)
 
@@ -580,9 +579,7 @@ class MainWindow(QMainWindow):
                         print(f"Unexpected error updating secondary display: {e}")
                 except Exception as e:
                     print(f"Error accessing secondary display: {e}")
-        else:
-            print(f"[DEBUG] Countdown ended - determining next or current part for label display")
-            print(f"[DEBUG] Current index: {self.timer_controller.current_part_index}, Parts count: {len(self.timer_controller.parts_list)}")
+                    
             # Disable countdown updates on secondary display
             if self._is_component_ready('secondary_display_handler'):
                 sd = self.secondary_display_handler.get_display()
@@ -599,16 +596,16 @@ class MainWindow(QMainWindow):
                 if next_index < len(self.timer_controller.parts_list):
                     next_part = self.timer_controller.parts_list[next_index]
                     label_text = f"Next Part: {next_part.title}"
-                    print(f"[DEBUG] _update_countdown final label update to: {label_text}")
+                    
                     self.current_part_label.setText(label_text)
                 elif self.timer_controller.current_part_index >= 0:
                     current_part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
                     label_text = f"Current Part: {current_part.title}"
-                    print(f"[DEBUG] _update_countdown final label update to: {label_text}")
+                    
                     self.current_part_label.setText(label_text)
                 else:
                     label_text = "Meeting in progress"
-                    print(f"[DEBUG] _update_countdown final label update to: {label_text}")
+                   
                     self.current_part_label.setText(label_text)
     
     def _update_meeting_selector(self):
@@ -742,7 +739,7 @@ class MainWindow(QMainWindow):
         # Update meetings from web
         update_meetings_action = QAction(get_icon("increase"), "&Update Meetings from Web", self)
         update_meetings_action.setShortcut("F5")
-        update_meetings_action.triggered.connect(lambda: self._check_for_updates(False))
+        update_meetings_action.triggered.connect(self._update_meetings)
         file_menu.addAction(update_meetings_action)
         
         file_menu.addSeparator()
@@ -1647,7 +1644,7 @@ class MainWindow(QMainWindow):
                                                "Meetings have been successfully updated."))
             except Exception as e:
                 progress.close()
-                QTimer.singleShot(0, lambda: QMessageBox.warning(self, "Update Failed",
+                QTimer.singleShot(0, lambda e=e: QMessageBox.warning(self, "Update Failed",
                                               f"Failed to update meetings: {str(e)}"))
         else:
             # Show options dialog as before
