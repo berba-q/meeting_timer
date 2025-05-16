@@ -29,8 +29,24 @@ jobs:
           VERSION=${TAG_NAME#v}
           VERSION=${VERSION#timerV}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-      
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate Release Notes from Conventional Commits
+        id: generate_notes
+        uses: docker://ghcr.io/conventional-changelog/conventional-changelog-cli:latest
+        with:
+          args: -p angular -r 2  # Generate release notes since the second-to-last release
+
+      - name: Save Release Notes
+        id: save_notes
+        run: |
+          # Get the generated release notes and format for the release
+          NOTES=$(cat CHANGELOG.md)
+          # Save to file and to output
+          echo "$NOTES" > release_notes.md
+          NOTES_ESCAPED=$(cat release_notes.md | jq -Rs .)
+          echo "release_notes=$NOTES_ESCAPED" >> $GITHUB_OUTPUT
+          
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
@@ -263,12 +279,6 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
-      - name: Check if version exists
-        if: ${{ !needs.release-please.outputs.version }}
-        run: |
-          echo "No release version found. Skipping build."
-          exit 1
-
       - name: Show release version
         run: echo "Building version ${{ needs.release-please.outputs.version }}"
         
@@ -295,7 +305,6 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
-
           pyinstaller --name "ontime" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
       
       - name: Create .desktop file
@@ -308,7 +317,6 @@ jobs:
           echo "Terminal=false" >> ontime.desktop
           echo "Type=Application" >> ontime.desktop
           echo "Categories=Utility;" >> ontime.desktop
-
       
       - name: Download AppImage tool
         run: |
@@ -321,31 +329,39 @@ jobs:
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           
-
           cp -r dist/ontime/* AppDir/usr/bin/
           cp ontime.desktop AppDir/usr/share/applications/
           cp assets/icons/app-icon.png AppDir/usr/share/icons/hicolor/256x256/apps/ontime.png
           
           ln -s usr/share/applications/ontime.desktop AppDir/ontime.desktop
           ln -s usr/share/icons/hicolor/256x256/apps/ontime.png AppDir/ontime.png
-
           
           # Create AppRun script
           echo '#!/bin/bash' > AppDir/AppRun
           echo 'SELF=$(readlink -f "$0")' >> AppDir/AppRun
           echo 'HERE=${SELF%/*}' >> AppDir/AppRun
           echo 'export PATH="${HERE}/usr/bin:${PATH}"' >> AppDir/AppRun
-
           echo 'exec "${HERE}/usr/bin/ontime" "$@"' >> AppDir/AppRun
-
           chmod +x AppDir/AppRun
+          
+          # Add architecture metadata
+          mkdir -p AppDir/usr/share/metainfo
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > AppDir/usr/share/metainfo/ontime.appdata.xml
+          echo '<component type="desktop-application">' >> AppDir/usr/share/metainfo/ontime.appdata.xml
+          echo '  <id>ontime</id>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
+          echo '  <metadata_license>MIT</metadata_license>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
+          echo '  <name>OnTime Meeting Timer</name>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
+          echo '  <summary>Timer application for managing meeting schedules</summary>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
+          echo '  <description><p>A timer application for managing meeting schedules</p></description>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
+          echo '</component>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
       
       - name: Install libfuse2
         run: sudo apt-get update && sudo apt-get install -y libfuse2
 
       - name: Build AppImage
         run: |
-          VERSION=${{ needs.release-please.outputs.version }} ./appimagetool AppDir OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
+          # Explicitly set architecture to x86_64 to fix the error
+          ARCH=x86_64 VERSION=${{ needs.release-please.outputs.version }} ./appimagetool AppDir OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
 
       - name: Generate SHA256 for AppImage
         run: |
@@ -356,18 +372,15 @@ jobs:
         with:
           name: linux-sha
           path: linux.sha256
-
         
       - name: Upload AppImage to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-
           upload_url: ${{ needs.release-please.outputs.upload_url }}
           asset_path: ./OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
           asset_name: OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
-
           asset_content_type: application/octet-stream
 
   update-version-json:
