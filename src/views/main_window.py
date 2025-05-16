@@ -906,7 +906,7 @@ class MainWindow(QMainWindow):
         tool_bar.addWidget(self.meeting_selector)
         
         # Settings button
-        settings_button = QPushButton("")
+        settings_button = QPushButton("Settings")
         settings_button.setIcon(get_icon("settings"))
         settings_button.clicked.connect(self._open_settings)
         tool_bar.addWidget(settings_button)
