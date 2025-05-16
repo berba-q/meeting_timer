@@ -362,7 +362,7 @@ class MainWindow(QMainWindow):
     def _connect_network_display_signals(self):
         """Connect timer controller signals to network display manager after it's loaded"""
         if self.network_display_manager:
-            print("Connecting network display manager signals")
+            
             
             # Make sure the timer_controller is directly accessible
             self.network_display_manager.timer_controller = self.timer_controller
@@ -382,7 +382,7 @@ class MainWindow(QMainWindow):
                 ) if self.network_display_manager else None
             )
             
-            print("Network display manager signals connected successfully")
+            
         else:
             print("WARNING: Cannot connect network display manager signals - component not loaded yet")
     
@@ -486,7 +486,7 @@ class MainWindow(QMainWindow):
         
         # If we found a meeting to select, update the selector and set current meeting
         if meeting_to_select:
-            print(f"Auto-selecting meeting: {selection_reason}")
+            
             
             # Find the meeting in the selector
             found_index = -1
@@ -547,6 +547,8 @@ class MainWindow(QMainWindow):
         """Update the countdown message with lazy-loaded components"""
         # Update status bar with countdown message
         if seconds_remaining > 0:
+            print(f"[DEBUG] Countdown active: {seconds_remaining} seconds remaining - updating label to: {message}")
+            print(f"[DEBUG] _update_countdown setting label to: {message}")
             # Show countdown in status bar
             self.current_part_label.setText(message)
 
@@ -578,23 +580,36 @@ class MainWindow(QMainWindow):
                         print(f"Unexpected error updating secondary display: {e}")
                 except Exception as e:
                     print(f"Error accessing secondary display: {e}")
-                
         else:
-            # Reset status bar when countdown ends
-            # Disable further countdown updates on the secondary display until the
-            # countdown is explicitly re‑enabled (e.g. for the next meeting).
+            print(f"[DEBUG] Countdown ended - determining next or current part for label display")
+            print(f"[DEBUG] Current index: {self.timer_controller.current_part_index}, Parts count: {len(self.timer_controller.parts_list)}")
+            # Disable countdown updates on secondary display
             if self._is_component_ready('secondary_display_handler'):
                 sd = self.secondary_display_handler.get_display()
                 if sd:
                     sd.show_countdown = False
-            if self.meeting_controller.current_meeting:
-                meeting = self.meeting_controller.current_meeting
-                if meeting.meeting_type == MeetingType.WEEKEND:
-                    self.current_meeting_label.setText(f"Current Meeting: Public Talk and Watchtower Study ({meeting.date.strftime('%Y-%m-%d')})")
+
+            # Update the status bar to show next part only
+            if (
+                hasattr(self, "timer_controller")
+                and hasattr(self.timer_controller, "parts_list")
+                and hasattr(self.timer_controller, "current_part_index")
+            ):
+                next_index = self.timer_controller.current_part_index + 1
+                if next_index < len(self.timer_controller.parts_list):
+                    next_part = self.timer_controller.parts_list[next_index]
+                    label_text = f"Next Part: {next_part.title}"
+                    print(f"[DEBUG] _update_countdown final label update to: {label_text}")
+                    self.current_part_label.setText(label_text)
+                elif self.timer_controller.current_part_index >= 0:
+                    current_part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
+                    label_text = f"Current Part: {current_part.title}"
+                    print(f"[DEBUG] _update_countdown final label update to: {label_text}")
+                    self.current_part_label.setText(label_text)
                 else:
-                    self.current_meeting_label.setText(f"Current Meeting: {meeting.title}")
-            else:
-                self.current_meeting_label.setText("No meeting selected")
+                    label_text = "Meeting in progress"
+                    print(f"[DEBUG] _update_countdown final label update to: {label_text}")
+                    self.current_part_label.setText(label_text)
     
     def _update_meeting_selector(self):
         """Update the meeting selector dropdown with available meetings"""
@@ -1150,7 +1165,7 @@ class MainWindow(QMainWindow):
         """Handle loaded meetings"""
         # Check for missing songs in weekend meeting
         if MeetingType.WEEKEND in meetings:
-            print(">>> Weekend meeting found. Checking songs...")
+            
             weekend_meeting = meetings[MeetingType.WEEKEND]
             self._process_weekend_meeting_songs(weekend_meeting)
 
@@ -1189,8 +1204,13 @@ class MainWindow(QMainWindow):
     
     def _part_changed(self, part, index):
         """Handle part change with lazy-loaded components"""
-        # Update status bar
-        self.current_part_label.setText(f"Current part: {part.title} ({part.duration_minutes} min)")
+        # Update status bar to show the next part instead of the current part
+        parts = self.timer_controller.parts_list
+        if index + 1 < len(parts):
+            next_part = parts[index + 1]
+            self.current_part_label.setText(f"Next Part: {next_part.title}")
+        else:
+            self.current_part_label.setText("Last Part")
 
         # Highlight the current part in the meeting view
         if self._is_component_ready('meeting_view'):
@@ -1206,7 +1226,6 @@ class MainWindow(QMainWindow):
             secondary_display = self.secondary_display_handler.get_display()
             if secondary_display:
                 # Check if there's a next part
-                parts = self.timer_controller.parts_list
                 if index + 1 < len(parts):
                     next_part = parts[index + 1]
                     # Update info_label1 with next part info
@@ -1257,6 +1276,9 @@ class MainWindow(QMainWindow):
         self.next_button.setEnabled(True)
         self.decrease_button.setEnabled(True)
         self.increase_button.setEnabled(True)
+
+        # Clear any leftover countdown or status text in the status bar
+        self.current_part_label.setText("")
         
         # If secondary display exists, update it to show meeting info
         self.timer_view.show_clock = False
@@ -1281,6 +1303,13 @@ class MainWindow(QMainWindow):
                 
             # Ensure both labels are visible
             self.secondary_display.info_label2.setVisible(True)
+
+        # Disconnect countdown update signal so countdown label updates stop after meeting starts
+        try:
+            self.timer_controller.timer.meeting_countdown_updated.disconnect(self._update_countdown)
+            
+        except TypeError:
+            print("Countdown update already disconnected or never connected")
     
     def _meeting_ended(self):
         """Handle meeting end"""
@@ -1335,6 +1364,7 @@ class MainWindow(QMainWindow):
     def _transition_started(self, transition_msg):
         """Handle chairman transition period"""
         # Update the current part label
+        
         self.current_part_label.setText(f"⏳ {transition_msg} (1:00)")
         
         # Also update the part_label in the timer view
@@ -1640,9 +1670,13 @@ class MainWindow(QMainWindow):
             
     def _process_weekend_meeting_songs(self, meeting: Meeting):
         """Process weekend meeting to ensure songs are properly displayed"""
-        print(f">>> [SongCheck] Meeting title: {meeting.title}, type: {meeting.meeting_type}")
+      
         if meeting.meeting_type != MeetingType.WEEKEND:
-            print(">>> Skipping song prompt — not a weekend meeting")
+            
+            return
+        # Only trigger dialog if manual weekend songs setting is enabled
+        if not self.settings_controller.get_settings().meeting_source.weekend_songs_manual:
+            
             return
         # Check for missing songs in the meeting
         import re
@@ -1650,7 +1684,7 @@ class MainWindow(QMainWindow):
 
         for section in meeting.sections:
             for part in section.parts:
-                print(f"Part: {part.title}")
+                
                 title = part.title.lower().strip()
                 if "song" in title and not re.search(r'song\s+\d+', title):
                     missing_songs = True
@@ -1659,7 +1693,7 @@ class MainWindow(QMainWindow):
             def ask_and_edit():
                 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton
                 from PyQt6.QtCore import Qt, QTimer
-                print(">>> Showing custom song edit dialog")
+                
                 dialog = QDialog(self)
                 dialog.setWindowTitle("Song Entry Required")
                 dialog.setMinimumWidth(450)
