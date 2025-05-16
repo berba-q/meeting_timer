@@ -124,7 +124,7 @@ jobs:
           sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}-setup.exe > windows.sha256
 
       - name: Upload SHA256 artifact (Windows)
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v4
         with:
           name: windows-sha
           path: windows.sha256
@@ -200,7 +200,7 @@ jobs:
           sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.dmg > macos.sha256
 
       - name: Upload SHA256 artifact (macOS)
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v4
         with:
           name: macos-sha
           path: macos.sha256
@@ -308,7 +308,7 @@ jobs:
           sha256sum OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage > linux.sha256
 
       - name: Upload SHA256 artifact (Linux)
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v4
         with:
           name: linux-sha
           path: linux.sha256
@@ -334,7 +334,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download SHA256 artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: sha256
 
