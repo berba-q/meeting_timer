@@ -11,14 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
-      version: ${{ steps.release.outputs.version || github.ref_name }}
-      upload_url: ${{ steps.release.outputs.upload_url }}
-      release_notes: ${{ steps.release.outputs.release_notes }}
+      version: ${{ steps.extract_version.outputs.version || github.ref_name }}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_notes: ${{ steps.save_notes.outputs.release_notes }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Get full history for conventional commits
       
       - name: Extract version from tag
         id: extract_version
@@ -29,28 +29,117 @@ jobs:
           VERSION=${TAG_NAME#v}
           VERSION=${VERSION#timerV}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      - name: Generate Release Notes from Conventional Commits
-        id: generate_notes
+      # Step 1: Generate complete CHANGELOG.md from all history
+      - name: Generate comprehensive CHANGELOG.md
         run: |
-          npx --yes conventional-changelog-cli -p angular -r 2 > release_notes.md
+          # Create a fresh CHANGELOG.md with a title
+          echo "# Changelog" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          
+          # Generate full changelog from all commit history
+          echo "Generating complete changelog from all conventional commits..."
+          npx --yes conventional-changelog-cli -p angular -r 0 >> CHANGELOG.md
+          
+          # Check if we generated meaningful content
+          if [ $(wc -l < CHANGELOG.md) -lt 5 ]; then
+            echo "Insufficient conventional commit history found - enriching with regular commits"
+            echo "## Commit History" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            
+            # Get all tags in chronological order
+            TAGS=$(git tag --sort=committerdate)
+            
+            if [ -n "$TAGS" ]; then
+              # If we have tags, group commits by tag
+              PREV_TAG=""
+              for TAG in $TAGS; do
+                echo "### $TAG" >> CHANGELOG.md
+                echo "" >> CHANGELOG.md
+                
+                if [ -n "$PREV_TAG" ]; then
+                  git log $PREV_TAG..$TAG --pretty=format:"* %s" >> CHANGELOG.md
+                else
+                  # For the first tag, get all commits up to that tag
+                  git log $TAG --pretty=format:"* %s" >> CHANGELOG.md
+                fi
+                
+                echo "" >> CHANGELOG.md
+                echo "" >> CHANGELOG.md
+                PREV_TAG=$TAG
+              done
+              
+              # Newest commits (after the last tag)
+              echo "### Unreleased changes" >> CHANGELOG.md
+              echo "" >> CHANGELOG.md
+              git log $PREV_TAG..HEAD --pretty=format:"* %s" >> CHANGELOG.md
+              echo "" >> CHANGELOG.md
+            else
+              # If no tags, just list all commits
+              git log --pretty=format:"* %s" >> CHANGELOG.md
+            fi
+          fi
+          
+          # Display the generated changelog for debugging
+          echo "Generated CHANGELOG.md (first 20 lines):"
+          head -n 20 CHANGELOG.md
+
+      # Step 2: Generate release notes for the current release
+      - name: Generate Release Notes for GitHub Release
+        run: |
+          # Generate release notes for current version
+          echo "# Release ${{ env.TAG_NAME }} ($(date '+%Y-%m-%d'))" > release_notes.md
+          echo "" >> release_notes.md
+          
+          # Try to generate notes just for the current release
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -n "$PREV_TAG" ]; then
+            echo "Found previous tag: $PREV_TAG - generating notes since then"
+            npx --yes conventional-changelog-cli -p angular -o release_notes_temp.md
+            
+            if [ -s release_notes_temp.md ]; then
+              cat release_notes_temp.md >> release_notes.md
+            else
+              echo "## Changes since $PREV_TAG:" >> release_notes.md
+              echo "" >> release_notes.md
+              git log $PREV_TAG..HEAD --pretty=format:"* %s" >> release_notes.md
+            fi
+          else
+            # No previous tag found, use recent commits
+            echo "## Changes in this release:" >> release_notes.md
+            echo "" >> release_notes.md
+            git log -n 20 --pretty=format:"* %s" >> release_notes.md
+          fi
+          
+          # Display the release notes for debugging
+          echo "Generated release notes:"
+          cat release_notes.md
+
+      # Step 3: Commit the new CHANGELOG.md to the repository
+      - name: Commit updated CHANGELOG.md
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add CHANGELOG.md
+          git commit -m "docs: update CHANGELOG.md for release ${{ env.TAG_NAME }}" || echo "No changes to commit"
+          git push origin HEAD:main || echo "Failed to push changes"
 
       - name: Save Release Notes
         id: save_notes
         run: |
-          # Get the generated release notes and format for the release
-          NOTES=$(cat CHANGELOG.md)
-          # Save to file and to output
-          echo "$NOTES" > release_notes.md
-          NOTES_ESCAPED=$(cat release_notes.md | jq -Rs .)
+          # Read the release notes and prepare for output
+          NOTES=$(cat release_notes.md)
+          # Use jq to properly escape the content for JSON
+          NOTES_ESCAPED=$(echo "$NOTES" | jq -Rs .)
           echo "release_notes=$NOTES_ESCAPED" >> $GITHUB_OUTPUT
-          
+      
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
@@ -59,6 +148,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           release_name: Release ${{ github.ref_name }}
+          body_path: release_notes.md
           draft: false
           prerelease: false
       
@@ -68,13 +158,13 @@ jobs:
           echo "release_created=true" >> $GITHUB_OUTPUT
           echo "version=${{ steps.extract_version.outputs.version }}" >> $GITHUB_OUTPUT
           echo "upload_url=${{ steps.create_release.outputs.upload_url }}" >> $GITHUB_OUTPUT
-          echo "release_notes=Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "release_notes=${{ steps.save_notes.outputs.release_notes }}" >> $GITHUB_OUTPUT
 
       - name: Debug release outputs
         run: |
           echo "Release created: ${{ steps.release.outputs.release_created }}"
           echo "Version: ${{ steps.release.outputs.version }}"
-          echo "Upload URL: ${{ steps.release.outputs.upload_url }}"
+          echo "Upload URL: ${{ steps.create_release.outputs.upload_url }}"
           
   build-windows:
     needs: release-please
@@ -127,7 +217,7 @@ jobs:
 
           #define MyAppVersion "$version"
           #define MyAppPublisher "Your Name"
-          #define MyAppURL "https://github.com/berb-q/meeting_timer"
+          #define MyAppURL "https://github.com/berba-q/meeting_timer"
           #define MyAppExeName "OnTime Meeting Timer.exe"
 
 
@@ -199,12 +289,6 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
-      - name: Check if version exists
-        if: ${{ !needs.release-please.outputs.version }}
-        run: |
-          echo "No release version found. Skipping build."
-          exit 1
-
       - name: Show release version
         run: echo "Building version ${{ needs.release-please.outputs.version }}"
         
@@ -237,7 +321,8 @@ jobs:
         run: |
           echo 'app = defines.get("app", "dist/OnTime Meeting Timer.app")' > dmg_settings.py
           echo 'appname = defines.get("appname", "OnTime Meeting Timer")' >> dmg_settings.py
-          echo 'background = "assets/icons/dmg_background.png"' >> dmg_settings.py
+          echo 'background = None' >> dmg_settings.py
+          echo 'background_color = "#f0f0f0"' >> dmg_settings.py
           echo 'volume_name = "OnTime Meeting Timer"' >> dmg_settings.py
           echo 'window_rect = ((100, 100), (640, 400))' >> dmg_settings.py
           echo 'icon_size = 128' >> dmg_settings.py
@@ -332,6 +417,7 @@ jobs:
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          mkdir -p AppDir/usr/share/metainfo
           
           cp -r dist/ontime/* AppDir/usr/bin/
           cp ontime.desktop AppDir/usr/share/applications/
@@ -348,16 +434,48 @@ jobs:
           echo 'exec "${HERE}/usr/bin/ontime" "$@"' >> AppDir/AppRun
           chmod +x AppDir/AppRun
           
-          # Add architecture metadata
-          mkdir -p AppDir/usr/share/metainfo
-          echo '<?xml version="1.0" encoding="UTF-8"?>' > AppDir/usr/share/metainfo/ontime.appdata.xml
-          echo '<component type="desktop-application">' >> AppDir/usr/share/metainfo/ontime.appdata.xml
-          echo '  <id>ontime</id>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
-          echo '  <metadata_license>MIT</metadata_license>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
-          echo '  <name>OnTime Meeting Timer</name>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
-          echo '  <summary>Timer application for managing meeting schedules</summary>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
-          echo '  <description><p>A timer application for managing meeting schedules</p></description>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
-          echo '</component>' >> AppDir/usr/share/metainfo/ontime.appdata.xml
+          # Create proper AppStream metadata file
+          cat > AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml << EOF
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '<component type="desktop-application">' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <id>com.berba-q.ontime</id>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <name>OnTime Meeting Timer</name>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <summary>Timer application for managing meeting schedules</summary>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <metadata_license>MIT</metadata_license>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <project_license>MIT</project_license>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <description>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '    <p>OnTime Meeting Timer is a comprehensive application designed to help you manage meeting schedules efficiently. It provides timing features and notifications to keep your meetings on track.</p>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '    <p>Features include:</p>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '    <ul>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '      <li>Meeting countdown timer</li>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '      <li>Visual alerts for time management</li>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '      <li>Integration with calendar systems</li>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '      <li>Customizable timer settings</li>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '    </ul>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  </description>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <launchable type="desktop-id">ontime.desktop</launchable>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <screenshots>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '    <screenshot type="default">' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '      <caption>The main timer interface</caption>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '      <image>https://github.com/berba-q/meeting_timer/raw/main/screenshots/main.png</image>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '    </screenshot>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  </screenshots>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <url type="homepage">https://github.com/berba-q/meeting_timer</url>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <developer_name>Griffiths</developer_name>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <content_rating type="oars-1.1" />' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  <releases>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '    <release version="${{ needs.release-please.outputs.version }}" date="$(date +%Y-%m-%d)">' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '      <description>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '        <p>Latest release with bug fixes and improvements.</p>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '      </description>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '    </release>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '  </releases>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          echo '</component>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          EOF
+
+          # Make sure the desktop file has the correct ID
+          sed -i 's/^Name=OnTime Meeting Timer/Name=OnTime Meeting Timer\nX-AppImage-Name=OnTime Meeting Timer/' AppDir/usr/share/applications/ontime.desktop
+          sed -i 's/^Exec=ontime/Exec=ontime %F/' AppDir/usr/share/applications/ontime.desktop
       
       - name: Install libfuse2
         run: sudo apt-get update && sudo apt-get install -y libfuse2
@@ -425,7 +543,6 @@ jobs:
             "version": "${VERSION}",
             "releaseDate": "${TODAY}",
             "downloadUrl": {
-
               "windows": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}-setup.exe",
               "macos": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.dmg",
               "linux": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.AppImage"
@@ -436,7 +553,6 @@ jobs:
               "macos": "${{ steps.sha.outputs.mac_sha }}",
               "linux": "${{ steps.sha.outputs.linux_sha }}"
             }
-
           }
           EOF
           
