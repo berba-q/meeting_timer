@@ -158,6 +158,7 @@ OnTime Meeting Timer is an open-source application. Contributions are welcome!
 OnTime Meeting Timer is released under the MIT License. See [LICENSE](https://github.com/berba-q/meeting_timer?tab=MIT-1-ov-file#readme) for details.
 
 ## Acknowledgments
+Special thanks to `Michael Mena`, `Antonio Montaperto` and `Clayton Smith` for their kind contributions to this project ⭐⭐⭐⭐⭐!
 
-- Built with Python and a tiny bit of HTML and Javascript
+- Built with 🐍 Python and a tiny bit of HTML 🕸️ and Javascript 🕸️
 - Special thanks to all contributors and testers
