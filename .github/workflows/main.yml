@@ -48,7 +48,7 @@ jobs:
           
           # Generate full changelog from all commit history
           echo "Generating complete changelog from all conventional commits..."
-          npx --yes conventional-changelog-cli -p angular -r 0 >> CHANGELOG.md
+          npx --yes conventional-changelog-cli -p angular -r 0 --commit-path="." >> CHANGELOG.md
           
           # Check if we generated meaningful content
           if [ $(wc -l < CHANGELOG.md) -lt 5 ]; then
@@ -67,10 +67,10 @@ jobs:
                 echo "" >> CHANGELOG.md
                 
                 if [ -n "$PREV_TAG" ]; then
-                  git log $PREV_TAG..$TAG --pretty=format:"* %s" >> CHANGELOG.md
+                  git log $PREV_TAG..$TAG --pretty=format:"* %s (%h)" >> CHANGELOG.md
                 else
                   # For the first tag, get all commits up to that tag
-                  git log $TAG --pretty=format:"* %s" >> CHANGELOG.md
+                  git log $TAG --pretty=format:"* %s (%h)" >> CHANGELOG.md
                 fi
                 
                 echo "" >> CHANGELOG.md
@@ -81,11 +81,11 @@ jobs:
               # Newest commits (after the last tag)
               echo "### Unreleased changes" >> CHANGELOG.md
               echo "" >> CHANGELOG.md
-              git log $PREV_TAG..HEAD --pretty=format:"* %s" >> CHANGELOG.md
+              git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" >> CHANGELOG.md
               echo "" >> CHANGELOG.md
             else
               # If no tags, just list all commits
-              git log --pretty=format:"* %s" >> CHANGELOG.md
+              git log --pretty=format:"* %s (%h)" >> CHANGELOG.md
             fi
           fi
           
@@ -97,7 +97,9 @@ jobs:
       - name: Generate Release Notes for GitHub Release
         run: |
           # Generate release notes for current version
-          echo "# Release ${{ steps.extract_version.outputs.version }} ($(date '+%Y-%m-%d'))" > release_notes.md
+          echo "# Release $TAG_NAME ($(date '+%Y-%m-%d'))" > release_notes.md
+          echo "" >> release_notes.md
+          echo "## Changes in this release:" >> release_notes.md
           echo "" >> release_notes.md
           
           # Try to generate notes just for the current release
@@ -105,46 +107,81 @@ jobs:
           
           if [ -n "$PREV_TAG" ]; then
             echo "Found previous tag: $PREV_TAG - generating notes since then"
-            npx --yes conventional-changelog-cli -p angular -o release_notes_temp.md
+            npx --yes conventional-changelog-cli -p angular -o release_notes_temp.md --commit-path="."
             
             if [ -s release_notes_temp.md ]; then
               cat release_notes_temp.md >> release_notes.md
             else
-              echo "## Changes since $PREV_TAG:" >> release_notes.md
+              # Get specific commit types using grep to organize changes
+              echo "### New Features:" >> release_notes.md
+              git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" | grep -i "^feat" >> release_notes.md || echo "* No new features in this release" >> release_notes.md
               echo "" >> release_notes.md
-              git log $PREV_TAG..HEAD --pretty=format:"* %s" >> release_notes.md
+              echo "" >> release_notes.md
+              
+              echo "### Bug Fixes:" >> release_notes.md
+              git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" | grep -i "^fix" >> release_notes.md || echo "* No bug fixes in this release" >> release_notes.md
+              echo "" >> release_notes.md
+              echo "" >> release_notes.md
+              
+              echo "### Other Changes:" >> release_notes.md
+              git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" | grep -v -i "^feat\|^fix" >> release_notes.md || echo "* No other changes in this release" >> release_notes.md
+              echo "" >> release_notes.md
             fi
           else
             # No previous tag found, use recent commits
-            echo "## Changes in this release:" >> release_notes.md
+            echo "### All Changes:" >> release_notes.md
             echo "" >> release_notes.md
-            git log -n 20 --pretty=format:"* %s" >> release_notes.md
+            git log -n 20 --pretty=format:"* %s (%h)" >> release_notes.md
           fi
+          
+          # Add download links to the release notes
+          echo "" >> release_notes.md
+          echo "## Downloads" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "* [Windows Installer](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/OnTimeMeetingTimer-$VERSION-setup.exe)" >> release_notes.md
+          echo "* [macOS DMG](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/OnTimeMeetingTimer-$VERSION.dmg)" >> release_notes.md
+          echo "* [Linux AppImage](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/OnTimeMeetingTimer-$VERSION.AppImage)" >> release_notes.md
+          echo "" >> release_notes.md
           
           # Display the release notes for debugging
           echo "Generated release notes:"
           cat release_notes.md
 
       # Step 3: Commit the new CHANGELOG.md to the repository
-      - name: Commit updated CHANGELOG.md
+      - name: Create PR for CHANGELOG.md update
         run: |
+          # Create a new branch for the changes
+          BRANCH_NAME="docs/changelog-${{ env.TAG_NAME }}"
+          git checkout -b $BRANCH_NAME
+          
+          # Add and commit the changes
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add CHANGELOG.md
-          git commit -m "docs: update CHANGELOG.md for release ${{ steps.extract_version.outputs.version }}" || echo "No changes to commit"
+          git commit -m "docs: update CHANGELOG.md for release ${{ env.TAG_NAME }}" || echo "No changes to commit"
           
-          # Push using token-based authentication with explicit permissions
-          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main || {
-            echo "Failed to push changes to main branch. This could be due to permission issues."
-            echo "You may need to add write permissions for the workflow."
-          }
+          # Push the branch
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" $BRANCH_NAME
+          
+          # Create a pull request using GitHub API
+          PR_RESPONSE=$(curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/pulls \
+            -d '{
+              "title": "Update CHANGELOG.md for release ${{ env.TAG_NAME }}",
+              "body": "This PR updates the CHANGELOG.md file for release ${{ env.TAG_NAME }}. It was automatically created by the release workflow.",
+              "head": "'$BRANCH_NAME'",
+              "base": "main"
+            }')
+          
+          echo "Created PR for CHANGELOG.md update: $PR_RESPONSE"
 
       - name: Save Release Notes
         id: save_notes
         run: |
-          # Read the release notes and prepare for output
-          cat release_notes.md > release_notes_final.md
-          echo "release_notes=See GitHub Release for complete notes" >> $GITHUB_OUTPUT
+          # Using a simplified approach for the output to avoid multiline issues
+          echo 'release_notes={"version":"${{ steps.extract_version.outputs.version }}","notes":"See GitHub Release for details"}' >> $GITHUB_OUTPUT
       
       - name: Create GitHub Release
         id: create_release
@@ -157,15 +194,15 @@ jobs:
           body_path: release_notes.md
           draft: false
           prerelease: false
-
+      
       - name: Set outputs
         id: release
         run: |
           echo "release_created=true" >> $GITHUB_OUTPUT
           echo "version=${{ steps.extract_version.outputs.version }}" >> $GITHUB_OUTPUT
           echo "upload_url=${{ steps.create_release.outputs.upload_url }}" >> $GITHUB_OUTPUT
-          # Use a simplified release notes approach for version.json
-          echo 'release_notes={"version":"${{ steps.extract_version.outputs.version }}","title":"Release ${{ github.ref_name }}","date":"'$(date +%Y-%m-%d)'","notes":"See GitHub Release for complete notes"}' >> $GITHUB_OUTPUT
+          # Using a simplified approach for releaes notes
+          echo 'release_notes={"version":"${{ steps.extract_version.outputs.version }}","notes":"See GitHub Release for details"}' >> $GITHUB_OUTPUT
 
       - name: Debug release outputs
         run: |
@@ -568,12 +605,31 @@ jobs:
           
           cat version.json
       
-      - name: Commit and push version.json
+      - name: Create PR for version.json update
         run: |
+          # Create a new branch for the changes
+          BRANCH_NAME="chore/version-json-${{ needs.release-please.outputs.version }}"
+          git checkout -b $BRANCH_NAME
+          
+          # Add and commit the changes
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add version.json
-          git commit -m "Update version.json to ${{ needs.release-please.outputs.version }}" || echo "No changes to commit"
+          git commit -m "chore: update version.json to ${{ needs.release-please.outputs.version }}" || echo "No changes to commit"
           
-          # Push using the GitHub token for authentication
-          git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main
+          # Push the branch
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" $BRANCH_NAME
+          
+          # Create a pull request using GitHub API
+          PR_RESPONSE=$(curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/pulls \
+            -d '{
+              "title": "Update version.json to ${{ needs.release-please.outputs.version }}",
+              "body": "This PR updates the version.json file for release ${{ needs.release-please.outputs.version }}. It was automatically created by the release workflow.",
+              "head": "'$BRANCH_NAME'",
+              "base": "main"
+            }')
+          
+          echo "Created PR for version.json update: $PR_RESPONSE"
