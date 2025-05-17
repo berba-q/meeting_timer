@@ -1,107 +1,90 @@
-# OnTime - Quick Start Guide
+# OnTime Meeting Timer - Quick Start Guide 🚀
 
-This guide covers the new features added in the latest version of the OnTime Meeting Timer application.
+![Main Interface](assets/main_interface.png)
 
-## New Features Overview
+** 🖥️ Main Interface Overview**  
+The top toolbar includes:  
+- ⏯️ **Start Meeting** (green) and **Pause** (orange) buttons  
+- ◀️ **Previous** / ▶️ **Next** section navigation  
+- ➖1 / ➕1 Minute adjustment controls  
+- 📋 Meeting selection dropdown  
+- ⚙️ **Settings** button for quick access  
 
-1. **Meeting Templates**
-2. **Manual Meeting Creation**
-3. **Meeting Editor**
-4. **Flexible Meeting Source Options**
-5. **Timer Testing Improvements**
+Below the toolbar, the large clock shows remaining time in HH:MM:SS. Underneath, the agenda table lists sections, durations, and status. The footer displays the **Next Part** and **Secondary Display** status.
 
-## Setting Up Meeting Sources
+---
 
-### Configuring Meeting Source Mode
+## 1. Configuring Meetings 📝
 
-1. Open **File → Settings**
-2. Select the **Meeting Source** tab
-3. Choose your preferred method for creating meetings:
-   - **Web Scraping**: Automatically download from wol.jw.org (original method)
-   - **Template-Based**: Use templates with customizations
-   - **Manual Entry**: Create meetings from scratch
+1. Click ⚙️ **Settings** in the top toolbar and select the **Meetings** tab.  
+2. Under **Midweek Meeting**, set your meeting **Day** and **Time**.  
+3. Under **Weekend Meeting**, set your meeting **Day** and **Time**.  
+4. Click ✅ **Apply** to save.
 
-![Meeting Source Settings](screenshots/meeting_source_settings.png)
+![Configure Meetings](assets/meetings_settings.png)
 
-### Additional Options
+## 2. Configuring Displays 💻 🖥️
 
-- **Automatically update meetings from the web**: Enable to fetch meetings on startup
-- **Save scraped meetings as templates**: Save web-scraped meetings as templates
-- **Always manually enter weekend songs**: Forces manual song entry for weekend meetings
+1. In ⚙️ **Settings**, go to the **Display** tab.  
+2. Under **Timer Display**, choose your theme (🌞 Light or 🌚 Dark).  
+3. In **Screen Selection**, pick:  
+   - 💻 **Primary Screen** for your main timer  
+   - 🖥️ **Secondary Screen** for external display  
+4. Check ✅ **Use Secondary Display** to enable the timer on both screens.  
+5. (Optional) Check ⏳ **Show predicted meeting end time**.  
+6. Click ✅ **Apply**.
 
-## Creating and Editing Meetings
+![Configure Displays](assets/display_settings.png)
 
-### Creating a New Meeting
+## 3. Configuring Meeting Sources 🔗
 
-1. Click **File → New Meeting**
-2. Enter meeting details (title, date, time)
-3. Select a template from the dropdown
-4. Click **Load Template** to populate the structure
-5. Add/Edit sections and parts as needed
-6. Click **Save** when complete
+1. In ⚙️ **Settings**, open the **Meeting Source** tab.  
+2. Select one mode:  
+   - 🌐 **Web Scraping**: download from wol.jw.org  (recommended)
+   - 📄 **Template-Based**: load from saved templates  
+   - ✍️ **Manual Entry**: enter all parts manually  
+3. Optionally enable:  
+   - 🔄 **Automatically update meetings from the web**  (recommended)
+   - 💾 **Save scraped meetings as templates**  
+   - 🎵 **Always manually enter weekend songs**  if you prefer to always enter the opening song for weekend meetings
+4. Click ✅ **Apply**.
 
-![Meeting Editor](screenshots/meeting_editor.png)
+![Configure Meeting Sources](assets/meeting_source.png)
 
-### Adding Sections and Parts
+## 4. Configuring Network Display 🌐
 
-1. In the meeting editor, click **Add Section**
-2. Enter a name for the section (e.g., "TREASURES FROM GOD'S WORD")
-3. With the section selected, click **Add Part**
-4. Enter part details:
-   - Title (e.g., "Bible Reading")
-   - Duration in minutes
-   - Presenter name (optional)
-5. Repeat for all meeting parts
+1. In ⚙️ **Settings**, switch to the **Network Display** tab.  
+2. Set **Network Display Mode** to 🔗 **HTTP and WebSocket (Complete solution)**.  
+3. **Recommended:** Check ✅ **Auto-start network display when application launches**.  
+4. (Optional) Check 📱 **Show QR code for easy connection**.  
+5. Click ✅ **Apply**.
 
-### Editing the Current Meeting
+![Configure Network Display](assets/network_settings.png)
 
-1. Select a meeting from the dropdown in the main window
-2. Click **File → Edit Current Meeting**
-3. Make your changes
-4. Click **Save** to update the meeting
+## 5. Using the Timer During Meetings ⏱️
 
-## Using Templates
+1. Click ▶️ **Start Meeting** (green).  
+2. Use ⏸️ **Pause**, ◀️ **Previous**/▶️ **Next**, and ➖1/➕1 **Minute** to control flow.  
+3. Read the large timer (HH:MM:SS) for remaining time.  
+4. Watch the agenda table for part statuses.  
+5. View the **Next Part** in the footer.  
+6. Click ⏹️ **Stop** or let the timer finish to end.
 
-### Saving a Meeting as Template
+![Timer Interface](assets/main_interface.png)
 
-1. Create or edit a meeting with your desired structure
-2. Click **Save as Template** in the meeting editor
-3. The template will be saved based on meeting type (Midweek/Weekend)
+## Secondary Display 🖥️
 
-### Creating a Meeting from a Template
+![Secondary Display](assets/secondary_display.png)
 
-1. Open the meeting editor (**File → New Meeting**)
-2. Select the meeting type
-3. Choose a template from the dropdown menu
-4. Click **Load Template**
-5. Customize as needed
-6. Click **Save**
+The secondary screen shows a full‑screen countdown with large digits, the upcoming part, and predicted end time (if enabled).
 
-## Updating Meetings
+---
 
-### Web Scraping Mode
+> **Note for macOS users:**  
+> After installing the `.dmg`, you may see a security warning because the app isn’t notarized by Apple. If the application is blocked, open **System Settings → Privacy & Security** and click **Open Anyway** next to OnTime Meeting Timer.  
+> For more information, see [Apple’s support article](https://support.apple.com/en-gb/guide/mac-help/mh40617/mac).
 
-When using web scraping mode, click the **Update Meetings from Web** button (F5) to fetch the latest meetings from wol.jw.org.
 
-### Template/Manual Mode
+For detailed documentation, visit the [readme document](https://github.com/berba-q/meeting_timer).
 
-When using template or manual mode, clicking the update button will show additional options:
-
-![Update Options](screenshots/update_options.png)
-
-- **Update from Web**: Force a web update regardless of current mode
-- **Edit Current Meeting**: Open the editor for the current meeting
-- **Create New Meeting**: Open the editor to create a new meeting
-
-## Tips for Success
-
-1. **Use templates for consistent meetings**: Save your common meeting formats as templates to save time.
-2. **Weekend songs**: Check "Always manually enter weekend songs" to leave song placeholders in weekend meetings.
-3. **Meeting updates**: Consider using "Save scraped meetings as templates" to maintain custom structures while getting the latest meeting content.
-4. **Edit while running**: You can edit a meeting even after it has started by using File → Edit Current Meeting.
-
-## Need Help?
-
-If you encounter any issues or have questions about the new features, please refer to the full documentation or contact support.
-
-Happy timing!
+To request for new features or to report potential bugs, please use the [issues feature](https://github.com/berba-q/meeting_timer/issues/new/choose)
