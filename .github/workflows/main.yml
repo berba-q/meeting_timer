@@ -158,7 +158,9 @@ jobs:
           echo "release_created=true" >> $GITHUB_OUTPUT
           echo "version=${{ steps.extract_version.outputs.version }}" >> $GITHUB_OUTPUT
           echo "upload_url=${{ steps.create_release.outputs.upload_url }}" >> $GITHUB_OUTPUT
-          echo "release_notes=${{ steps.save_notes.outputs.release_notes }}" >> $GITHUB_OUTPUT
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          echo "${{ steps.save_notes.outputs.release_notes }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Debug release outputs
         run: |
@@ -435,42 +437,42 @@ jobs:
           chmod +x AppDir/AppRun
           
           # Create proper AppStream metadata file
-          cat > AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml << EOF
-          echo '<?xml version="1.0" encoding="UTF-8"?>' > AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '<component type="desktop-application">' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <id>com.berba-q.ontime</id>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <name>OnTime Meeting Timer</name>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <summary>Timer application for managing meeting schedules</summary>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <metadata_license>MIT</metadata_license>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <project_license>MIT</project_license>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <description>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '    <p>OnTime Meeting Timer is a comprehensive application designed to help you manage meeting schedules efficiently. It provides timing features and notifications to keep your meetings on track.</p>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '    <p>Features include:</p>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '    <ul>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '      <li>Meeting countdown timer</li>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '      <li>Visual alerts for time management</li>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '      <li>Integration with calendar systems</li>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '      <li>Customizable timer settings</li>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '    </ul>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  </description>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <launchable type="desktop-id">ontime.desktop</launchable>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <screenshots>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '    <screenshot type="default">' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '      <caption>The main timer interface</caption>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '      <image>https://github.com/berba-q/meeting_timer/raw/main/screenshots/main.png</image>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '    </screenshot>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  </screenshots>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <url type="homepage">https://github.com/berba-q/meeting_timer</url>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <developer_name>Griffiths</developer_name>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <content_rating type="oars-1.1" />' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  <releases>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '    <release version="${{ needs.release-please.outputs.version }}" date="$(date +%Y-%m-%d)">' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '      <description>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '        <p>Latest release with bug fixes and improvements.</p>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '      </description>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '    </release>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '  </releases>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
-          echo '</component>' >> AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml
+          cat > AppDir/usr/share/metainfo/com.berba-q.ontime.appdata.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <component type="desktop-application">
+            <id>com.berba-q.ontime</id>
+            <name>OnTime Meeting Timer</name>
+            <summary>Timer application for managing meeting schedules</summary>
+            <metadata_license>MIT</metadata_license>
+            <project_license>MIT</project_license>
+            <description>
+              <p>OnTime Meeting Timer is a comprehensive application designed to help you manage meeting schedules efficiently. It provides timing features and notifications to keep your meetings on track.</p>
+              <p>Features include:</p>
+              <ul>
+                <li>Meeting countdown timer</li>
+                <li>Visual alerts for time management</li>
+                <li>Integration with calendar systems</li>
+                <li>Customizable timer settings</li>
+              </ul>
+            </description>
+            <launchable type="desktop-id">ontime.desktop</launchable>
+            <screenshots>
+              <screenshot type="default">
+                <caption>The main timer interface</caption>
+                <image>https://github.com/berba-q/meeting_timer/raw/main/screenshots/main.png</image>
+              </screenshot>
+            </screenshots>
+            <url type="homepage">https://github.com/berba-q/meeting_timer</url>
+            <developer_name>Griffiths</developer_name>
+            <content_rating type="oars-1.1" />
+            <releases>
+              <release version="${{ needs.release-please.outputs.version }}" date="$(date +%Y-%m-%d)">
+                <description>
+                  <p>Latest release with bug fixes and improvements.</p>
+                </description>
+              </release>
+            </releases>
+          </component>
           EOF
 
           # Make sure the desktop file has the correct ID
