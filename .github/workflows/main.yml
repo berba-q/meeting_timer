@@ -109,19 +109,28 @@ jobs:
           if [ -n "$PREV_TAG" ]; then
             echo "Generating notes for changes between $PREV_TAG and $TAG_NAME"
             
-            # Get the list of commits between the tags in a more direct way
+            # Debug: Show all commits between tags
+            echo "All commits between $PREV_TAG and $TAG_NAME:"
+            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"%h %s"
+            
+            # Debug: Show what our grep would find as features
+            echo "Feature commits found (debug):"
+            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"%h %s" | grep -i "feat"
+            
+            # Get the list of commits between the tags with better pattern matching
             echo "### Features:" >> release_notes.md
-            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"* %s (%h)" | grep -i "^feat" >> release_notes.md || echo "* No new features in this release" >> release_notes.md
+            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"* %s (%h)" | grep -i -E "^feat|^* feat" >> release_notes.md || echo "* No new features in this release" >> release_notes.md
             echo "" >> release_notes.md
             echo "" >> release_notes.md
             
             echo "### Bug Fixes:" >> release_notes.md
-            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"* %s (%h)" | grep -i "^fix" >> release_notes.md || echo "* No bug fixes in this release" >> release_notes.md
+            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"* %s (%h)" | grep -i -E "^fix|^* fix" >> release_notes.md || echo "* No bug fixes in this release" >> release_notes.md
             echo "" >> release_notes.md
             echo "" >> release_notes.md
             
             echo "### Other Changes:" >> release_notes.md
-            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"* %s (%h)" | grep -v -i "^feat\|^fix" >> release_notes.md || echo "* No other changes in this release" >> release_notes.md
+            # Exclude both feat and fix with expanded pattern matching
+            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"* %s (%h)" | grep -v -i -E "^feat|^* feat|^fix|^* fix" >> release_notes.md || echo "* No other changes in this release" >> release_notes.md
             echo "" >> release_notes.md
           else
             echo "No previous tag found, using recent commits"
@@ -139,7 +148,7 @@ jobs:
           echo "* [Linux AppImage](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/OnTimeMeetingTimer-$VERSION.AppImage)" >> release_notes.md
           echo "" >> release_notes.md
           
-          # Display the release notes for debugging
+          # Display the generated release notes for debugging
           echo "Generated release notes:"
           cat release_notes.md
 
