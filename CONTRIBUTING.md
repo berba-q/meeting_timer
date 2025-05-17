@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to bug fixes and new features! This guide outlines how to get started, the expected workflow, and our standards for commits and pull requests.
 
+Special thanks to `Michael Mena`, `Antonio Montaperto` and `Clayton Smith` for their kind contributions to this project ⭐⭐⭐⭐⭐!
+
 ---
 
 ## 📦 Project Setup
