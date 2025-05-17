@@ -102,38 +102,34 @@ jobs:
           echo "## Changes in this release:" >> release_notes.md
           echo "" >> release_notes.md
 
-          # Try to generate notes just for the current release
-          PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p' || true)
+          # Try to find the previous tag using a more reliable method
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git tag --sort=-creatordate | sed -n '2p' || echo "")
+          echo "Previous tag found: $PREV_TAG"
 
           if [ -n "$PREV_TAG" ]; then
-            echo "Found previous tag: $PREV_TAG - generating notes since then"
-            npx --yes conventional-changelog-cli -p angular -r 1 --tag-prefix "" -o release_notes_temp.md --commit-path="."
-
-            if [ -s release_notes_temp.md ]; then
-              cat release_notes_temp.md >> release_notes.md
-            else
-              # Get specific commit types using grep to organize changes
-              echo "### New Features:" >> release_notes.md
-              git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" | grep -i "^feat" >> release_notes.md || echo "* No new features in this release" >> release_notes.md
-              echo "" >> release_notes.md
-              echo "" >> release_notes.md
-
-              echo "### Bug Fixes:" >> release_notes.md
-              git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" | grep -i "^fix" >> release_notes.md || echo "* No bug fixes in this release" >> release_notes.md
-              echo "" >> release_notes.md
-              echo "" >> release_notes.md
-
-              echo "### Other Changes:" >> release_notes.md
-              git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" | grep -v -i "^feat\|^fix" >> release_notes.md || echo "* No other changes in this release" >> release_notes.md
-              echo "" >> release_notes.md
-            fi
+            echo "Generating notes for changes between $PREV_TAG and $TAG_NAME"
+            
+            # Get the list of commits between the tags in a more direct way
+            echo "### Features:" >> release_notes.md
+            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"* %s (%h)" | grep -i "^feat" >> release_notes.md || echo "* No new features in this release" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "" >> release_notes.md
+            
+            echo "### Bug Fixes:" >> release_notes.md
+            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"* %s (%h)" | grep -i "^fix" >> release_notes.md || echo "* No bug fixes in this release" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "" >> release_notes.md
+            
+            echo "### Other Changes:" >> release_notes.md
+            git log "$PREV_TAG..$TAG_NAME" --pretty=format:"* %s (%h)" | grep -v -i "^feat\|^fix" >> release_notes.md || echo "* No other changes in this release" >> release_notes.md
+            echo "" >> release_notes.md
           else
-            # No previous tag found, use recent commits
+            echo "No previous tag found, using recent commits"
             echo "### All Changes:" >> release_notes.md
             echo "" >> release_notes.md
             git log -n 20 --pretty=format:"* %s (%h)" >> release_notes.md
           fi
-
+          
           # Add download links to the release notes
           echo "" >> release_notes.md
           echo "## Downloads" >> release_notes.md
@@ -142,7 +138,7 @@ jobs:
           echo "* [macOS DMG](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/OnTimeMeetingTimer-$VERSION.dmg)" >> release_notes.md
           echo "* [Linux AppImage](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/OnTimeMeetingTimer-$VERSION.AppImage)" >> release_notes.md
           echo "" >> release_notes.md
-
+          
           # Display the release notes for debugging
           echo "Generated release notes:"
           cat release_notes.md
@@ -191,7 +187,6 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          generate_release_notes: true
           body_path: release_notes.md
           draft: false
           prerelease: false
@@ -581,29 +576,22 @@ jobs:
           VERSION=$(echo "$VERSION_RAW" | sed 's/^timerV//;s/^v//')
           TODAY=$(date +"%Y-%m-%d")
           REPO="${GITHUB_REPOSITORY}"
-          RELEASE_NOTES="${{needs.release-please.outputs.release_notes}}"
-          if [ -z "$RELEASE_NOTES" ]; then
-            RELEASE_NOTES="No release notes available."
-          fi
           
-          # Create version.json file
-          cat > version.json << EOF
-          {
-            "version": "${VERSION}",
-            "releaseDate": "${TODAY}",
+          echo '{
+            "version": "'"$VERSION"'",
+            "releaseDate": "'"$TODAY"'",
             "downloadUrl": {
-              "windows": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}-setup.exe",
-              "macos": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.dmg",
-              "linux": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.AppImage"
+              "windows": "https://github.com/'"$REPO"'/releases/download/'"$VERSION_RAW"'/OnTimeMeetingTimer-'"$VERSION"'-setup.exe",
+              "macos": "https://github.com/'"$REPO"'/releases/download/'"$VERSION_RAW"'/OnTimeMeetingTimer-'"$VERSION"'.dmg",
+              "linux": "https://github.com/'"$REPO"'/releases/download/'"$VERSION_RAW"'/OnTimeMeetingTimer-'"$VERSION"'.AppImage"
             },
             "releaseNotes": "See GitHub Release for complete notes",
             "sha256": {
-              "windows": "${{ steps.sha.outputs.win_sha }}",
-              "macos": "${{ steps.sha.outputs.mac_sha }}",
-              "linux": "${{ steps.sha.outputs.linux_sha }}"
+              "windows": "'"${{ steps.sha.outputs.win_sha }}"'",
+              "macos": "'"${{ steps.sha.outputs.mac_sha }}"'",
+              "linux": "'"${{ steps.sha.outputs.linux_sha }}"'"
             }
-          }
-          EOF
+          }' > version.json
           
           # Display the generated file for debugging
           echo "Generated version.json:"
