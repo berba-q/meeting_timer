@@ -1,4 +1,4 @@
-# Contributing to JW Meeting Timer
+# Contributing to OnTime Meeting Timer
 
 Thank you for your interest in contributing to bug fixes and new features! This guide outlines how to get started, the expected workflow, and our standards for commits and pull requests.
 
