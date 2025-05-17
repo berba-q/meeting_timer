@@ -101,14 +101,14 @@ jobs:
           echo "" >> release_notes.md
           echo "## Changes in this release:" >> release_notes.md
           echo "" >> release_notes.md
-          
+
           # Try to generate notes just for the current release
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          
+          PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p' || true)
+
           if [ -n "$PREV_TAG" ]; then
             echo "Found previous tag: $PREV_TAG - generating notes since then"
-            npx --yes conventional-changelog-cli -p angular -o release_notes_temp.md --commit-path="."
-            
+            npx --yes conventional-changelog-cli -p angular -r 1 --tag-prefix "" -o release_notes_temp.md --commit-path="."
+
             if [ -s release_notes_temp.md ]; then
               cat release_notes_temp.md >> release_notes.md
             else
@@ -117,12 +117,12 @@ jobs:
               git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" | grep -i "^feat" >> release_notes.md || echo "* No new features in this release" >> release_notes.md
               echo "" >> release_notes.md
               echo "" >> release_notes.md
-              
+
               echo "### Bug Fixes:" >> release_notes.md
               git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" | grep -i "^fix" >> release_notes.md || echo "* No bug fixes in this release" >> release_notes.md
               echo "" >> release_notes.md
               echo "" >> release_notes.md
-              
+
               echo "### Other Changes:" >> release_notes.md
               git log $PREV_TAG..HEAD --pretty=format:"* %s (%h)" | grep -v -i "^feat\|^fix" >> release_notes.md || echo "* No other changes in this release" >> release_notes.md
               echo "" >> release_notes.md
@@ -133,7 +133,7 @@ jobs:
             echo "" >> release_notes.md
             git log -n 20 --pretty=format:"* %s (%h)" >> release_notes.md
           fi
-          
+
           # Add download links to the release notes
           echo "" >> release_notes.md
           echo "## Downloads" >> release_notes.md
@@ -142,7 +142,7 @@ jobs:
           echo "* [macOS DMG](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/OnTimeMeetingTimer-$VERSION.dmg)" >> release_notes.md
           echo "* [Linux AppImage](https://github.com/${{ github.repository }}/releases/download/$TAG_NAME/OnTimeMeetingTimer-$VERSION.AppImage)" >> release_notes.md
           echo "" >> release_notes.md
-          
+
           # Display the release notes for debugging
           echo "Generated release notes:"
           cat release_notes.md
@@ -151,14 +151,14 @@ jobs:
       - name: Create PR for CHANGELOG.md update
         run: |
           # Create a new branch for the changes
-          BRANCH_NAME="docs/changelog-${{ env.TAG_NAME }}"
+          BRANCH_NAME="docs/changelog-${{ steps.extract_version.outputs.version }}"
           git checkout -b $BRANCH_NAME
           
           # Add and commit the changes
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add CHANGELOG.md
-          git commit -m "docs: update CHANGELOG.md for release ${{ env.TAG_NAME }}" || echo "No changes to commit"
+          git commit -m "docs: update CHANGELOG.md for release ${{ steps.extract_version.outputs.version }}" || echo "No changes to commit"
           
           # Push the branch
           git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" $BRANCH_NAME
@@ -169,8 +169,8 @@ jobs:
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/pulls \
             -d '{
-              "title": "Update CHANGELOG.md for release ${{ env.TAG_NAME }}",
-              "body": "This PR updates the CHANGELOG.md file for release ${{ env.TAG_NAME }}. It was automatically created by the release workflow.",
+              "title": "Update CHANGELOG.md for release ${{ steps.extract_version.outputs.version }}",
+              "body": "This PR updates the CHANGELOG.md file for release ${{ steps.extract_version.outputs.version }}. It was automatically created by the release workflow.",
               "head": "'$BRANCH_NAME'",
               "base": "main"
             }')
@@ -185,12 +185,13 @@ jobs:
       
       - name: Create GitHub Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
           body_path: release_notes.md
           draft: false
           prerelease: false
@@ -585,6 +586,7 @@ jobs:
             RELEASE_NOTES="No release notes available."
           fi
           
+          # Create version.json file
           cat > version.json << EOF
           {
             "version": "${VERSION}",
@@ -594,7 +596,7 @@ jobs:
               "macos": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.dmg",
               "linux": "https://github.com/${REPO}/releases/download/${VERSION_RAW}/OnTimeMeetingTimer-${VERSION}.AppImage"
             },
-            "releaseNotes": ${RELEASE_NOTES@Q},
+            "releaseNotes": "See GitHub Release for complete notes",
             "sha256": {
               "windows": "${{ steps.sha.outputs.win_sha }}",
               "macos": "${{ steps.sha.outputs.mac_sha }}",
@@ -603,6 +605,8 @@ jobs:
           }
           EOF
           
+          # Display the generated file for debugging
+          echo "Generated version.json:"
           cat version.json
       
       - name: Create PR for version.json update
