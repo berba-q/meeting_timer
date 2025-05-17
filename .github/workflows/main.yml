@@ -158,12 +158,8 @@ jobs:
           echo "release_created=true" >> $GITHUB_OUTPUT
           echo "version=${{ steps.extract_version.outputs.version }}" >> $GITHUB_OUTPUT
           echo "upload_url=${{ steps.create_release.outputs.upload_url }}" >> $GITHUB_OUTPUT
-          # Using a different approach for multiline release notes
-          # Create a delimiter that's unlikely to appear in the content
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "release_notes<<$EOF" >> $GITHUB_OUTPUT
-          echo "${{ steps.save_notes.outputs.release_notes }}" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
+          # Correctly write multiline release notes output
+          printf "release_notes<<EOF\n%s\nEOF\n" "${{ steps.save_notes.outputs.release_notes }}" >> $GITHUB_OUTPUT
 
       - name: Debug release outputs
         run: |
