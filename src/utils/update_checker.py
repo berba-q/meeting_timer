@@ -13,6 +13,14 @@ from pathlib import Path
 import urllib.request
 import urllib.error
 import ssl
+
+
+ # Use certifi bundle to ensure up-to-date CAs on macOS and packaged Python
+try:
+    import certifi
+    SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+except ImportError:
+    SSL_CONTEXT = ssl.create_default_context()
 from typing import Dict, Optional, Tuple, Any
 from datetime import datetime
 from PyQt6.QtWidgets import (
@@ -46,7 +54,7 @@ class UpdateChecker(QObject):
         url = UPDATE_CHECK_URL + cache_buster
         for attempt in range(3):
             try:
-                with urllib.request.urlopen(url, timeout=15) as response:
+                with urllib.request.urlopen(url, timeout=15, context=SSL_CONTEXT) as response:
                     content = response.read().decode('utf-8')
                     version_info = json.loads(content)
 
@@ -325,7 +333,7 @@ class DownloadWorker(QObject):
             request = urllib.request.Request(self.url, headers={'User-Agent': 'Mozilla/5.0'})
 
             # Open the URL
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with urllib.request.urlopen(request, timeout=30, context=SSL_CONTEXT) as response:
                 # Get file size
                 file_size = int(response.info().get('Content-Length', 0))
 
