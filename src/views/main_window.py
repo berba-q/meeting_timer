@@ -7,10 +7,10 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QComboBox, QTabWidget, QMessageBox, QDockWidget,
     QSplitter, QFrame, QToolBar, QStatusBar, QMenuBar,
-    QApplication, QSizePolicy
+    QApplication, QSizePolicy, QSystemTrayIcon, QGraphicsOpacityEffect
 )
 from PyQt6.QtGui import QIcon, QAction, QFont
-from PyQt6.QtCore import Qt, QSize, pyqtSlot, QTimer, QEvent, QThread, pyqtSignal, QObject
+from PyQt6.QtCore import Qt, QSize, pyqtSlot, QTimer, QEvent, QThread, pyqtSignal, QObject, QPropertyAnimation, QEasingCurve
 from PyQt6.QtWidgets import QDialog
 
 from src.utils.screen_handler import ScreenHandler
@@ -60,8 +60,8 @@ class UpdateCheckWorker(QObject):
 
 class MainWindow(QMainWindow):
     """Main application window"""
-    
-    def __init__(self, meeting_controller: MeetingController, settings_controller: SettingsController):
+
+    def __init__(self, meeting_controller: MeetingController, timer_controller: TimerController, settings_controller: SettingsController):
         super().__init__()
         
         # Cache the last network URL so late‑loaded widgets can sync
@@ -108,6 +108,9 @@ class MainWindow(QMainWindow):
         # Now create other UI components
         self._create_menu_bar()
         self._create_tool_bar()
+        # Initialize persistent system tray icon for notifications
+        self.tray_icon = QSystemTrayIcon(self.windowIcon(), self)
+        self.tray_icon.show()
         self._create_central_widget()
         self._create_status_bar()
         
@@ -119,6 +122,18 @@ class MainWindow(QMainWindow):
         
         # Start loading components in background
         QTimer.singleShot(100, self._start_component_loading)
+        
+        # Reminders to start/advance the meeting
+        from src.controllers.reminder_controller import ReminderController
+        self.reminder_controller = ReminderController(
+            self.timer_controller, 
+            self.settings_controller,
+            self.meeting_controller,
+            parent=self)
+        
+        # Connect reminder signals
+        self.reminder_controller.remind_to_start.connect(self.nudge_start)
+        self.reminder_controller.remind_to_advance.connect(self.nudge_advance)
 
     def _restore_window_size(self):
         self.setMinimumSize(600, 400)
@@ -1414,30 +1429,6 @@ class MainWindow(QMainWindow):
         if settings.display.remember_tools_dock_state:
             QTimer.singleShot(0, lambda: self.tools_dock.setVisible(settings.display.show_tools_dock))
     
-    """
-    def _display_mode_changed(self, mode):
-        self.timer_view.set_display_mode(mode)
-        
-        # Check if secondary display exists before trying to update it
-        if self.secondary_display:
-            # Check what attributes are available
-            if hasattr(self.secondary_display, 'timer_view'):
-                # Old implementation with timer_view
-                self.secondary_display.timer_view.set_display_mode(mode)
-            else:
-                # New implementation with direct timer label
-                # No need to change display mode as it's always digital
-                pass
-                
-        self._update_display_mode_label()
-    """
-    """
-    def _update_display_mode_label(self):
-        mode = self.settings_controller.get_settings().display.display_mode
-        mode_text = "Digital" if mode == TimerDisplayMode.DIGITAL else "Analog"
-        self.display_mode_label.setText(f"Display Mode: {mode_text}")
-    """
-    
     def _update_secondary_display_label(self):
         """Update the secondary display indicator in the status bar"""
         settings = self.settings_controller.get_settings()
@@ -1577,6 +1568,41 @@ class MainWindow(QMainWindow):
     def _adjust_time(self, minutes_delta):
         """Adjust timer by adding/removing minutes"""
         self.timer_controller.adjust_time(minutes_delta)
+    
+    # Notification for meeting start and advance    
+    def _nudge_start(self):
+        """Visual + tray nudge to start the meeting."""
+        if not getattr(self, 'start_button', None):
+            return
+        self._pulse_widget(self.start_button)
+        self.tray_icon.showMessage("⌛ Did We Forget Something?",
+            "Click Start Meeting to launch the meeting timer and stay on track.")
+
+    def _nudge_advance(self):
+        """Visual + tray nudge to advance parts."""
+        if not getattr(self, 'next_button', None):
+            return
+        self._pulse_widget(self.next_button)
+        part = getattr(self.timer_controller, 'current_part', None)
+        title = getattr(part, 'title', 'current part')
+        self.tray_icon.showMessage("😅 Whoops, looks like!",
+                                   f"'{title}' is over — advance to next part?")
+
+    def _pulse_widget(self, widget):
+        """Animate a widget with a brief opacity pulse to draw attention."""
+        # Ensure the widget has an opacity effect
+        effect = widget.graphicsEffect()
+        if not isinstance(effect, QGraphicsOpacityEffect):
+            effect = QGraphicsOpacityEffect(widget)
+            widget.setGraphicsEffect(effect)
+        # Animate opacity 1.0 -> 0.3 -> 1.0
+        anim = QPropertyAnimation(effect, b"opacity", widget)
+        anim.setDuration(800)
+        anim.setStartValue(1.0)
+        anim.setKeyValueAt(0.5, 0.3)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
     
     def _create_new_meeting(self):
         """Create a new custom meeting"""

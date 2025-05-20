@@ -175,7 +175,12 @@ class AppSettings:
     meeting_source: MeetingSourceSettings = field(default_factory=MeetingSourceSettings)
     recent_meetings: List[str] = field(default_factory=list)  # List of meeting file paths
     network_display: NetworkDisplaySettings = field(default_factory=NetworkDisplaySettings)
-    
+    # Global notification reminder settings
+    start_reminder_enabled: bool = True
+    start_reminder_delay:   int  = 2  # seconds
+    overrun_enabled:        bool = True
+    overrun_delay:          int  = 20  # seconds
+
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
         return {
@@ -185,7 +190,11 @@ class AppSettings:
             'display': self.display.to_dict(),
             'meeting_source': self.meeting_source.to_dict(),
             'recent_meetings': self.recent_meetings,
-            'network_display': self.network_display.to_dict()
+            'network_display': self.network_display.to_dict(),
+            'start_reminder_enabled': self.start_reminder_enabled,
+            'start_reminder_delay':   self.start_reminder_delay,
+            'overrun_enabled':        self.overrun_enabled,
+            'overrun_delay':          self.overrun_delay,
         }
     
     @classmethod
@@ -198,7 +207,11 @@ class AppSettings:
             display=DisplaySettings.from_dict(data.get('display', {})),
             meeting_source=MeetingSourceSettings.from_dict(data.get('meeting_source', {})),
             recent_meetings=data.get('recent_meetings', []),
-            network_display=NetworkDisplaySettings.from_dict(data.get('network_display', {}))
+            network_display=NetworkDisplaySettings.from_dict(data.get('network_display', {})),
+            start_reminder_enabled=data.get('start_reminder_enabled', True),
+            start_reminder_delay=data.get('start_reminder_delay', 2),
+            overrun_enabled=data.get('overrun_enabled', True),
+            overrun_delay=data.get('overrun_delay', 20),
         )
 
 class SettingsManager:

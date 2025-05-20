@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QComboBox, QCheckBox, QTimeEdit, QPushButton,
     QGroupBox, QFormLayout, QSpinBox, QDialogButtonBox,
-    QRadioButton, QButtonGroup, QScrollArea, QLineEdit
+    QRadioButton, QButtonGroup, QScrollArea, QLineEdit, QGridLayout
 )
 from PyQt6.QtCore import Qt, QTime
 from PyQt6.QtGui import QPixmap, QImage
@@ -161,12 +161,52 @@ class SettingsDialog(QDialog):
         
         weekend_layout.addRow("Day:", self.weekend_day_combo)
         weekend_layout.addRow("Time:", self.weekend_time_edit)
+
+        # Initialize notification reminder controls
+        from PyQt6.QtWidgets import QCheckBox, QSpinBox  # ensure imports at top if missing
+
+        self.start_reminder_check = QCheckBox("Remind to start timer after delay")
+        self.start_delay_spin = QSpinBox()
+        self.start_delay_spin.setRange(1, 300)
+        self.start_delay_spin.setSuffix(" s")
+        self.start_delay_spin.setMaximumWidth(60)
+        self.start_reminder_check.setToolTip(
+            "When enabled, shows a reminder if you haven't started the timer after the specified delay."
+        )
+        self.start_delay_spin.setToolTip(
+            "Delay in seconds before reminding to start the timer."
+        )
+
+        self.overrun_reminder_check = QCheckBox("Remind on part overrun after delay")
+        self.overrun_delay_spin = QSpinBox()
+        self.overrun_delay_spin.setRange(1, 300)
+        self.overrun_delay_spin.setSuffix(" s")
+        self.overrun_delay_spin.setMaximumWidth(60)
+        self.overrun_reminder_check.setToolTip(
+            "When enabled, shows a reminder if a meeting part exceeds its allocated time."
+        )
+        self.overrun_delay_spin.setToolTip(
+            "Delay in seconds before reminding to move to the next part."
+        )
+        
+        # Notification reminders settings
+        notif_group = QGroupBox("Notification Reminders")
+        notif_layout = QFormLayout(notif_group)
+        #notif_group.setLayout(notif_layout)
+        #notif_layout.setContentsMargins(10, 5, 10, 10)
+        #notif_layout.setSpacing(8)
+        notif_layout.addRow(self.start_reminder_check, self.start_delay_spin)
+        notif_layout.addRow(self.overrun_reminder_check, self.overrun_delay_spin)
+       
+        
         
         # Add groups to layout
         layout.addWidget(midweek_group)
         layout.addWidget(weekend_group)
+        layout.addWidget(notif_group)
         layout.addStretch()
-    
+        
+       
     def _setup_display_tab(self):
         """Setup display settings tab"""
         layout = QVBoxLayout(self.display_tab)
@@ -389,6 +429,11 @@ class SettingsDialog(QDialog):
             settings.weekend_meeting.time.hour,
             settings.weekend_meeting.time.minute
         ))
+        # Notification reminder settings
+        self.start_reminder_check.setChecked(settings.start_reminder_enabled)
+        self.start_delay_spin.setValue(settings.start_reminder_delay)
+        self.overrun_reminder_check.setChecked(settings.overrun_enabled)
+        self.overrun_delay_spin.setValue(settings.overrun_delay)
         
         # Display settings
         # Digital is the only supported mode; nothing to update here.
@@ -477,6 +522,12 @@ class SettingsDialog(QDialog):
         weekend_time = time(weekend_time_qtime.hour(), weekend_time_qtime.minute())
         
         self.settings_controller.set_weekend_meeting(weekend_day, weekend_time)
+        
+        # Notification reminder settings
+        self.settings_controller.set_start_reminder_enabled(self.start_reminder_check.isChecked())
+        self.settings_controller.set_start_reminder_delay(self.start_delay_spin.value())
+        self.settings_controller.set_overrun_enabled(self.overrun_reminder_check.isChecked())
+        self.settings_controller.set_overrun_delay(self.overrun_delay_spin.value())
         
         # Display settings
         

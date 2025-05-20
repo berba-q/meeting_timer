@@ -166,6 +166,30 @@ class SettingsController(QObject):
         self.settings_manager.settings.meeting_source.weekend_songs_manual = enabled
         self.settings_manager.save_settings()
         self.settings_changed.emit()
+
+    def set_start_reminder_enabled(self, enabled: bool):
+        """Enable/disable start timer reminder"""
+        self.settings_manager.settings.start_reminder_enabled = enabled
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+
+    def set_start_reminder_delay(self, delay: int):
+        """Set delay (seconds) before start timer reminder"""
+        self.settings_manager.settings.start_reminder_delay = delay
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+
+    def set_overrun_enabled(self, enabled: bool):
+        """Enable/disable part overrun reminder"""
+        self.settings_manager.settings.overrun_enabled = enabled
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
+
+    def set_overrun_delay(self, delay: int):
+        """Set delay (seconds) before part overrun reminder"""
+        self.settings_manager.settings.overrun_delay = delay
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
     
     def get_all_screens(self):
         """Get information about all available screens"""
