@@ -1555,16 +1555,42 @@ class MainWindow(QMainWindow):
         
         if self.timer_controller.timer.state == TimerState.RUNNING:
             self.timer_controller.pause_timer()
+            # Disable all other controls during pause
+            self.prev_button.setEnabled(False)
+            self.next_button.setEnabled(False)
+            self.decrease_button.setEnabled(False)
+            self.increase_button.setEnabled(False)
+            #self.start_button.setEnabled(False)
             self.pause_resume_button.setText("Resume")
             self.pause_resume_button.setIcon(get_icon("play"))
             self.pause_resume_button.setObjectName("startButton")  # Change style
             self.pause_resume_button.setStyleSheet("")  # Force style refresh
+            
+            # Blur/opacity effect on controls
+            for widget in [self.prev_button, self.next_button, self.decrease_button, self.increase_button]:
+                if widget:
+                    blur_effect = QGraphicsOpacityEffect(widget)
+                    blur_effect.setOpacity(0.4)
+                    widget.setGraphicsEffect(blur_effect)
+            
         else:
             self.timer_controller.resume_timer()
+            # Re-enable controls after resuming
+            self.prev_button.setEnabled(True)
+            self.next_button.setEnabled(True)
+            self.decrease_button.setEnabled(True)
+            self.increase_button.setEnabled(True)
+            self.meeting_selector.setEnabled(True)
             self.pause_resume_button.setText("Pause")
             self.pause_resume_button.setIcon(get_icon("pause"))
             self.pause_resume_button.setObjectName("pauseButton")  # Change style
             self.pause_resume_button.setStyleSheet("")  # Force style refresh
+            
+            # Remove blur/opacity effect on controls
+            for widget in [self.prev_button, self.next_button, self.decrease_button, self.increase_button, self.start_button, self.meeting_selector]:
+                if widget and isinstance(widget.graphicsEffect(), QGraphicsOpacityEffect):
+                    widget.graphicsEffect().setOpacity(1.0)
+                    widget.setGraphicsEffect(None)
     
     def _next_part(self):
         """Move to the next part"""
