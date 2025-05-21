@@ -7,7 +7,7 @@ from pathlib import Path
 
 # Application information
 APP_NAME = "OnTime"
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 APP_AUTHOR = "Open Source"
 
 # Determine if we're running in a bundled app (e.g., PyInstaller)

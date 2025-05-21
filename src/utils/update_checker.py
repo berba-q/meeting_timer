@@ -14,6 +14,8 @@ import urllib.request
 import urllib.error
 import ssl
 
+from src import __version__ as CURRENT_VERSION
+
 
  # Use certifi bundle to ensure up-to-date CAs on macOS and packaged Python
 try:
@@ -29,8 +31,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QTimer
 
-# Current version - this should match __version__ in src/__init__.py
-CURRENT_VERSION = "1.0.2"
 
 # URL to check for updates
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/berba-q/meeting_timer/main/version.json"
@@ -50,6 +50,7 @@ class UpdateChecker(QObject):
     def check_for_updates(self):
         """Check for updates - called from a worker thread"""
         # Add a random query parameter to avoid caching
+        
         cache_buster = f"?t={int(time.time())}"
         url = UPDATE_CHECK_URL + cache_buster
         for attempt in range(3):
