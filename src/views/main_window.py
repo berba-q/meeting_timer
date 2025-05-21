@@ -1557,8 +1557,16 @@ class MainWindow(QMainWindow):
         self.timer_controller.start_meeting()
     
     def _stop_meeting(self):
-        """Stop the current meeting"""
-        self.timer_controller.stop_meeting()
+        """Stop the current meeting after confirmation"""
+        confirm = QMessageBox.question(
+            self,
+            "End Meeting?",
+            "😅 Hold up! Are you sure you want to stop the meeting?\nThis will end the timer and reset the session.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel
+        )
+        if confirm == QMessageBox.StandardButton.Yes:
+            self.timer_controller.stop_meeting()
     
     def _toggle_pause_resume(self):
         """Toggle between pause and resume"""
