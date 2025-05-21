@@ -13,6 +13,16 @@ from pathlib import Path
 import urllib.request
 import urllib.error
 import ssl
+
+from src import __version__ as CURRENT_VERSION
+
+
+ # Use certifi bundle to ensure up-to-date CAs on macOS and packaged Python
+try:
+    import certifi
+    SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+except ImportError:
+    SSL_CONTEXT = ssl.create_default_context()
 from typing import Dict, Optional, Tuple, Any
 from datetime import datetime
 from PyQt6.QtWidgets import (
@@ -21,8 +31,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QTimer
 
-# Current version - this should match __version__ in src/__init__.py
-CURRENT_VERSION = "1.0.2"
 
 # URL to check for updates
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/berba-q/meeting_timer/main/version.json"
@@ -42,11 +50,12 @@ class UpdateChecker(QObject):
     def check_for_updates(self):
         """Check for updates - called from a worker thread"""
         # Add a random query parameter to avoid caching
+        
         cache_buster = f"?t={int(time.time())}"
         url = UPDATE_CHECK_URL + cache_buster
         for attempt in range(3):
             try:
-                with urllib.request.urlopen(url, timeout=15) as response:
+                with urllib.request.urlopen(url, timeout=15, context=SSL_CONTEXT) as response:
                     content = response.read().decode('utf-8')
                     version_info = json.loads(content)
 
@@ -325,7 +334,7 @@ class DownloadWorker(QObject):
             request = urllib.request.Request(self.url, headers={'User-Agent': 'Mozilla/5.0'})
 
             # Open the URL
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with urllib.request.urlopen(request, timeout=30, context=SSL_CONTEXT) as response:
                 # Get file size
                 file_size = int(response.info().get('Content-Length', 0))
 

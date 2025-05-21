@@ -4,10 +4,10 @@ Application configuration constants and settings for OnTime Meeting Timer
 import os
 import sys
 from pathlib import Path
+from src import __version__ as APP_VERSION
 
 # Application information
 APP_NAME = "OnTime"
-APP_VERSION = "1.0.2"
 APP_AUTHOR = "Open Source"
 
 # Determine if we're running in a bundled app (e.g., PyInstaller)

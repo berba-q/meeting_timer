@@ -94,6 +94,7 @@ from pathlib import Path
 from src.models.meeting import MeetingType
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.controllers.meeting_controller import MeetingController
+from src.controllers.timer_controller import TimerController
 from src.controllers.settings_controller import SettingsController
 from src.views.main_window import MainWindow
 from src.utils.resources import get_icon, apply_stylesheet
@@ -194,10 +195,16 @@ def main():
     # Direct initialization
     controller = MeetingController()
     settings_controller = SettingsController(controller.settings_manager)
+    timer_controller = TimerController(settings_controller)
     controller.load_meetings()
     splash.status_label.setText("Loading complete...")
 
-    main_window = MainWindow(controller, settings_controller)
+    # Pass both MeetingController and its TimerController to MainWindow
+    main_window = MainWindow(
+        controller,
+        timer_controller,
+        settings_controller
+    )
     _select_meeting_by_day(controller, main_window)
     splash.finish(main_window)
     main_window.show()

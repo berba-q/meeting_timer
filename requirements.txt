@@ -20,3 +20,6 @@ jsonschema>=4.23.0
 
 # For cache directory
 platformdirs>=4.3.7
+
+# SSL certificate
+certifi>=2025.1.31
