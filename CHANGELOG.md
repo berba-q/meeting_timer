@@ -1,6 +1,23 @@
 # Changelog
 
-# [](https://github.com/berba-q/meeting_timer/compare/v1.0.2...v) (2025-05-17)
+# [](https://github.com/berba-q/meeting_timer/compare/v1.0.3...v) (2025-05-21)
+
+
+### Bug Fixes
+
+* add SSL certificate dependency to requirements.txt ([cb7c41f](https://github.com/berba-q/meeting_timer/commit/cb7c41fc9403a25315759e5a105302194bb8a39e))
+* correct download URLs in version.json to include 'v' prefix for version ([041d3c8](https://github.com/berba-q/meeting_timer/commit/041d3c8964cb23744c869f7f0cf171268d782d92))
+* implement SSL context for secure URL requests in update checker ([8f3673a](https://github.com/berba-q/meeting_timer/commit/8f3673abc629b36f2e3c1bd53e0afaa36c57a547))
+* **workflow:** enhance release notes generation with improved commit filtering and debugging output ([9360266](https://github.com/berba-q/meeting_timer/commit/9360266012a0f6d029fb55bdd1800157bb452364))
+
+
+### Features
+
+* add confirmation dialog for stopping a meeting ([e676fbb](https://github.com/berba-q/meeting_timer/commit/e676fbb0ff3c0124e95bfc0ce656d16259537bdf))
+* add reminder functionality for meeting start and next part with user-configurable settings ([1bb1c9f](https://github.com/berba-q/meeting_timer/commit/1bb1c9fdcad4de4f4c808b96622993a38ecde578))
+* enhance reminder functionality with improved timer management and visual cues ([c961457](https://github.com/berba-q/meeting_timer/commit/c9614575c68f167a27381962b6e86b4b1f9fc386))
+* enhance timer controls with pause state management and visual feedback ([9e4b06e](https://github.com/berba-q/meeting_timer/commit/9e4b06e614348733920f23b2bd2bd0ff1d0c812d))
+* update meeting selector behavior with blur effect during meeting start ([e6c2b8a](https://github.com/berba-q/meeting_timer/commit/e6c2b8a54d0459ded22bcac799435e70c3eec4eb))
 
 
 
