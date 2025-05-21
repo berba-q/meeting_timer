@@ -110,6 +110,7 @@ class MainWindow(QMainWindow):
         self._create_tool_bar()
         # Initialize persistent system tray icon for notifications
         self.tray_icon = QSystemTrayIcon(self.windowIcon(), self)
+        self.tray_icon.setToolTip("OnTime Meeting Timer")
         self.tray_icon.show()
         self._create_central_widget()
         self._create_status_bar()
@@ -132,8 +133,8 @@ class MainWindow(QMainWindow):
             parent=self)
         
         # Connect reminder signals
-        self.reminder_controller.remind_to_start.connect(self.nudge_start)
-        self.reminder_controller.remind_to_advance.connect(self.nudge_advance)
+        self.reminder_controller.remind_to_start.connect(self._nudge_start)
+        self.reminder_controller.remind_to_advance.connect(self._nudge_advance)
 
     def _restore_window_size(self):
         self.setMinimumSize(600, 400)
@@ -1292,6 +1293,13 @@ class MainWindow(QMainWindow):
         # Clear any leftover countdown or status text in the status bar
         self.current_part_label.setText("")
         
+        # stop start reminder animation
+        if hasattr(self, 'start_button') and hasattr(self.start_button, '_pulse_animations'):
+            for anim in self.start_button._pulse_animations:
+                anim.stop()
+            self.start_button._pulse_animations.clear()
+            self.start_button.graphicsEffect().setOpacity(1.0)
+        
         # If secondary display exists, update it to show meeting info
         self.timer_view.show_clock = False
         if self.secondary_display:
@@ -1315,6 +1323,7 @@ class MainWindow(QMainWindow):
                 
             # Ensure both labels are visible
             self.secondary_display.info_label2.setVisible(True)
+        
 
         # Disconnect countdown update signal so countdown label updates stop after meeting starts
         try:
@@ -1559,6 +1568,13 @@ class MainWindow(QMainWindow):
     
     def _next_part(self):
         """Move to the next part"""
+        # Stop next button pulse if active
+        if hasattr(self, 'next_button') and hasattr(self.next_button, '_pulse_animations'):
+            for anim in self.next_button._pulse_animations:
+                anim.stop()
+            self.next_button._pulse_animations.clear()
+            self.next_button.graphicsEffect().setOpacity(1.0)
+        # Move to the next part
         self.timer_controller.next_part()
     
     def _previous_part(self):
@@ -1570,39 +1586,93 @@ class MainWindow(QMainWindow):
         self.timer_controller.adjust_time(minutes_delta)
     
     # Notification for meeting start and advance    
-    def _nudge_start(self):
-        """Visual + tray nudge to start the meeting."""
-        if not getattr(self, 'start_button', None):
-            return
-        self._pulse_widget(self.start_button)
-        self.tray_icon.showMessage("⌛ Did We Forget Something?",
-            "Click Start Meeting to launch the meeting timer and stay on track.")
-
-    def _nudge_advance(self):
-        """Visual + tray nudge to advance parts."""
-        if not getattr(self, 'next_button', None):
-            return
-        self._pulse_widget(self.next_button)
-        part = getattr(self.timer_controller, 'current_part', None)
-        title = getattr(part, 'title', 'current part')
-        self.tray_icon.showMessage("😅 Whoops, looks like!",
-                                   f"'{title}' is over — advance to next part?")
-
     def _pulse_widget(self, widget):
-        """Animate a widget with a brief opacity pulse to draw attention."""
+        """Animate a widget like a heartbeat until manually stopped."""
+
+        if not widget or not widget.isVisible():
+        
+            return
+
         # Ensure the widget has an opacity effect
         effect = widget.graphicsEffect()
         if not isinstance(effect, QGraphicsOpacityEffect):
             effect = QGraphicsOpacityEffect(widget)
             widget.setGraphicsEffect(effect)
-        # Animate opacity 1.0 -> 0.3 -> 1.0
-        anim = QPropertyAnimation(effect, b"opacity", widget)
-        anim.setDuration(800)
-        anim.setStartValue(1.0)
-        anim.setKeyValueAt(0.5, 0.3)
-        anim.setEndValue(1.0)
+            effect.setOpacity(1.0)
+
+        # Create heartbeat-like pulse animation
+        anim = QPropertyAnimation(effect, b"opacity")
+        anim.setDuration(1200)
+        anim.setKeyValues([
+            (0.0, 1.0),
+            (0.1, 0.3),
+            (0.2, 1.0),
+            (0.3, 0.4),
+            (0.4, 1.0),
+            (1.0, 1.0),
+        ])
+        anim.setLoopCount(-1)
         anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
-        anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+        anim.start()
+
+        effect.setEnabled(True)
+
+        if not hasattr(widget, '_pulse_animations'):
+            widget._pulse_animations = []
+        widget._pulse_animations = [a for a in widget._pulse_animations if a.state() == QPropertyAnimation.State.Running]
+        widget._pulse_animations.append(anim)
+        
+    def _nudge_start(self):
+        """Visual + tray nudge to remind the user to start the meeting."""
+        if not getattr(self, 'start_button', None):
+            return
+
+        # Pulse the button
+        self._pulse_widget(self.start_button)
+        
+        # Show tray message
+        if hasattr(self, 'tray_icon') and self.tray_icon:
+            self.tray_icon.showMessage(
+                "⌛ Did We Forget Something?",
+                "Click Start Meeting to launch the meeting timer and stay on track.",
+                self.tray_icon.icon(),
+                5000  # 5 seconds
+            )
+        else:
+            print("No tray_icon found")
+            
+    def _nudge_advance(self):
+        """Visual + tray nudge to remind the user to advance to the next part."""
+        print("_nudge_advance called")
+        if not getattr(self, 'next_button', None):
+            print("No next_button found")
+            return
+        
+        # Pulse the button
+        self._pulse_widget(self.next_button)
+        
+        # Get current part title
+        part_title = "current part"
+        if (hasattr(self.timer_controller, 'current_part_index') and 
+            hasattr(self.timer_controller, 'parts_list') and
+            0 <= self.timer_controller.current_part_index < len(self.timer_controller.parts_list)):
+            
+            part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
+            if hasattr(part, 'title'):
+                part_title = part.title
+        
+        # Show tray message
+        if hasattr(self, 'tray_icon') and self.tray_icon:
+            print("Showing tray notification")
+            self.tray_icon.showMessage(
+                "😅 Time to move on!",
+                f"'{part_title}' is over — advance to next part?",
+                self.tray_icon.icon(),
+                5000  # 5 seconds
+            )
+        else:
+            print("No tray_icon found")
+
     
     def _create_new_meeting(self):
         """Create a new custom meeting"""
@@ -2122,3 +2192,42 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(200, lambda: self.secondary_display.showFullScreen())
         #print(f"[FIXED] Moved secondary display to screen: {screen.name()}")
     # The following methods were used for lazy-loading and are now removed:
+    def show_attention_indicator(self):
+        """Change tray icon to show a red badge or indicator"""
+        from PyQt6.QtGui import QPixmap, QPainter, QColor
+        base_icon = self.windowIcon().pixmap(64, 64)
+        icon_with_badge = QPixmap(base_icon)
+        painter = QPainter(icon_with_badge)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        radius = 10
+        badge_color = QColor(220, 0, 0)
+        painter.setBrush(badge_color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(icon_with_badge.width() - radius * 2, 0, radius * 2, radius * 2)
+        painter.setPen(QColor("white"))
+        font = painter.font()
+        font.setPointSize(10)
+        painter.setFont(font)
+        painter.drawText(icon_with_badge.width() - radius * 2, 0, radius * 2, radius * 2, Qt.AlignmentFlag.AlignCenter, "1")
+        painter.end()
+        self.tray_icon.setIcon(QIcon(icon_with_badge))
+
+    def clear_attention_indicator(self):
+        """Restore original tray icon without badge"""
+        self.tray_icon.setIcon(self.windowIcon())
+
+    def start_pulse_button(self, button_name):
+        """Start pulsing the specified button continuously until stopped"""
+        button = getattr(self, button_name, None)
+        if button:
+            self._pulse_widget(button)  # Call the already defined method
+
+    def stop_pulse_button(self, button_name):
+        """Stop all animations for the given button"""
+        button = getattr(self, button_name, None)
+        if button and hasattr(button, '_pulse_animations'):
+            for anim in button._pulse_animations:
+                anim.stop()
+            button._pulse_animations.clear()
+            if button.graphicsEffect():
+                button.graphicsEffect().setOpacity(1.0)
