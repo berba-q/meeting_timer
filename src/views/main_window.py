@@ -1232,7 +1232,7 @@ class MainWindow(QMainWindow):
             self._store_pending_action('meeting_view', 'highlight_part', index)
 
         # Display part information in the central widget
-        self.timer_view.part_label.setText(f"{part.title} ({part.duration_minutes} min)")
+        self.timer_view.part_label.setText(f"{part.title}")
 
         # Update secondary display if available
         if self._is_component_ready('secondary_display_handler'):
@@ -1290,6 +1290,12 @@ class MainWindow(QMainWindow):
         self.decrease_button.setEnabled(True)
         self.increase_button.setEnabled(True)
 
+        # Disable meeting selector and apply blur
+        self.meeting_selector.setEnabled(False)
+        blur_effect = QGraphicsOpacityEffect(self.meeting_selector)
+        blur_effect.setOpacity(0.4)
+        self.meeting_selector.setGraphicsEffect(blur_effect)
+
         # Clear any leftover countdown or status text in the status bar
         self.current_part_label.setText("")
         
@@ -1342,6 +1348,11 @@ class MainWindow(QMainWindow):
         self.start_button.setStyleSheet("")  # Force style refresh
         self.start_button.clicked.disconnect()
         self.start_button.clicked.connect(self._start_meeting)
+        
+        # Enable meeting selector and remove blur
+        self.meeting_selector.setEnabled(True)
+        if isinstance(self.meeting_selector.graphicsEffect(), QGraphicsOpacityEffect):
+            self.meeting_selector.setGraphicsEffect(None)
         
         # Disable controls
         self.pause_resume_button.setEnabled(False)
