@@ -384,11 +384,35 @@ class NetworkDisplayManager(QObject):
                 meeting_ended=False
             )
     
+    def _on_current_time_updated(self, time_str: str):
+        """Handle current time updates (string format) from the timer"""
+        # This handles the current_time_updated signal which sends a formatted time string
+        if (self.timer_controller.timer.state == TimerState.STOPPED and
+            self.timer_controller.current_part_index < 0 and
+            not self._updating_display):
+            
+            # Update broadcaster with current time display
+            self.broadcaster.update_timer_data(
+                time_str=time_str,
+                state="stopped",
+                part_title="",
+                next_part="",
+                end_time="",
+                overtime_seconds=0,
+                countdown_message="",
+                meeting_ended=False
+            )
+    
     def _on_time_updated(self, seconds: int):
         """Handle timer time updates with proper current time and countdown display"""
-        # Prevent recursion - more aggressive check
+        # Prevent recursion
         if self._updating_display:
             print("[NetworkDisplayManager] Recursion detected - skipping update")
+            return
+            
+        # Type check to prevent string/int errors
+        if not isinstance(seconds, int):
+            print(f"[NetworkDisplayManager] Warning: Expected int, got {type(seconds)}: {seconds}")
             return
             
         # Add stack trace debugging to find the source
