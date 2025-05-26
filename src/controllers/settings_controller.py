@@ -248,3 +248,33 @@ class SettingsController(QObject):
         
         # Save updated settings
         self.settings_manager.save_settings()
+
+    def update_secondary_screen_config(self, use_secondary: bool, screen_index: int = None):
+        """Update and persist secondary screen configuration"""
+        settings = self.get_settings()
+        changed = False
+
+        if settings.display.use_secondary_screen != use_secondary:
+            settings.display.use_secondary_screen = use_secondary
+            changed = True
+
+        if screen_index is not None and screen_index != settings.display.secondary_screen_index:
+            settings.display.secondary_screen_index = screen_index
+            changed = True
+
+        if changed:
+            self.save_settings()
+            self.secondary_screen_changed.emit(settings.display.secondary_screen_index, use_secondary)
+            
+    def update_tools_dock_state(self, visible: bool):
+        """Update and persist the tools dock visibility if settings allow"""
+        settings = self.get_settings()
+        if settings.display.remember_tools_dock_state:
+            settings.display.show_tools_dock = visible
+            self.save_settings()
+
+    def set_force_secondary_cleanup(self, enabled: bool):
+        """Enable/disable forced cleanup of secondary display on close"""
+        self.settings_manager.settings.display.force_secondary_cleanup = enabled
+        self.settings_manager.save_settings()
+        self.settings_changed.emit()
