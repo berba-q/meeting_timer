@@ -5,133 +5,11 @@ It also includes a manager class to handle the loading process and caching of co
 The LazyComponentLoader class is responsible for loading components in a separate thread, emitting signals when components are loaded.
 
 """
-
 from PyQt6.QtCore import QThread, pyqtSignal, QObject, QEventLoop, QTimer, QMetaObject, Qt, pyqtSlot
 from PyQt6.QtWidgets import QApplication
 import logging
 import traceback
 
-
-class LazyComponentLoader(QThread):
-    """Thread to load components asynchronously with improved signaling"""
-    component_loaded = pyqtSignal(str, object)  # component_name, component_object
-    all_components_loaded = pyqtSignal()
-    progress_updated = pyqtSignal(str, int)  # component_name, progress percentage
-
-    def __init__(self, main_window):
-        super().__init__()
-        self.main_window = main_window
-        self.components_to_load = [
-            "meeting_view",
-            "network_display_manager",
-            "secondary_display"
-        ]
-        self.loaded_components = set()
-        self.running = True
-        self.priority_components = set()  # Components that should load first
-
-    def run(self):
-        """Load all heavy components in background with proper signaling"""
-        try:
-            # First load high-priority components if any are set
-            for component in self.priority_components:
-                if component == "meeting_view":
-                    self._load_meeting_view()
-                    self.progress_updated.emit("meeting_view", 33)
-                elif component == "network_manager":
-                    self._load_network_components()
-                    self.progress_updated.emit("network_manager", 66)
-                elif component == "secondary_display":
-                    self._prepare_secondary_display()
-                    self.progress_updated.emit("secondary_display", 100)
-
-            # Now load any remaining components
-            load_funcs = {
-                "meeting_view": self._load_meeting_view,
-                "network_manager": self._load_network_components,
-                "secondary_display": self._prepare_secondary_display
-            }
-            
-            to_load = [c for c in self.components_to_load if c not in self.loaded_components]
-            total = len(to_load)
-            
-            for i, component in enumerate(to_load):
-                if not self.running:
-                    break
-                if component in load_funcs:
-                    load_funcs[component]()
-                    progress = int(((i + 1) / total) * 100)
-                    self.progress_updated.emit(component, progress)
-        finally:
-            if self.running:
-                self.all_components_loaded.emit()
-
-    def stop(self):
-        """Stop the loading process"""
-        self.running = False
-        self.wait(1000)  # Wait up to 1 second for thread to finish
-        if self.isRunning():
-            self.terminate()
-            
-    def set_priority_components(self, components):
-        """Set components that should be loaded first"""
-        self.priority_components = set(components)
-
-    def _load_meeting_view(self):
-        """Load meeting view"""
-        if "meeting_view" in self.loaded_components:
-            return
-            
-        from src.views.meeting_view import MeetingView
-
-        meeting_view = MeetingView(
-            self.main_window.meeting_controller,
-            self.main_window.timer_controller
-        )
-        self.component_loaded.emit("meeting_view", meeting_view)
-        self.loaded_components.add("meeting_view")
-
-    def _load_network_components(self):
-        """Load network components"""
-        if "network_display_manager" in self.loaded_components:
-            return
-            
-        # Use the optimized NetworkDisplayManager instead
-        # which already implements lazy loading
-        from src.utils.network_display_manager import NetworkDisplayManager
-        from src.views.network_status_widget import NetworkStatusWidget
-
-        network_manager = NetworkDisplayManager(
-            self.main_window.timer_controller,
-            self.main_window.settings_controller.settings_manager
-        )
-        network_widget = NetworkStatusWidget(network_manager)
-
-        self.component_loaded.emit("network_display_manager", network_manager)
-        self.component_loaded.emit("network_widget", network_widget)
-        self.loaded_components.add("network_display_manager")
-        self.loaded_components.add("network_widget")
-
-    def _prepare_secondary_display(self):
-        """Prepare secondary display handler"""
-        if "secondary_display" in self.loaded_components:
-            return
-            
-        # Create and initialize the SecondaryDisplayHandler
-        from src.views.secondary_display import SecondaryDisplay
-        from PyQt6.QtWidgets import QApplication
-        
-        # Instead of creating the secondary display directly,
-        # prepare the handler which will create it when needed
-        secondary_display_handler = SecondaryDisplayHandler(
-            self.main_window.timer_controller,
-            self.main_window.settings_controller,
-            self.main_window
-        )
-        
-        self.component_loaded.emit("secondary_display_handler", secondary_display_handler)
-        self.loaded_components.add("secondary_display")
-        self.loaded_components.add("secondary_display_handler")
 
 class ComponentLoadWorker(QThread):
     """Worker thread for loading components asynchronously"""
@@ -149,17 +27,16 @@ class ComponentLoadWorker(QThread):
             "meeting_view",
             "network_display_manager",
             "network_widget",
-            "secondary_display_handler",
-            "secondary_display"
+            # Remove "secondary_display_handler" and "secondary_display" from auto-load
+            # These are now managed directly by MainWindow
         ]
         self.priority_components = set(priority_components or [])
         self.loaded_components = set()
         self.running = True
         
-        # Component dependencies
+        # Updated component dependencies (simplified)
         self.dependencies = {
             "network_widget": ["network_display_manager"],
-            "secondary_display": ["secondary_display_handler"]
         }
         
         # Map of loader functions
@@ -167,8 +44,6 @@ class ComponentLoadWorker(QThread):
             "meeting_view": self._load_meeting_view,
             "network_display_manager": self._load_network_display_manager,
             "network_widget": self._load_network_widget,
-            "secondary_display_handler": self._load_secondary_display_handler,
-            "secondary_display": self._load_secondary_display,
         }
     
     def run(self):
@@ -230,38 +105,36 @@ class ComponentLoadWorker(QThread):
         """Load a specific component with error handling"""
         if component_name in self.loaded_components:
             return
+            
         try:
             # Find the loader function
             loader_func = self.loader_functions.get(component_name)
             if not loader_func:
                 raise ValueError(f"No loader function for component: {component_name}")
 
-            # Build QObject-based components in the GUI thread so their internals
-            # live in the correct thread. Avoid deadlocks.
+            # Build QObject-based components in the GUI thread
             if component_name in (
                 "meeting_view",
-                "network_manager",
+                "network_display_manager",
                 "network_widget",
-                "secondary_display_handler",
-                "secondary_display",
             ):
                 gui_thread = QApplication.instance().thread()
                 current_thread = QThread.currentThread()
 
-                # If we're already running on the GUI thread, build directly.
+                # If we're already running on the GUI thread, build directly
                 if current_thread == gui_thread:
                     component = loader_func()
                 else:
-                    # Otherwise build in the GUI thread and wait for completion.
+                    # Otherwise build in the GUI thread and wait for completion
                     _holder = {}
 
                     class _Invoker(QObject):
                         @pyqtSlot()
-                        def run(self):                       # slot runs in GUI thread
+                        def run(self):
                             _holder["instance"] = loader_func()
 
                     invoker = _Invoker()
-                    invoker.moveToThread(gui_thread)  # ensure the slot’s receiver lives in GUI thread
+                    invoker.moveToThread(gui_thread)
 
                     QMetaObject.invokeMethod(
                         invoker,
@@ -287,7 +160,6 @@ class ComponentLoadWorker(QThread):
     
     def _load_meeting_view(self):
         """Load meeting view component"""
-        # Import within method to avoid upfront loading
         from src.views.meeting_view import MeetingView
         
         return MeetingView(
@@ -297,7 +169,6 @@ class ComponentLoadWorker(QThread):
     
     def _load_network_display_manager(self):
         """Load network display manager component"""
-        # Import within method to avoid upfront loading 
         from src.utils.network_display_manager import NetworkDisplayManager
         
         return NetworkDisplayManager(
@@ -320,30 +191,6 @@ class ComponentLoadWorker(QThread):
         from src.views.network_status_widget import NetworkStatusWidget
         return NetworkStatusWidget(network_display_manager)
     
-    def _load_secondary_display_handler(self):
-        """Load secondary display handler component"""
-        # Import the SecondaryDisplayHandler
-        # Use a relative import when lazy loading
-        from src.utils.lazy_loader import SecondaryDisplayHandler
-        return SecondaryDisplayHandler(
-            self.main_window.timer_controller,
-            self.main_window.settings_controller,
-            self.main_window
-        )
-
-    def _load_secondary_display(self):
-        """Load or create the actual SecondaryDisplay window"""
-        # First ensure the handler exists
-        secondary_handler = getattr(self.main_window, 'secondary_display_handler', None)
-        if not secondary_handler:
-            secondary_handler = self._load_secondary_display_handler()
-            # Emit so main‑window can pick it up
-            self.component_loaded.emit("secondary_display_handler", secondary_handler)
-            self.loaded_components.add("secondary_display_handler")
-        # Ask the handler for (and lazily create) the display
-        display = secondary_handler.get_display()
-        return display
-    
     def stop(self):
         """Stop the loading process"""
         self.running = False
@@ -354,6 +201,7 @@ class ComponentLoadWorker(QThread):
         # Force terminate if still running
         if self.isRunning():
             self.terminate()
+
 
 class ComponentLoadManager(QObject):
     """Manager for lazy loading components with improved error handling"""
@@ -521,147 +369,34 @@ class ComponentLoadManager(QObject):
         self.loading_in_progress = False
 
 
-# SecondaryDisplayHandler implementation (to be imported by the improved lazy loader)
-class SecondaryDisplayHandler(QObject):
-    """Handler for the secondary display to defer creation until needed"""
-    
-    def __init__(self, timer_controller, settings_controller, parent=None):
-        super().__init__(parent)
-        self.timer_controller = timer_controller
-        self.settings_controller = settings_controller
-        self.parent = parent
-        self._secondary_display = None
-        self._initialized = False
-    
-    def toggle_display(self):
-        """Toggle the secondary display on/off"""
-        settings = self.settings_controller.get_settings()
-        new_state = not settings.display.use_secondary_screen
-        
-        self.settings_controller.toggle_secondary_screen(new_state)
-        self.update_display()
-        self.settings_controller.save_settings()
-    
-    def update_display(self):
-        """Update secondary display based on settings"""
-        settings = self.settings_controller.get_settings()
-        
-        if settings.display.use_secondary_screen and settings.display.secondary_screen_index is not None:
-            # Create secondary window if it doesn't exist
-            if not self._secondary_display:
-                self._create_secondary_display()
-            
-            # Apply proper styling to ensure visibility
-            self._apply_theme()
-            
-            # Show and position on the correct screen
-            self._position_display()
-        elif self._secondary_display:
-            # Hide the secondary display
-            self._secondary_display.hide()
-    
-    def _create_secondary_display(self):
-        """Create the secondary display on demand"""
-        # Import here to avoid loading at startup
-        from src.views.secondary_display import SecondaryDisplay
-        
-        self._secondary_display = SecondaryDisplay(
-            self.timer_controller, 
-            self.settings_controller,
-            self.parent
-        )
-        
-        # Connect countdown updated signal to secondary display
-        self.timer_controller.timer.meeting_countdown_updated.connect(
-            self._secondary_display._update_countdown
-        )
-        
-        # After connecting, ensure secondary display receives the latest countdown
-        if self.timer_controller.timer._target_meeting_time:
-            self.timer_controller.timer._update_current_time()
-            
-        self._initialized = True
-    
-    def _apply_theme(self):
-        """Apply high-contrast styling to the secondary display"""
-        if not self._secondary_display:
-            return
-        
-        # Always apply a black background with white text for maximum visibility
-        self._secondary_display.setStyleSheet("""
-            QMainWindow, QWidget {
-                background-color: #000000;
-                color: #ffffff;
-            }
-            
-            QLabel {
-                color: #ffffff;
-                font-weight: bold;
-            }
-            
-            QFrame {
-                background-color: rgba(50, 50, 50, 180);
-                border: 2px solid #ffffff;
-                border-radius: 15px;
-            }
-        """)
-        
-        # Check for direct timer_label attribute in newer implementation
-        if hasattr(self._secondary_display, 'timer_label'):
-            self._secondary_display.timer_label.setStyleSheet("""
-                color: #ffffff;
-                font-size: 380px;
-                font-weight: bold;
-                font-family: 'Courier New', monospace;
-            """)
-    
-    def _position_display(self):
-        """Position the secondary display on the correct screen"""
-        if not self._secondary_display:
-            return
-        
-        # Import screen handler here to avoid early loading
-        from src.utils.screen_handler import ScreenHandler
-        from PyQt6.QtWidgets import QApplication
-        
-        settings = self.settings_controller.get_settings()
-        screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
-        
-        if screen:
-            geometry = screen.geometry()
-            self._secondary_display.setGeometry(geometry)
-            self._secondary_display.show()
-            
-            # Delay fullscreen mode to ensure proper positioning
-            QTimer.singleShot(200, lambda: self._make_fullscreen(screen))
-    
-    def _make_fullscreen(self, screen):
-        """Helper to enter fullscreen after delay"""
-        if not self._secondary_display:
-            return
-            
-        # Move the window to the screen's top-left first
-        self._secondary_display.move(screen.geometry().topLeft())
-        
-        # Explicitly set the screen for the window
-        if hasattr(self._secondary_display, 'windowHandle'):
-            self._secondary_display.windowHandle().setScreen(screen)
-            
-        # Now go fullscreen
-        self._secondary_display.showFullScreen()
-    
-    def get_display(self):
-        """Get the secondary display instance (creating if needed)"""
-        if not self._secondary_display and self.settings_controller.get_settings().display.use_secondary_screen:
-            self._create_secondary_display()
-        return self._secondary_display
-    
-    def is_active(self):
-        """Check if secondary display is active"""
-        return self._secondary_display is not None and self._secondary_display.isVisible()
-    
-    def cleanup(self):
-        """Clean up resources"""
-        if self._secondary_display:
-            self._secondary_display.close()
-            self._secondary_display = None
+# Legacy support classes (keep for compatibility)
+class LazyComponentLoader(QThread):
+    """Legacy loader - now delegates to ComponentLoadWorker"""
+    component_loaded = pyqtSignal(str, object)
+    all_components_loaded = pyqtSignal()
+    progress_updated = pyqtSignal(str, int)
+
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+        self.components_to_load = [
+            "meeting_view",
+            "network_display_manager",
+        ]
+        self.loaded_components = set()
+        self.running = True
+        self.priority_components = set()
+
+    def run(self):
+        """Delegate to the new worker"""
+        worker = ComponentLoadWorker(self.main_window, self.components_to_load, self.priority_components)
+        worker.component_loaded.connect(self.component_loaded)
+        worker.progress_updated.connect(self.progress_updated)
+        worker.finished.connect(self.all_components_loaded)
+        worker.run()
+
+    def stop(self):
+        self.running = False
+
+    def set_priority_components(self, components):
+        self.priority_components = set(components)
