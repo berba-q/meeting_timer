@@ -50,7 +50,7 @@ class NetworkDisplayManager(QObject):
         self.display_refresh_timer = QTimer(self)
         self.display_refresh_timer.setInterval(1000)  # every second
         self.display_refresh_timer.timeout.connect(
-            lambda: self._on_time_updated(self.timer_controller.timer.remaining_seconds)
+            lambda: self._on_time_updated(-1)
         )
     
     def _setup_html_content(self):
@@ -372,40 +372,39 @@ class NetworkDisplayManager(QObject):
         overtime_seconds = 0
         countdown_message = ""
         meeting_ended = False
-        
+
         # Check if we're in STOPPED state with no active part (pre-meeting)
-        if (self.timer_controller.timer.state == TimerState.STOPPED and 
+        if (self.timer_controller.timer.state == TimerState.STOPPED and
             self.timer_controller.current_part_index < 0):
-            
+
             # Use current time for display in stopped state
-            now = datetime.now()
-            time_str = now.strftime("%H:%M:%S")
-            
+            time_str = current_time.strftime("%H:%M:%S")
+
             # Check if we have a countdown message
             if hasattr(self.timer_controller.timer, '_target_meeting_time'):
                 target = self.timer_controller.timer._target_meeting_time
-                if target and target > now:
-                    time_diff = target - now
+                if target and target > current_time:
+                    time_diff = target - current_time
                     seconds_remaining = int(time_diff.total_seconds())
-                    
+
                     if seconds_remaining > 0:
                         hours, remainder = divmod(seconds_remaining, 3600)
                         minutes, seconds = divmod(remainder, 60)
-                        
+
                         if hours > 0:
                             countdown_message = f"Meeting starts in {hours}h {minutes}m {seconds}s"
                         else:
                             countdown_message = f"Meeting starts in {minutes}m {seconds}s"
-        
+
         # Check if meeting has ended (after last part completed)
-        elif (self.timer_controller.timer.state == TimerState.STOPPED and 
-            self.timer_controller.current_part_index >= 0 and
-            len(self.timer_controller.parts_list) > 0 and
-            self.timer_controller.current_part_index >= len(self.timer_controller.parts_list) - 1):
-            
+        elif (self.timer_controller.timer.state == TimerState.STOPPED and
+              self.timer_controller.current_part_index >= 0 and
+              len(self.timer_controller.parts_list) > 0 and
+              self.timer_controller.current_part_index >= len(self.timer_controller.parts_list) - 1):
+
             meeting_ended = True
             time_str = current_time.strftime("%H:%M:%S")
-            
+
         else:
             # Normal timer operation (during meeting)
             if seconds < 0:  # Overtime
@@ -416,7 +415,7 @@ class NetworkDisplayManager(QObject):
                 minutes = seconds // 60
                 secs = seconds % 60
                 time_str = f"{minutes:02d}:{secs:02d}"
-            
+
             # Map timer state to string representation
             state_map = {
                 TimerState.RUNNING: "running",
@@ -426,14 +425,14 @@ class NetworkDisplayManager(QObject):
                 TimerState.STOPPED: "stopped",
                 TimerState.COUNTDOWN: "running"
             }
-            
+
             state_str = state_map.get(self.timer_controller.timer.state, "stopped")
-            
+
             # If timer is running and less than 60 seconds, use warning color
-            if (self.timer_controller.timer.state == TimerState.RUNNING and 
+            if (self.timer_controller.timer.state == TimerState.RUNNING and
                 0 < self.timer_controller.timer.remaining_seconds <= 60):
                 state_str = "warning"
-            
+
             # If in transition state, get the transition message
             if self.timer_controller.timer.state == TimerState.TRANSITION:
                 # Try to get the current transition message from the timer controller
@@ -442,26 +441,26 @@ class NetworkDisplayManager(QObject):
                 else:
                     # Fallback to generic message if not stored
                     part_title = "Chairman transition"
-            
+
             # Get current part title - only used in transition state
             elif self.timer_controller.current_part_index >= 0 and self.timer_controller.parts_list:
                 current_part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
                 part_title = current_part.title
-            
+
             # Get next part title (for "Next Part:" display)
             next_part_index = self.timer_controller.current_part_index + 1
-            if (self.timer_controller.parts_list and 
+            if (self.timer_controller.parts_list and
                 next_part_index < len(self.timer_controller.parts_list)):
                 next_part = self.timer_controller.parts_list[next_part_index]
                 next_part_title = next_part.title
-            
+
             # Get predicted end time
             if hasattr(self.timer_controller, '_predicted_end_time') and self.timer_controller._predicted_end_time:
                 end_time_str = self.timer_controller._predicted_end_time.strftime("%H:%M")
-            
+
             # Get overtime seconds
             overtime_seconds = getattr(self.timer_controller, '_total_overtime_seconds', 0)
-        
+
         # Update broadcaster with current state
         self.broadcaster.update_timer_data(
             time_str=time_str,
