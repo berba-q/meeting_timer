@@ -265,6 +265,8 @@ class NetworkDisplayManager(QObject):
         self.timer_controller.part_changed.connect(self._on_part_changed)
         self.timer_controller.predicted_end_time_updated.connect(self._on_predicted_end_time_updated)
         self.timer_controller.meeting_overtime.connect(self._on_meeting_overtime)
+        # Connect meeting_countdown_updated without debug print
+        # (debug print removed for production)
     
     def start_network_display(self, mode: NetworkDisplayMode, 
                              http_port: Optional[int] = None, 
