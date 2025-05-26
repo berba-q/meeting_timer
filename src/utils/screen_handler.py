@@ -73,34 +73,69 @@ class ScreenHandler:
     def get_configured_screen(settings, is_primary=True):
         """Get the configured screen (tries by index first, then by name)"""
         screens = QApplication.screens()
-        
+
         if is_primary:
             index = settings.display.primary_screen_index
             name = getattr(settings.display, 'primary_screen_name', '')
         else:
             index = settings.display.secondary_screen_index
             name = getattr(settings.display, 'secondary_screen_name', '')
-        
+
         # Try by index first
         if index is not None and 0 <= index < len(screens):
-            return screens[index]
-        
-        # If index fails, try by name
+            screen = screens[index]
+            if is_primary or screen != QApplication.primaryScreen():
+                return screen
+
+        # If index fails or resolves to primary when it shouldn't, try by name
         if name:
             for screen in screens:
                 if screen.name() == name:
-                    return screen
-        
-        # If all else fails, return primary screen for primary, second screen for secondary
+                    if is_primary or screen != QApplication.primaryScreen():
+                        return screen
+
+        # If all else fails, return primary screen for primary, non-primary for secondary
         if is_primary:
             return QApplication.primaryScreen()
         else:
-            # For secondary, use a non-primary screen if available
             primary_screen = QApplication.primaryScreen()
-            secondary_candidates = [screen for screen in screens if screen != primary_screen]
+            secondary_candidates = [s for s in screens if s != primary_screen]
+            for screen in secondary_candidates:
+                if screen.name() != getattr(settings.display, 'primary_screen_name', ''):
+                    return screen
             if secondary_candidates:
                 return secondary_candidates[0]
-            # Fallback to last available screen if present
-            if screens:
-                return screens[-1]
-            return None
+            return screens[-1] if screens else None
+    
+    @staticmethod
+    def verify_screen_binding(window, target_screen):
+        """Verify if a window is properly bound to the target screen"""
+        if not window or not window.windowHandle() or not target_screen:
+            return False
+        
+        current_screen = window.windowHandle().screen()
+        return current_screen == target_screen
+    
+    @staticmethod
+    def safe_bind_to_screen(window, target_screen, max_attempts=3):
+        """Safely bind a window to a specific screen with retries"""
+        if not window or not target_screen:
+            return False
+        
+        for attempt in range(max_attempts):
+            try:
+                # Set geometry first
+                window.setGeometry(target_screen.geometry())
+                
+                # Then bind to screen
+                if window.windowHandle():
+                    window.windowHandle().setScreen(target_screen)
+                
+                # Verify binding
+                if ScreenHandler.verify_screen_binding(window, target_screen):
+                    return True
+                    
+            except Exception as e:
+                print(f"[ScreenHandler] Binding attempt {attempt + 1} failed: {e}")
+        
+        return False
