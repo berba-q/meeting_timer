@@ -75,7 +75,7 @@ class TimerView(QWidget):
         self.timer_controller.timer.state_changed.connect(self._update_state)
         self.timer_controller.part_changed.connect(self._update_part)
         self.timer_controller.timer.current_time_updated.connect(self._update_current_time)
-        self.timer_controller.timer.meeting_countdown_updated.connect(self._update_countdown)
+        self.timer_controller.meeting_countdown_updated.connect(self._update_countdown)
     
     def set_display_mode(self, mode: TimerDisplayMode):
         """Set the timer display mode"""
@@ -162,7 +162,7 @@ class TimerView(QWidget):
                 self.timer_controller.timer.state_changed.disconnect(self._update_state)
                 self.timer_controller.part_changed.disconnect(self._update_part)
                 self.timer_controller.timer.current_time_updated.disconnect(self._update_current_time)
-                self.timer_controller.timer.meeting_countdown_updated.disconnect(self._update_countdown)
+                self.timer_controller.meeting_countdown_updated.disconnect(self._update_countdown)
         except (TypeError, RuntimeError):
             # Signal was not connected
             pass
