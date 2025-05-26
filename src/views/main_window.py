@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
             # Connect current time updates - use specific format for current time
             # This connects directly to the broadcaster
             self.timer_controller.timer.current_time_updated.connect(
-                self.network_display_manager._on_time_updated
+                self.network_display_manager._on_current_time_updated
             )
             
             
@@ -1131,6 +1131,10 @@ class MainWindow(QMainWindow):
         
         # Settings controller signals
         self.settings_controller.settings_changed.connect(self._settings_changed)
+        # Connect to specific secondary screen changes 
+        self.settings_controller.secondary_screen_changed.connect(self._on_secondary_screen_changed)
+        # Connect to tools dock visibility change
+        #self.settings_controller.tools_dock_state_changed.connect(self._on_tools_dock_state_changed)
         #self.settings_controller.display_mode_changed.connect(self._display_mode_changed)
         self.settings_controller.theme_changed.connect(self._theme_changed)
 
@@ -1425,12 +1429,9 @@ class MainWindow(QMainWindow):
         return global_index
     
     def _settings_changed(self):
-        """Handle settings changes"""
-        settings = self.settings_controller.get_settings()
-        self.settings_controller.update_secondary_screen_config(
-            use_secondary=settings.display.use_secondary_screen,
-            screen_index=settings.display.secondary_screen_index
-        )
+        """Handle general settings changes (non-screen related)"""
+        # Only update tools dock state if it's not a secondary screen change
+        # The tools dock state update is now handled by a specific signal
         self.settings_controller.update_tools_dock_state(self.tools_dock.isVisible())
     
     def _update_secondary_display_label(self):
