@@ -530,9 +530,8 @@ class SettingsDialog(QDialog):
         self.settings_controller.set_overrun_delay(self.overrun_delay_spin.value())
         
         # Display settings
-        
         if hasattr(self, 'remember_tools_dock_check'):
-            self.settings_controller.get_settings().display.remember_tools_dock_state = self.remember_tools_dock_check.isChecked()
+            self.settings_controller.set_remember_tools_dock_state(self.remember_tools_dock_check.isChecked())
         
         # Theme setting
         theme = self.theme_combo.currentData()
@@ -544,23 +543,21 @@ class SettingsDialog(QDialog):
         # Screen settings
         primary_screen = self.primary_screen_combo.currentData()
         self.settings_controller.set_primary_screen(primary_screen)
-        
+
         secondary_screen = self.secondary_screen_combo.currentData()
         use_secondary = self.use_secondary_check.isChecked()
-        
+
         # Make sure use_secondary is False if secondary_screen is None
         if secondary_screen is None:
             use_secondary = False
-            # Immediately clean up the secondary display if it exists
-            self.settings_controller.get_settings().display.force_secondary_cleanup = True
-            
+            self.settings_controller.set_force_secondary_cleanup(True)
         else:
-            self.settings_controller.get_settings().display.force_secondary_cleanup = False
-        
+            self.settings_controller.set_force_secondary_cleanup(False)
+
         # Set secondary screen first
         if secondary_screen is not None:
             self.settings_controller.set_secondary_screen(secondary_screen)
-        
+
         # Then update use_secondary_screen
         self.settings_controller.toggle_secondary_screen(use_secondary)
         
