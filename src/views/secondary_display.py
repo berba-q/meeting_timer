@@ -321,21 +321,29 @@ class SecondaryDisplay(QMainWindow):
         # Update next part information
         parts = self.timer_controller.parts_list
 
-        # Reset styling
-        self.info_label1.setStyleSheet("""
-            color: #ffffff;
-            font-weight: bold;
-        """)
-
         # Check if there's a next part
         if index + 1 < len(parts):
             self.next_part = parts[index + 1]
-            formatted_text = self._format_text_for_display(f"NEXT PART: {self.next_part.title.upper()}")
-            self.info_label1.setText(formatted_text)
+            # Format text once and cache to prevent flickering
+            next_part_text = f"NEXT PART: {self.next_part.title.upper()}"
+            formatted_text = self._format_text_for_display_stable(next_part_text)
+            
+            # Only update if text actually changed
+            if self.info_label1.text() != formatted_text:
+                self.info_label1.setText(formatted_text)
+                self.info_label1.setStyleSheet("""
+                    color: #ffffff;
+                    font-weight: bold;
+                """)
         else:
             # No next part (this is the last part)
             self.next_part = None
-            self.info_label1.setText("LAST PART")
+            if self.info_label1.text() != "LAST PART":
+                self.info_label1.setText("LAST PART")
+                self.info_label1.setStyleSheet("""
+                    color: #ffffff;
+                    font-weight: bold;
+                """)
     
     def _transition_started(self, transition_msg):
         """Handle chairman transition"""
@@ -345,8 +353,9 @@ class SecondaryDisplay(QMainWindow):
             pass
         else:
             # If this is the last transition
-            formatted_text = self._format_text_for_display("MEETING CONCLUSION")
-            self.info_label1.setText(formatted_text)
+            formatted_text = self._format_text_for_display_stable("MEETING CONCLUSION")
+            if self.info_label1.text() != formatted_text:
+                self.info_label1.setText(formatted_text)
 
     def _update_predicted_end_time(self, original_end_time, predicted_end_time):
         """Update the predicted end time display with improved precision"""
@@ -444,10 +453,12 @@ class SecondaryDisplay(QMainWindow):
         except TypeError:
             print("[DEBUG] Signal already disconnected or not connected")
 
-        # Set initial next part info
+        # Set initial next part info with stable formatting
         if len(self.timer_controller.parts_list) > 1:
             next_part = self.timer_controller.parts_list[1]
-            self.info_label1.setText(f"NEXT PART: {next_part.title.upper()}")
+            next_part_text = f"NEXT PART: {next_part.title.upper()}"
+            formatted_text = self._format_text_for_display_stable(next_part_text)
+            self.info_label1.setText(formatted_text)
             self.info_label1.setStyleSheet("""
                 color: #ffffff;
                 font-weight: bold;
@@ -459,7 +470,7 @@ class SecondaryDisplay(QMainWindow):
             self.info_label1.setText("LAST PART")
             self.info_label2.setVisible(True)
 
-        # Force‑refresh the “next part” panel in case the part‑changed signal
+        # Force‑refresh the "next part" panel in case the part‑changed signal
         # was emitted before we connected to it.
         current_index = self.timer_controller.current_part_index
         if current_index < 0 and self.timer_controller.parts_list:
@@ -658,7 +669,7 @@ class SecondaryDisplay(QMainWindow):
             font.setPointSize(best_timer_size)
             self.timer_label.setFont(font)
 
-        # PRIORITY 2: Info labels
+        # PRIORITY 2: Info labels - with stability improvements
         max_info_font_size = getattr(self, 'max_info_font', 100)
         min_info_font_size = getattr(self, 'min_info_font', 40)
 
@@ -674,9 +685,27 @@ class SecondaryDisplay(QMainWindow):
             if not text:
                 continue
 
+            # Check if we've already calculated font size for this exact text
+            text_hash = hash(text)
+            cache_key = f"{label_name}_font_cache"
+            if not hasattr(self, cache_key):
+                setattr(self, cache_key, {})
+            
+            font_cache = getattr(self, cache_key)
+            
+            # If we have a cached font size for this exact text, use it
+            if text_hash in font_cache:
+                cached_size = font_cache[text_hash]
+                font = label.font()
+                if font.pointSize() != cached_size:
+                    font.setPointSize(cached_size)
+                    label.setFont(font)
+                continue
+
             available_width = int(screen_width * 0.95)
             available_height = int(screen_height * 0.20)
 
+            # Pre-format text once to avoid repeated formatting
             formatted_text = self._format_text_for_screen_width(text, available_width, max_info_font_size)
             if formatted_text != text:
                 label.setText(formatted_text)
@@ -707,6 +736,16 @@ class SecondaryDisplay(QMainWindow):
                     best_size = size
                     break
 
+            # Cache the calculated font size for this text
+            font_cache[text_hash] = best_size
+            
+            # Limit cache size to prevent memory bloat
+            if len(font_cache) > 50:
+                # Remove oldest entries
+                oldest_keys = list(font_cache.keys())[:25]
+                for key in oldest_keys:
+                    del font_cache[key]
+
             font.setPointSize(best_size)
             label.setFont(font)
     
@@ -735,6 +774,31 @@ class SecondaryDisplay(QMainWindow):
             self.max_info_font = int(80 * scale_factor)
             self.min_timer_font = int(70 * scale_factor)
             self.min_info_font = int(20 * scale_factor)
+            
+    def _format_text_for_display_stable(self, text, max_length=60):
+        """Format text for display with consistent results to prevent flickering"""
+        if not text or len(text) <= max_length:
+            return text
+        
+        # Create a stable cache key for this text
+        cache_key = f"_format_cache_{hash(text)}"
+        if hasattr(self, cache_key):
+            return getattr(self, cache_key)
+        
+        # Format the text
+        formatted = self._format_text_for_display(text, max_length)
+        
+        # Cache the result
+        setattr(self, cache_key, formatted)
+        
+        # Limit cache size
+        cache_attrs = [attr for attr in dir(self) if attr.startswith('_format_cache_')]
+        if len(cache_attrs) > 20:
+            # Remove oldest cache entries
+            for attr in cache_attrs[:10]:
+                delattr(self, attr)
+        
+        return formatted
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
