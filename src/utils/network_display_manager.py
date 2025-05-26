@@ -82,7 +82,7 @@ class NetworkDisplayManager(QObject):
         body {
             background-color: #000000;
             color: #ffffff;
-            font-family: 'Segoe UI', 'Arial', 'sans-serif';
+            font-family: 'Tahoma', 'Arial', 'sans-serif';
             margin: 0;
             padding: 0;
             display: flex;
