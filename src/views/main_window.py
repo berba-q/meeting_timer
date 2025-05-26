@@ -1130,16 +1130,13 @@ class MainWindow(QMainWindow):
         self.timer_controller.meeting_countdown_updated.connect(self._update_countdown)
         
         # Settings controller signals
-        self.settings_controller.settings_changed.connect(self._settings_changed)
-        # Connect to specific secondary screen changes 
         self.settings_controller.secondary_screen_changed.connect(self._on_secondary_screen_changed)
-        # Connect to tools dock visibility change
-        #self.settings_controller.tools_dock_state_changed.connect(self._on_tools_dock_state_changed)
-        #self.settings_controller.display_mode_changed.connect(self._display_mode_changed)
+        self.settings_controller.tools_dock_state_changed.connect(self._on_tools_dock_state_changed)
         self.settings_controller.theme_changed.connect(self._theme_changed)
-
-        # Connect settings_controller signal for secondary screen live change
-        self.settings_controller.secondary_screen_changed.connect(self._on_secondary_screen_changed)
+        self.settings_controller.meeting_settings_changed.connect(self._on_meeting_settings_changed)
+        self.settings_controller.reminder_settings_changed.connect(self._on_reminder_settings_changed)
+        # General settings changed signal for all other settings
+        self.settings_controller.settings_changed.connect(self._settings_changed)
         
     def _connect_network_signals(self):
         """Connect network display manager signals when component is available"""
@@ -1429,10 +1426,24 @@ class MainWindow(QMainWindow):
         return global_index
     
     def _settings_changed(self):
-        """Handle general settings changes (non-screen related)"""
-        # Only update tools dock state if it's not a secondary screen change
-        # The tools dock state update is now handled by a specific signal
+        """Handle general settings changes (fallback for uncategorized settings)"""
+        # This should now rarely be called since most settings have specific signals
+        pass
+    
+    def _on_tools_dock_state_changed(self, visible: bool):
+        """Handle tools dock state changes"""
+        # Update tools dock state without affecting secondary screen
         self.settings_controller.update_tools_dock_state(self.tools_dock.isVisible())
+    
+    def _on_meeting_settings_changed(self):
+        """Handle meeting time/source settings changes"""
+        # Update meeting-related UI if needed
+        pass
+    
+    def _on_reminder_settings_changed(self):
+        """Handle reminder settings changes"""
+        # Update reminder-related functionality if needed
+        pass
     
     def _update_secondary_display_label(self):
         """Update the secondary display indicator in the status bar"""
