@@ -254,20 +254,28 @@ class SettingsController(QObject):
 
     def update_secondary_screen_config(self, use_secondary: bool, screen_index: int = None):
         """Update and persist secondary screen configuration"""
-        settings = self.get_settings()
-        changed = False
+        # Prevent recursion
+        if self._updating_settings:
+            return
+            
+        self._updating_settings = True
+        try:
+            settings = self.get_settings()
+            changed = False
 
-        if settings.display.use_secondary_screen != use_secondary:
-            settings.display.use_secondary_screen = use_secondary
-            changed = True
+            if settings.display.use_secondary_screen != use_secondary:
+                settings.display.use_secondary_screen = use_secondary
+                changed = True
 
-        if screen_index is not None and screen_index != settings.display.secondary_screen_index:
-            settings.display.secondary_screen_index = screen_index
-            changed = True
+            if screen_index is not None and screen_index != settings.display.secondary_screen_index:
+                settings.display.secondary_screen_index = screen_index
+                changed = True
 
-        if changed:
-            self.save_settings()
-            self.secondary_screen_changed.emit(settings.display.secondary_screen_index, use_secondary)
+            if changed:
+                self.settings_manager.save_settings()  # Don't emit settings_changed here
+                self.secondary_screen_changed.emit(settings.display.secondary_screen_index, use_secondary)
+        finally:
+            self._updating_settings = False
             
     def update_tools_dock_state(self, visible: bool):
         """Update and persist the tools dock visibility if settings allow"""
@@ -284,6 +292,11 @@ class SettingsController(QObject):
                     self.settings_manager.save_settings()  # Don't emit settings_changed here
         finally:
             self._updating_settings = False
+    
+    def _on_tools_dock_state_changed(self, visible: bool):
+        """Handle tools dock state changes without affecting secondary screen"""
+        # Handle tools dock visibility if needed
+        pass
 
     def set_force_secondary_cleanup(self, enabled: bool):
         """Enable/disable forced cleanup of secondary display on close"""
