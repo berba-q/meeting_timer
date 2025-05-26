@@ -531,7 +531,7 @@ class SettingsDialog(QDialog):
         
         # Display settings
         if hasattr(self, 'remember_tools_dock_check'):
-            self.settings_controller.set_remember_tools_dock_state(self.remember_tools_dock_check.isChecked())
+            self.settings_controller.update_tools_dock_state(self.remember_tools_dock_check.isChecked())
         
         # Theme setting
         theme = self.theme_combo.currentData()

@@ -34,6 +34,8 @@ class SettingsController(QObject):
         super().__init__()
         self.settings_manager = settings_manager
         
+        self._updating_settings = False
+        
         # Initialize correct screen indices if not already set
         self._initialize_screen_settings()
     
@@ -44,7 +46,8 @@ class SettingsController(QObject):
     def save_settings(self):
         """Save current settings"""
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        if not self._updating_settings:
+            self.settings_changed.emit()
     
     def reset_settings(self):
         """Reset settings to defaults"""
@@ -268,10 +271,19 @@ class SettingsController(QObject):
             
     def update_tools_dock_state(self, visible: bool):
         """Update and persist the tools dock visibility if settings allow"""
-        settings = self.get_settings()
-        if settings.display.remember_tools_dock_state:
-            settings.display.show_tools_dock = visible
-            self.save_settings()
+        # Prevent recursion - this is the source of the infinite loop
+        if self._updating_settings:
+            return
+            
+        self._updating_settings = True
+        try:
+            settings = self.get_settings()
+            if settings.display.remember_tools_dock_state:
+                if settings.display.show_tools_dock != visible:
+                    settings.display.show_tools_dock = visible
+                    self.settings_manager.save_settings()  # Don't emit settings_changed here
+        finally:
+            self._updating_settings = False
 
     def set_force_secondary_cleanup(self, enabled: bool):
         """Enable/disable forced cleanup of secondary display on close"""
