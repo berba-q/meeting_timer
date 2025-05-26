@@ -1429,7 +1429,8 @@ class MainWindow(QMainWindow):
     def _settings_changed(self):
         """Handle settings changes"""
         # Step 1: Cache old secondary screen settings at the start of the method
-        old_settings = self.settings_controller.settings_manager.settings
+        from copy import deepcopy
+        old_display = deepcopy(self.settings_controller.settings_manager.settings.display)
 
         # Step 2: Get current settings after the line:
         settings = self.settings_controller.get_settings()
@@ -1445,8 +1446,8 @@ class MainWindow(QMainWindow):
 
         # Step 3: Check if secondary display settings changed before triggering updates
         if (
-            old_settings.display.use_secondary_screen != settings.display.use_secondary_screen or
-            old_settings.display.secondary_screen_index != settings.display.secondary_screen_index
+            old_display.use_secondary_screen != settings.display.use_secondary_screen or
+            old_display.secondary_screen_index != settings.display.secondary_screen_index
         ):
             QTimer.singleShot(0, self._update_secondary_display_label)
             QTimer.singleShot(0, self._update_secondary_display)
