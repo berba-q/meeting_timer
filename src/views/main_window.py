@@ -385,9 +385,7 @@ class MainWindow(QMainWindow):
             # Connect current time updates - use specific format for current time
             # This connects directly to the broadcaster
             self.timer_controller.timer.current_time_updated.connect(
-                lambda time_str: self.network_display_manager._on_time_updated(
-                    self.timer_controller.timer.remaining_seconds
-                ) if self.network_display_manager else None
+                self.network_display_manager._on_time_updated
             )
             
             
@@ -1428,33 +1426,12 @@ class MainWindow(QMainWindow):
     
     def _settings_changed(self):
         """Handle settings changes"""
-        # Step 1: Cache old secondary screen settings at the start of the method
-        from copy import deepcopy
-        old_display = deepcopy(self.settings_controller.settings_manager.settings.display)
-
-        # Step 2: Get current settings after the line:
         settings = self.settings_controller.get_settings()
-
-        # Check if we need to force cleanup of the secondary display
-        if settings.display.force_secondary_cleanup:
-            # Clean up secondary display
-            if hasattr(self, 'secondary_display') and self.secondary_display:
-                self._cleanup_secondary_display()
-            # Reset the flag
-            settings.display.force_secondary_cleanup = False
-            self.settings_controller.save_settings()
-
-        # Step 3: Check if secondary display settings changed before triggering updates
-        if (
-            old_display.use_secondary_screen != settings.display.use_secondary_screen or
-            old_display.secondary_screen_index != settings.display.secondary_screen_index
-        ):
-            QTimer.singleShot(0, self._update_secondary_display_label)
-            QTimer.singleShot(0, self._update_secondary_display)
-
-        # Update tools dock visibility based on settings, but only if remember_tools_dock_state is true
-        if settings.display.remember_tools_dock_state:
-            QTimer.singleShot(0, lambda: self.tools_dock.setVisible(settings.display.show_tools_dock))
+        self.settings_controller.update_secondary_screen_config(
+            use_secondary=settings.display.use_secondary_screen,
+            screen_index=settings.display.secondary_screen_index
+        )
+        self.settings_controller.update_tools_dock_state(self.tools_dock.isVisible())
     
     def _update_secondary_display_label(self):
         """Update the secondary display indicator in the status bar"""
