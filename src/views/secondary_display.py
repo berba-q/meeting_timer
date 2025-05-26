@@ -671,7 +671,7 @@ class SecondaryDisplay(QMainWindow):
 
         # PRIORITY 2: Info labels - with stability improvements
         max_info_font_size = getattr(self, 'max_info_font', 100)
-        min_info_font_size = getattr(self, 'min_info_font', 40)
+        min_info_font_size = getattr(self, 'min_info_font', 80)
 
         for label_name in ["info_label1", "info_label2"]:
             if not hasattr(self, label_name):
