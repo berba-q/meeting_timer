@@ -440,7 +440,7 @@ class SecondaryDisplay(QMainWindow):
         self.info_label1.clear()
         self.info_label2.clear()
         try:
-            self.timer_controller.timer.meeting_countdown_updated.disconnect(self._update_countdown)
+            self.timer_controller.meeting_countdown_updated.disconnect(self._update_countdown)
         except TypeError:
             print("[DEBUG] Signal already disconnected or not connected")
 
@@ -479,7 +479,7 @@ class SecondaryDisplay(QMainWindow):
         self.info_label2.setText("")
         # Re‑enable the countdown signal for the next meeting
         try:
-            self.timer_controller.timer.meeting_countdown_updated.connect(
+            self.timer_controller.meeting_countdown_updated.connect(
                 self._update_countdown,  # type: ignore[arg-type]
             )
         except TypeError:
