@@ -74,12 +74,17 @@ class ReminderController(QObject):
     
     def _on_timer_state_changed(self, state):
         """Handle timer state changes"""
-        # If we enter overtime, start the overrun reminder timer
         if state == TimerState.OVERTIME:
             self.overrun_reminder_triggered = False
             self._start_overrun_timer()
-        
-        # Reset overrun reminder when state changes from OVERTIME to something else
+        elif state == TimerState.STOPPED:
+            self.waiting_for_start = False
+            self.start_reminder_triggered = False
+            self.overrun_reminder_triggered = False
+            if self.start_reminder_timer.isActive():
+                self.start_reminder_timer.stop()
+            if self.overrun_reminder_timer.isActive():
+                self.overrun_reminder_timer.stop()
         elif state != TimerState.OVERTIME:
             self.overrun_reminder_triggered = False
             if self.overrun_reminder_timer.isActive():
