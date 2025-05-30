@@ -1130,6 +1130,8 @@ class MainWindow(QMainWindow):
         self.timer_controller.meeting_countdown_updated.connect(self._update_countdown)
         
         # Settings controller signals
+        
+        self.settings_controller.language_changed.connect(self._on_language_changed) # Language change signal
         self.settings_controller.secondary_screen_changed.connect(self._on_secondary_screen_changed)
         self.settings_controller.tools_dock_state_changed.connect(self._on_tools_dock_state_changed)
         self.settings_controller.theme_changed.connect(self._theme_changed)
@@ -1425,6 +1427,18 @@ class MainWindow(QMainWindow):
         global_index += part_index
         return global_index
     
+    
+    def _on_language_changed(self, lang_code: str):
+        """Handle runtime language change"""
+        from src.utils.translator import load_translation
+        import sys
+        from PyQt6.QtCore import QProcess
+        load_translation(QApplication.instance(), lang_code)
+
+        QMessageBox.information(self, "Language Changed", "App will now restart to apply changes.")
+        QApplication.quit()
+        QProcess.startDetached(sys.executable, sys.argv)
+
     def _settings_changed(self):
         """Handle general settings changes (fallback for uncategorized settings)"""
         # This should now rarely be called since most settings have specific signals
