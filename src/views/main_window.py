@@ -1452,6 +1452,7 @@ class MainWindow(QMainWindow):
             self.secondary_display_label.setText("Secondary Display: Active")
         else:
             self.secondary_display_label.setText("Secondary Display: Inactive")
+
     
     def _apply_current_theme(self):
         """Apply the current theme from settings"""
@@ -2191,21 +2192,24 @@ class MainWindow(QMainWindow):
         
     def _on_secondary_screen_changed(self, *_):
         """Handle live updates to the selected secondary screen"""
-        if not self.secondary_display:
+        settings = self.settings_controller.get_settings()
+
+        if not settings.display.use_secondary_screen:
+            self._cleanup_secondary_display()
+            self._update_secondary_display_label()
             return
 
-        #print(f"[EVENT] _on_secondary_screen_changed triggered")
-
-        settings = self.settings_controller.get_settings()
-        #print(f"Settings screen index: {settings.display.secondary_screen_index}")
-        #print(f"Settings screen name: {settings.display.secondary_screen_name}")
+        # Only continue if secondary display is enabled
+        if not self.secondary_display:
+            self._ensure_single_secondary_display()
 
         screen = ScreenHandler.get_configured_screen(settings, is_primary=False)
         if screen:
-            #print(f"Resolved screen: {screen.name()} — {screen.geometry().width()}x{screen.geometry().height()}")
             QTimer.singleShot(500, lambda: self._move_secondary_display(screen))
         else:
             print("[WARNING] Could not resolve a valid screen for secondary display.")
+
+        self._update_secondary_display_label()
 
     def _move_secondary_display(self, screen):
         """Safely move the secondary display to the selected screen after a delay"""
