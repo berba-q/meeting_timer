@@ -1562,6 +1562,16 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.Cancel
         )
         if confirm == QMessageBox.StandardButton.Yes:
+            # Stop visual animations (e.g., start/next button pulse)
+            for btn in [self.start_button, self.next_button]:
+                if hasattr(btn, '_pulse_animations'):
+                    for anim in btn._pulse_animations:
+                        anim.stop()
+                    btn._pulse_animations.clear()
+                    if btn.graphicsEffect():
+                        btn.graphicsEffect().setOpacity(1.0)
+                        btn.setGraphicsEffect(None)
+
             self.timer_controller.stop_meeting()
     
     def _toggle_pause_resume(self):
