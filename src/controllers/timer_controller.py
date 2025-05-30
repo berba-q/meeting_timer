@@ -361,29 +361,10 @@ class TimerController(QObject):
         self._transition_timer.start(transition_seconds * 1000)  # Convert to milliseconds
         
     def _complete_transition(self):
-        """Automatically move to the next part after the chairman transition"""
+        """Let transition enter overtime instead of moving to next part"""
         if self._in_transition:
             self._in_transition = False
-            
-            # Move to the next part
-            self.current_part_index = self._next_part_after_transition
-            
-            # Check if we're at the end
-            if self.current_part_index >= len(self.parts_list):
-                self.stop_meeting()
-                return
-            
-            # Get next part
-            current_part = self.parts_list[self.current_part_index]
-            
-            # Start timer for next part
-            self.timer.start(current_part.duration_seconds)
-            
-            # Emit signal
-            self.part_changed.emit(current_part, self.current_part_index)
-            
-            # Update predicted end time
-            self._update_predicted_end_time()
+            # Do not auto-advance. Allow the timer to go into overtime.
 
     
     def previous_part(self):
