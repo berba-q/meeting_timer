@@ -817,8 +817,13 @@ class SecondaryDisplay(QMainWindow):
         
     def _on_settings_updated(self):
         """Handle settings updates"""
-        # Use safe positioning when settings change
-        QTimer.singleShot(100, self._move_to_configured_screen)
+        settings = self.settings_controller.get_settings()
+        use_secondary = settings.display.use_secondary_screen
+        
+        if use_secondary:
+            self.show_on_configured_screen_safely()
+        else:
+            self.hide()
 
     def _move_to_configured_screen(self):
         """Move to configured screen using safe positioning"""
