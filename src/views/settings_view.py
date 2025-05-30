@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTime
 from PyQt6.QtGui import QPixmap, QImage
 
+from src.config import AVAILABLE_LANGUAGES
 
 from src.models.settings import NetworkDisplayMode
 from src.utils.qr_code_utility import generate_qr_code
@@ -31,17 +32,7 @@ class SettingsDialog(QDialog):
         self.settings_controller = settings_controller
         
         # Available languages
-        self.available_languages = {
-            "en": "English"
-           # "es": "Español",
-           # "fr": "Français",
-           # "de": "Deutsch",
-           # "pt": "Português",
-           # "it": "Italiano",
-           # "ja": "日本語",
-            #"ko": "한국어",
-            #"zh": "中文"
-        }
+        self.available_languages = AVAILABLE_LANGUAGES
         
         # Setup UI
         self._setup_ui()
