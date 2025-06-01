@@ -19,6 +19,8 @@ from PyQt6.QtWidgets import QSplashScreen
 from PyQt6.QtGui import QPixmap, QPainter, QColor
 from PyQt6.QtCore import Qt, QSize
 
+from src.utils.translator import load_translation
+
 class CustomSplashScreen(QSplashScreen):
     def __init__(self):
         super().__init__()
@@ -197,6 +199,22 @@ def main():
     settings_controller = SettingsController(controller.settings_manager)
     timer_controller = TimerController(settings_controller)
     controller.load_meetings()
+
+    # Load saved language
+    saved_language = settings_controller.get_settings().language
+    if saved_language == "en":
+        print("[LANG] Using default English interface.")
+    else:
+        if not load_translation(app, saved_language):
+            QMessageBox.information(
+                None,
+                "Language Fallback",
+                f"The selected language '{saved_language}' is not available.\nThe application will use English instead."
+            )
+            load_translation(app, "en")
+        else:
+            print(f"[LANG] Loaded translation for {saved_language}")
+
     splash.status_label.setText("Loading complete...")
 
     # Pass both MeetingController and its TimerController to MainWindow

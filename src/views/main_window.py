@@ -13,6 +13,9 @@ from PyQt6.QtGui import QIcon, QAction, QFont
 from PyQt6.QtCore import Qt, QSize, pyqtSlot, QTimer, QEvent, QThread, pyqtSignal, QObject, QPropertyAnimation, QEasingCurve
 from PyQt6.QtWidgets import QDialog
 
+from PyQt6.QtCore import QCoreApplication
+_ = QCoreApplication.translate
+
 from src.utils.screen_handler import ScreenHandler
 from src.controllers.meeting_controller import MeetingController
 from src.controllers.timer_controller import TimerController
@@ -175,12 +178,12 @@ class MainWindow(QMainWindow):
         # Create a placeholder widget
         placeholder = QWidget()
         placeholder_layout = QVBoxLayout(placeholder)
-        loading_label = QLabel("Loading components...")
+        loading_label = QLabel(_("MainWindow", "Loading components..."))
         placeholder_layout.addWidget(loading_label)
         
         # Add to dock tabs
-        self.dock_tabs.addTab(placeholder, "Network")
-        
+        self.dock_tabs.addTab(placeholder, _("MainWindow", "Network"))
+
         # Wrap in tools dock
         self.tools_dock = QDockWidget("Tools", self)
         self.tools_dock.setWidget(self.dock_tabs)
@@ -203,8 +206,8 @@ class MainWindow(QMainWindow):
         self.component_loader.start_loading(priority_components=["meeting_view"])
         
         # Update status bar
-        self.statusBar().showMessage("Loading components...", 5000)
-    
+        self.statusBar().showMessage(_("MainWindow", "Loading components..."), 5000)
+
     def _is_component_ready(self, component_name):
         """Check if a component is ready for use"""
         return hasattr(self, component_name) and getattr(self, component_name) is not None
@@ -359,8 +362,8 @@ class MainWindow(QMainWindow):
     def _on_all_components_ready(self):
         """Handle all components being loaded"""
         # Update status bar
-        self.statusBar().showMessage("All components loaded", 3000)
-        
+        self.statusBar().showMessage(_("MainWindow", "All components loaded"), 3000)
+
         # Auto-start network display if enabled
         if self.settings_controller.get_settings().network_display.auto_start:
             mode = self.settings_controller.get_settings().network_display.mode
@@ -519,10 +522,10 @@ class MainWindow(QMainWindow):
             
             # Ensure the status bar shows the correct meeting
             if meeting.meeting_type == MeetingType.WEEKEND:
-                self.current_meeting_label.setText(f"Current Meeting: Public Talk and Watchtower Study ({meeting.date.strftime('%Y-%m-%d')})")
+                self.current_meeting_label.setText(_("MainWindow", f"Current Meeting: Public Talk and Watchtower Study ({meeting.date.strftime('%Y-%m-%d')})"))
             else:
-                self.current_meeting_label.setText(f"Current Meeting: {meeting.title}")
-            
+                self.current_meeting_label.setText(_("MainWindow", f"Current Meeting: {meeting.title}"))
+
             # Debug output
             #print(f"Selected meeting in _initialize_timer_display: {meeting.title}, Type: {meeting.meeting_type.value}")
             #print(f"Sections: {[s.title for s in meeting.sections]}")
@@ -633,7 +636,7 @@ class MainWindow(QMainWindow):
         if seconds_remaining > 0:
             # Show countdown in status bar
             if self.current_part_label.text() != message:
-                self.current_part_label.setText(message)
+                self.current_part_label.setText(_("MainWindow", message))
 
             # If the secondary display exists and is allowed to show the countdown, update it as well.
             secondary_display = self.secondary_display
@@ -641,7 +644,7 @@ class MainWindow(QMainWindow):
                 try:
                     if hasattr(secondary_display, "info_label1") and secondary_display.info_label1 is not None:
                         if secondary_display.info_label1.text() != message:
-                            secondary_display.info_label1.setText(message)
+                            secondary_display.info_label1.setText(_("MainWindow", message))
                         # Use only color/font-weight, let SecondaryDisplay handle font-size/layout
                         secondary_display.info_label1.setStyleSheet("color: #4a90e2; font-weight: bold;")
                         # Clear the second label during countdown
@@ -670,15 +673,15 @@ class MainWindow(QMainWindow):
                 if next_index < len(self.timer_controller.parts_list):
                     next_part = self.timer_controller.parts_list[next_index]
                     label_text = f"Next Part: {next_part.title}"
-                    self.current_part_label.setText(label_text)
+                    self.current_part_label.setText(_("MainWindow", label_text))
                 elif self.timer_controller.current_part_index >= 0:
                     current_part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
                     label_text = f"Current Part: {current_part.title}"
-                    self.current_part_label.setText(label_text)
+                    self.current_part_label.setText(_("MainWindow", label_text))
                 else:
                     label_text = "Meeting in progress"
-                    self.current_part_label.setText(label_text)
-    
+                    self.current_part_label.setText(_("MainWindow", label_text))
+
     def _update_meeting_selector(self):
         """Update the meeting selector dropdown with available meetings"""
         self.meeting_selector.clear()
@@ -709,7 +712,7 @@ class MainWindow(QMainWindow):
         """Show secondary display safely"""
         secondary_display = self._ensure_single_secondary_display()
         if secondary_display:
-            self.secondary_display_label.setText("Secondary Display: Active")
+            self.secondary_display_label.setText(_("MainWindow", "Secondary Display: Active"))
             self.toggle_secondary_action.setChecked(True)
         
     def showEvent(self, event):
@@ -736,26 +739,26 @@ class MainWindow(QMainWindow):
         menu_bar = self.menuBar()
         
         # File menu
-        file_menu = menu_bar.addMenu("&File")
-        
+        file_menu = menu_bar.addMenu(_("MainWindow", "&File"))
+
         # Create new meeting
-        new_meeting_action = QAction(get_icon("clock"), "&New Meeting", self)
+        new_meeting_action = QAction(get_icon("clock"), _("MainWindow", "&New Meeting"), self)
         new_meeting_action.setShortcut("Ctrl+N")
         new_meeting_action.triggered.connect(self._create_new_meeting)
         file_menu.addAction(new_meeting_action)
         
         # Open meeting
-        open_meeting_action = QAction(get_icon("clock"), "&Open Meeting", self)
+        open_meeting_action = QAction(get_icon("clock"), _("MainWindow", "&Open Meeting"), self)
         open_meeting_action.setShortcut("Ctrl+O")
         open_meeting_action.triggered.connect(self._open_meeting)
         file_menu.addAction(open_meeting_action)
         
         # Edit current meeting
-        edit_meeting_action = QAction(get_icon("edit"), "&Edit Current Meeting", self)
+        edit_meeting_action = QAction(get_icon("edit"), _("MainWindow", "&Edit Current Meeting"), self)
         edit_meeting_action.setShortcut("Ctrl+E")
         edit_meeting_action.triggered.connect(self._edit_current_meeting)
         file_menu.addAction(edit_meeting_action)
-        edit_songs_action = QAction(get_icon("music"), "Edit Weekend &Songs", self)
+        edit_songs_action = QAction(get_icon("music"), _("MainWindow", "Edit Weekend &Songs"), self)
         edit_songs_action.setShortcut("Ctrl+Shift+S")
         edit_songs_action.triggered.connect(self._edit_weekend_meeting_songs)
         file_menu.addAction(edit_songs_action)
@@ -763,7 +766,7 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         
         # Update meetings from web
-        update_meetings_action = QAction(get_icon("increase"), "&Update Meetings from Web", self)
+        update_meetings_action = QAction(get_icon("increase"), _("MainWindow", "&Update Meetings from Web"), self)
         update_meetings_action.setShortcut("F5")
         update_meetings_action.triggered.connect(self._update_meetings)
         file_menu.addAction(update_meetings_action)
@@ -771,30 +774,30 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         
         # View menu
-        view_menu = menu_bar.addMenu("&View")
-        
+        view_menu = menu_bar.addMenu(_("MainWindow", "&View"))
+
         # Network display actions
-        self.network_menu = view_menu.addMenu("&Network Display")
+        self.network_menu = view_menu.addMenu(_("MainWindow", "&Network Display"))  
 
         # Toggle network dock widget
-        toggle_network_dock_action = QAction("Show Network Panel", self)
+        toggle_network_dock_action = QAction(_("MainWindow", "Show Network Panel"), self)
         toggle_network_dock_action.setCheckable(True)
         toggle_network_dock_action.setChecked(self.tools_dock.isVisible())
         toggle_network_dock_action.triggered.connect(lambda checked: self.tools_dock.setVisible(checked))
         self.network_menu.addAction(toggle_network_dock_action)
 
         # Start/stop network display
-        self.toggle_network_action = QAction("Start Network Display", self)
+        self.toggle_network_action = QAction(_("MainWindow", "Start Network Display"), self)
         self.toggle_network_action.triggered.connect(self._toggle_network_display)
         self.network_menu.addAction(self.toggle_network_action)
 
         # Show network info
-        network_info_action = QAction("Network Display Info...", self)
+        network_info_action = QAction(_("MainWindow", "Network Display Info..."), self)
         network_info_action.triggered.connect(self._show_network_info)
         self.network_menu.addAction(network_info_action)
         
         # Settings
-        settings_action = QAction(get_icon("settings"), "&Settings", self)
+        settings_action = QAction(get_icon("settings"), _("MainWindow", "&Settings"), self)
         settings_action.setShortcut("Ctrl+,")
         settings_action.triggered.connect(self._open_settings)
         file_menu.addAction(settings_action)
@@ -802,14 +805,14 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         
         # Exit
-        exit_action = QAction("E&xit", self)
+        exit_action = QAction(_("MainWindow", "E&xit"), self)
         exit_action.setShortcut("Alt+F4")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
         
         # Toggle secondary display
-        self.toggle_secondary_action = QAction("Toggle &Secondary Display", self)
+        self.toggle_secondary_action = QAction(_("MainWindow", "Toggle &Secondary Display"), self)
         self.toggle_secondary_action.setShortcut("F10")
         self.toggle_secondary_action.triggered.connect(self._toggle_secondary_display)
         self.toggle_secondary_action.setCheckable(True)
@@ -827,16 +830,16 @@ class MainWindow(QMainWindow):
         """
         
         # Switch theme
-        self.theme_menu = view_menu.addMenu("&Theme")
-        
+        self.theme_menu = view_menu.addMenu(_("MainWindow", "&Theme"))
+
         # Light theme action
-        self.light_theme_action = QAction("&Light Theme", self)
+        self.light_theme_action = QAction(_("MainWindow", "&Light Theme"), self)
         self.light_theme_action.setCheckable(True)
         self.light_theme_action.triggered.connect(lambda: self._set_theme("light"))
         self.theme_menu.addAction(self.light_theme_action)
         
         # Dark theme action
-        self.dark_theme_action = QAction("&Dark Theme", self)
+        self.dark_theme_action = QAction(_("MainWindow", "&Dark Theme"), self)
         self.dark_theme_action.setCheckable(True)
         self.dark_theme_action.triggered.connect(lambda: self._set_theme("dark"))
         self.theme_menu.addAction(self.dark_theme_action)
@@ -849,17 +852,17 @@ class MainWindow(QMainWindow):
             self.light_theme_action.setChecked(True)
         
         # Help menu
-        help_menu = menu_bar.addMenu("&Help")
-        
+        help_menu = menu_bar.addMenu(_("MainWindow", "&Help"))
+
         # About
-        about_action = QAction("&About", self)
+        about_action = QAction(_("MainWindow", "&About"), self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
         
         help_menu.addSeparator()
         
         # Check for updates
-        check_updates_action = QAction("&Check for Updates", self)
+        check_updates_action = QAction(_("MainWindow", "&Check for Updates"), self)
         check_updates_action.triggered.connect(lambda: self._check_for_updates(False))
         help_menu.addAction(check_updates_action)
     
@@ -871,16 +874,15 @@ class MainWindow(QMainWindow):
         tool_bar.setIconSize(QSize(32, 32))
         tool_bar.setMovable(False)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
-        
         # Timer controls
-        self.start_button = QPushButton("Start Meeting")
+        self.start_button = QPushButton(_("MainWindow", "Start Meeting"))
         self.start_button.setIcon(get_icon("play"))
         self.start_button.setIconSize(QSize(24, 24))
         self.start_button.setObjectName("startButton")
         self.start_button.clicked.connect(self._start_meeting)
         tool_bar.addWidget(self.start_button)
-        
-        self.pause_resume_button = QPushButton("Pause")
+
+        self.pause_resume_button = QPushButton(_("MainWindow", "Pause"))
         self.pause_resume_button.setIcon(get_icon("pause"))
         self.pause_resume_button.setIconSize(QSize(24, 24))
         self.pause_resume_button.setObjectName("pauseButton")
@@ -891,14 +893,14 @@ class MainWindow(QMainWindow):
         tool_bar.addSeparator()
         
         # Part navigation
-        self.prev_button = QPushButton("Previous")
+        self.prev_button = QPushButton(_("MainWindow", "Previous"))
         self.prev_button.setIcon(get_icon("previous"))
         self.prev_button.setIconSize(QSize(24, 24))
         self.prev_button.clicked.connect(self._previous_part)
         self.prev_button.setEnabled(False)
         tool_bar.addWidget(self.prev_button)
-        
-        self.next_button = QPushButton("Next")
+
+        self.next_button = QPushButton(_("MainWindow", "Next"))
         self.next_button.setIcon(get_icon("next"))
         self.next_button.setIconSize(QSize(24, 24))
         self.next_button.clicked.connect(self._next_part)
@@ -908,14 +910,14 @@ class MainWindow(QMainWindow):
         tool_bar.addSeparator()
         
         # Time adjustment
-        self.decrease_button = QPushButton("-1 Minute")
+        self.decrease_button = QPushButton(_("MainWindow", "-1 Minute"))    
         self.decrease_button.setIcon(get_icon("decrease"))
         self.decrease_button.setIconSize(QSize(24, 24))
         self.decrease_button.clicked.connect(lambda: self._adjust_time(-1))
         self.decrease_button.setEnabled(False)
         tool_bar.addWidget(self.decrease_button)
-        
-        self.increase_button = QPushButton("+1 Minute")
+
+        self.increase_button = QPushButton(_("MainWindow", "+1 Minute"))
         self.increase_button.setIcon(get_icon("increase"))
         self.increase_button.setIconSize(QSize(24, 24))
         self.increase_button.clicked.connect(lambda: self._adjust_time(1))
@@ -932,7 +934,7 @@ class MainWindow(QMainWindow):
         tool_bar.addWidget(self.meeting_selector)
         
         # Settings button
-        settings_button = QPushButton("Settings")
+        settings_button = QPushButton(_("MainWindow", "Settings"))
         settings_button.setIcon(get_icon("settings"))
         settings_button.clicked.connect(self._open_settings)
         tool_bar.addWidget(settings_button)
@@ -954,7 +956,7 @@ class MainWindow(QMainWindow):
         if self.network_display_manager.broadcaster and self.network_display_manager.broadcaster.is_broadcasting:
             # Stop network display
             self.network_display_manager.stop_network_display()
-            self.toggle_network_action.setText("Start Network Display")
+            self.toggle_network_action.setText(_("MainWindow", "Start Network Display"))
         else:
             # Start network display with current settings
             mode = self.settings_controller.get_settings().network_display.mode
@@ -968,13 +970,13 @@ class MainWindow(QMainWindow):
             # Start network display
             if mode != NetworkDisplayMode.DISABLED:
                 QTimer.singleShot(0, lambda: self.network_display_manager.start_network_display(mode, http_port, ws_port))
-                self.toggle_network_action.setText("Stop Network Display")
+                self.toggle_network_action.setText(_("MainWindow", "Stop Network Display"))
             else:
                 # Show message if network display is disabled in settings
                 QTimer.singleShot(0, lambda: QMessageBox.information(
                     self,
-                    "Network Display Disabled",
-                    "Network display is disabled in settings. Please enable it in Settings > Network Display."
+                    _("MainWindow", "Network Display Disabled"),
+                    _("MainWindow", "Network display is disabled in settings. Please enable it in Settings > Network Display.")
                 ))
     
     def _show_network_info(self):
@@ -987,7 +989,7 @@ class MainWindow(QMainWindow):
             
             # Check again if it's available
             if not self._is_component_ready('network_display_manager'):
-                self.statusBar().showMessage("Network display component not available", 3000)
+                self.statusBar().showMessage(_("MainWindow", "Network display component not available"), 3000)
                 return
         
         # Now use the component
@@ -1019,8 +1021,8 @@ class MainWindow(QMainWindow):
         # Start network display if enabled
         if mode != NetworkDisplayMode.DISABLED:
             self.network_display_manager.start_network_display(mode, http_port, ws_port)
-            self.toggle_network_action.setText("Stop Network Display")
-        
+            self.toggle_network_action.setText(_("MainWindow", "Stop Network Display"))
+
             # Also sync the network widget if it exists
             if self._is_component_ready('network_status_widget'):
                 QTimer.singleShot(500, self._sync_network_widget_state)
@@ -1052,7 +1054,7 @@ class MainWindow(QMainWindow):
         meeting_view_layout = QVBoxLayout(meeting_view_placeholder)
         
         # Create a placeholder message
-        placeholder_label = QLabel("Loading meeting information...")
+        placeholder_label = QLabel(_("MainWindow", "Loading meeting information..."))
         placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         meeting_view_layout.addWidget(placeholder_label)
         
@@ -1076,9 +1078,8 @@ class MainWindow(QMainWindow):
         """Create the status bar"""
         status_bar = QStatusBar()
         self.setStatusBar(status_bar)
-        
         # Current part label
-        self.current_part_label = QLabel("No meeting selected")
+        self.current_part_label = QLabel(_("MainWindow", "No meeting selected"))
         self.current_part_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         status_bar.addWidget(self.current_part_label)
         
@@ -1154,10 +1155,10 @@ class MainWindow(QMainWindow):
         """Handle network display started"""
         self._last_network_url = url # Store the URL for later use
         # Update menu action text
-        self.toggle_network_action.setText("Stop Network Display")
-        
+        self.toggle_network_action.setText(_("MainWindow", "Stop Network Display"))
+
         # Update status bar
-        self.statusBar().showMessage(f"Network display started at {url}", 5000)
+        self.statusBar().showMessage(_("MainWindow", f"Network display started at {url}"), 5000)
         if hasattr(self, "network_status_widget") and self.network_status_widget:
             self.network_status_widget._display_started(url)
         
@@ -1176,8 +1177,8 @@ class MainWindow(QMainWindow):
         """Handle network display stopped"""
         self._last_network_url = None # Clear the URL
         # Update menu action text
-        self.toggle_network_action.setText("Start Network Display")
-        
+        self.toggle_network_action.setText(_("MainWindow", "Start Network Display"))
+
         # Update status bar
         self.statusBar().showMessage("Network display stopped", 5000)
         if hasattr(self, "network_status_widget") and self.network_status_widget:
@@ -1233,9 +1234,9 @@ class MainWindow(QMainWindow):
         parts = self.timer_controller.parts_list
         if index + 1 < len(parts):
             next_part = parts[index + 1]
-            self.current_part_label.setText(f"Next Part: {next_part.title}")
+            self.current_part_label.setText(_("MainWindow", f"Next Part: {next_part.title}"))
         else:
-            self.current_part_label.setText("Last Part")
+            self.current_part_label.setText(_("MainWindow", "Last Part"))
 
         # Highlight the current part in the meeting view
         if self._is_component_ready('meeting_view'):
@@ -1250,13 +1251,13 @@ class MainWindow(QMainWindow):
         if self.secondary_display:
             if index + 1 < len(parts):
                 next_part = parts[index + 1]
-                self.secondary_display.info_label1.setText(f"Next Part: {next_part.title}")
+                self.secondary_display.info_label1.setText(_("MainWindow", f"Next Part: {next_part.title}"))
                 # Use only color/font-weight, let SecondaryDisplay handle font-size/layout
                 self.secondary_display.info_label1.setStyleSheet("color: #ffffff; font-weight: bold;")
             else:
-                self.secondary_display.info_label1.setText("Last Part")
+                self.secondary_display.info_label1.setText(_("MainWindow", "Last Part"))
                 self.secondary_display.info_label1.setStyleSheet("color: #ffffff; font-weight: bold;")
-        
+
     def _part_updated(self, part, section_index, part_index):
         """Handle a part being updated"""
         global_index = self._get_global_part_index(section_index, part_index)
@@ -1275,8 +1276,8 @@ class MainWindow(QMainWindow):
     def _meeting_started(self):
         """Handle meeting start event in the main window"""
         from src.utils.resources import get_icon
-        
-        self.start_button.setText("Stop Meeting")
+
+        self.start_button.setText(_("MainWindow", "Stop Meeting"))
         self.start_button.setIcon(get_icon("stop"))
         self.start_button.setObjectName("stopButton")  # Change style
         self.start_button.setStyleSheet("")  # Force style refresh
@@ -1317,7 +1318,7 @@ class MainWindow(QMainWindow):
             parts = self.timer_controller.parts_list
             if len(parts) > 1:
                 # Show current and next part info
-                self.secondary_display.info_label1.setText(f"Next Part: {parts[1].title}")
+                self.secondary_display.info_label1.setText(_("MainWindow", f"Next Part: {parts[1].title}"))
                 self.secondary_display.info_label1.setStyleSheet("""
                     color: #ffffff; 
                     font-size: 60px;
@@ -1325,8 +1326,8 @@ class MainWindow(QMainWindow):
                 """)
             else:
                 # Only one part in the meeting
-                self.secondary_display.info_label1.setText("Last Part")
-                
+                self.secondary_display.info_label1.setText(_("MainWindow", "Last Part"))
+
             # Ensure both labels are visible
             self.secondary_display.info_label2.setVisible(True)
         
@@ -1341,8 +1342,8 @@ class MainWindow(QMainWindow):
     def _meeting_ended(self):
         """Handle meeting end"""
         from src.utils.resources import get_icon
-        
-        self.start_button.setText("Start Meeting")
+
+        self.start_button.setText(_("MainWindow", "Start Meeting"))
         self.start_button.setIcon(get_icon("play"))
         self.start_button.setObjectName("startButton")  # Change style
         self.start_button.setStyleSheet("")  # Force style refresh
@@ -1362,7 +1363,7 @@ class MainWindow(QMainWindow):
         self.increase_button.setEnabled(False)
         
         # Reset pause/resume button
-        self.pause_resume_button.setText("Pause")
+        self.pause_resume_button.setText(_("MainWindow", "Pause"))
         self.pause_resume_button.setIcon(get_icon("pause"))
         self.pause_resume_button.setObjectName("pauseButton")  # Change style
         self.pause_resume_button.setStyleSheet("")  # Force style refresh
@@ -1380,7 +1381,7 @@ class MainWindow(QMainWindow):
         if self.secondary_display:
             self.secondary_display.show_clock = True
             # Show meeting completed message
-            self.secondary_display.info_label1.setText("Meeting Completed")
+            self.secondary_display.info_label1.setText(_("MainWindow", "Meeting Completed"))
             self.secondary_display.info_label1.setStyleSheet("""
                 color: #ffffff; 
                 font-size: 60px;
@@ -1397,16 +1398,16 @@ class MainWindow(QMainWindow):
     def _transition_started(self, transition_msg):
         """Handle chairman transition period"""
         # Update the current part label
-        
-        self.current_part_label.setText(f"⏳ {transition_msg} (1:00)")
-        
+
+        self.current_part_label.setText(_("MainWindow", f"⏳ {transition_msg} (1:00)"))
+
         # Also update the part_label in the timer view
-        self.timer_view.part_label.setText(transition_msg)
-        
+        self.timer_view.part_label.setText(_("MainWindow", transition_msg))
+
         # Update secondary display if available
         if self.secondary_display:
             # Use info_label1 instead of next_part_label in the new design
-            self.secondary_display.info_label1.setText(transition_msg)
+            self.secondary_display.info_label1.setText(_("MainWindow", transition_msg))
             self.secondary_display.info_label1.setStyleSheet("""
                 color: #bb86fc; /* Purple for transitions */
                 font-size: 60px;
@@ -1435,7 +1436,7 @@ class MainWindow(QMainWindow):
         from PyQt6.QtCore import QProcess
         load_translation(QApplication.instance(), lang_code)
 
-        QMessageBox.information(self, "Language Changed", "App will now restart to apply changes.")
+        QMessageBox.information(self, _("MainWindow", "Language Changed"), _("MainWindow", "App will now restart to apply changes."))
         QApplication.quit()
         QProcess.startDetached(sys.executable, sys.argv)
 
@@ -1463,9 +1464,9 @@ class MainWindow(QMainWindow):
         """Update the secondary display indicator in the status bar"""
         settings = self.settings_controller.get_settings()
         if settings.display.use_secondary_screen and settings.display.secondary_screen_index is not None:
-            self.secondary_display_label.setText("Secondary Display: Active")
+            self.secondary_display_label.setText(_("MainWindow", "Secondary Display: Active"))
         else:
-            self.secondary_display_label.setText("Secondary Display: Inactive")
+            self.secondary_display_label.setText(_("MainWindow", "Secondary Display: Inactive"))
 
     
     def _apply_current_theme(self):
@@ -1561,8 +1562,8 @@ class MainWindow(QMainWindow):
     def _start_meeting(self):
         """Start the current meeting"""
         if not self.meeting_controller.current_meeting:
-            QTimer.singleShot(0, lambda: QMessageBox.warning(self, "No Meeting Selected",
-                                                            "Please select a meeting to start."))
+            QTimer.singleShot(0, lambda: QMessageBox.warning(self, _("MainWindow", "No Meeting Selected"),
+                                                            _("MainWindow", "Please select a meeting to start.")))
             return
 
         self.timer_controller.start_meeting()
@@ -1571,8 +1572,8 @@ class MainWindow(QMainWindow):
         """Stop the current meeting after confirmation"""
         confirm = QMessageBox.question(
             self,
-            "End Meeting?",
-            "😅 Hold up! Are you sure you want to stop the meeting?\nThis will end the timer and reset the session.",
+            _("MainWindow", "End Meeting?"),
+            _("MainWindow", "😅 Hold up! Are you sure you want to stop the meeting?\nThis will end the timer and reset the session."),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel
         )
@@ -1601,7 +1602,7 @@ class MainWindow(QMainWindow):
             self.decrease_button.setEnabled(False)
             self.increase_button.setEnabled(False)
             #self.start_button.setEnabled(False)
-            self.pause_resume_button.setText("Resume")
+            self.pause_resume_button.setText(_("MainWindow", "Resume"))
             self.pause_resume_button.setIcon(get_icon("play"))
             self.pause_resume_button.setObjectName("startButton")  # Change style
             self.pause_resume_button.setStyleSheet("")  # Force style refresh
@@ -1621,7 +1622,7 @@ class MainWindow(QMainWindow):
             self.decrease_button.setEnabled(True)
             self.increase_button.setEnabled(True)
             self.meeting_selector.setEnabled(True)
-            self.pause_resume_button.setText("Pause")
+            self.pause_resume_button.setText(_("MainWindow", "Pause"))
             self.pause_resume_button.setIcon(get_icon("pause"))
             self.pause_resume_button.setObjectName("pauseButton")  # Change style
             self.pause_resume_button.setStyleSheet("")  # Force style refresh
@@ -1699,8 +1700,8 @@ class MainWindow(QMainWindow):
         # Show tray message
         if hasattr(self, 'tray_icon') and self.tray_icon:
             self.tray_icon.showMessage(
-                "⌛ Did We Forget Something?",
-                "Click Start Meeting to launch the meeting timer and stay on track.",
+                _("MainWindow", "⌛ Did We Forget Something?"),
+                _("MainWindow", "Click Start Meeting to launch the meeting timer and stay on track."),
                 self.tray_icon.icon(),
                 5000  # 5 seconds
             )
@@ -1731,8 +1732,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'tray_icon') and self.tray_icon:
             print("Showing tray notification")
             self.tray_icon.showMessage(
-                "😅 Time to move on!",
-                f"'{part_title}' is over — advance to next part?",
+                _("MainWindow", "😅 Time to move on!"),
+                _("MainWindow", f"'{part_title}' is over — advance to next part?"),
                 self.tray_icon.icon(),
                 5000  # 5 seconds
             )
@@ -1776,7 +1777,7 @@ class MainWindow(QMainWindow):
                         self.meeting_controller.settings_manager.settings.recent_meetings.append(file_path)
                         self.meeting_controller.settings_manager.save_settings()
             except Exception as e:
-                QTimer.singleShot(0, lambda: QMessageBox.critical(self, "Error", f"Failed to load meeting: {str(e)}"))
+                QTimer.singleShot(0, lambda: QMessageBox.critical(self, _("MainWindow", "Error"), _("MainWindow", f"Failed to load meeting: {str(e)}")))
     
     def _update_meetings(self):
         """Update meetings from web with enhanced weekend meeting handling"""
@@ -1785,8 +1786,8 @@ class MainWindow(QMainWindow):
         if mode == MeetingSourceMode.WEB_SCRAPING:
             # Show a progress dialog
             from PyQt6.QtWidgets import QProgressDialog
-            progress = QProgressDialog("Updating meetings from wol.jw.org...", "Cancel", 0, 0, self)
-            progress.setWindowTitle("Updating Meetings")
+            progress = QProgressDialog(_("MainWindow", "Updating meetings from wol.jw.org..."), _("MainWindow", "Cancel"), 0, 0, self)
+            progress.setWindowTitle(_("MainWindow", "Updating Meetings"))
             progress.setWindowModality(Qt.WindowModality.WindowModal)
             progress.show()
 
@@ -1805,26 +1806,26 @@ class MainWindow(QMainWindow):
                 progress.close()
 
                 # Show a success message
-                QTimer.singleShot(0, lambda: QMessageBox.information(self, "Update Complete",
-                                               "Meetings have been successfully updated."))
+                QTimer.singleShot(0, lambda: QMessageBox.information(self, _("MainWindow", "Update Complete"),
+                                               _("MainWindow", "Meetings have been successfully updated.")))
             except Exception as e:
                 progress.close()
-                QTimer.singleShot(0, lambda e=e: QMessageBox.warning(self, "Update Failed",
-                                              f"Failed to update meetings: {str(e)}"))
+                QTimer.singleShot(0, lambda e=e: QMessageBox.warning(self, _("MainWindow", "Update Failed"),
+                                              _("MainWindow", f"Failed to update meetings: {str(e)}")))
         else:
             # Show options dialog as before
             from PyQt6.QtWidgets import QMenu
 
             menu = QMenu(self)
-            web_action = menu.addAction("Update from Web")
+            web_action = menu.addAction(_("MainWindow", "Update from Web"))
             web_action.triggered.connect(self.meeting_controller.update_meetings_from_web)
 
-            edit_action = menu.addAction("Edit Current Meeting")
+            edit_action = menu.addAction(_("MainWindow", "Edit Current Meeting"))
             edit_action.triggered.connect(lambda: self._edit_current_meeting())
 
             menu.addSeparator()
 
-            create_action = menu.addAction("Create New Meeting")
+            create_action = menu.addAction(_("MainWindow", "Create New Meeting"))
             create_action.triggered.connect(self._create_new_meeting)
 
             # Position menu below the update button
@@ -1857,7 +1858,7 @@ class MainWindow(QMainWindow):
                 from PyQt6.QtCore import Qt, QTimer
                 
                 dialog = QDialog(self)
-                dialog.setWindowTitle("Song Entry Required")
+                dialog.setWindowTitle(_("MainWindow", "Song Entry Required"))
                 dialog.setMinimumWidth(450)
                 dialog.setModal(True)
                 dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
@@ -1865,18 +1866,18 @@ class MainWindow(QMainWindow):
                 layout = QVBoxLayout(dialog)
 
                 info_label = QLabel(
-                    "<b>Some meeting songs are missing.</b><br><br>"
-                    "Would you like to edit them now?"
-                )
+                                _("MainWindow", "You are about to modify a running meeting.") + "\n\n" +
+                                _("MainWindow", "This may reset timing. Continue?")
+                            )
                 info_label.setWordWrap(True)
                 layout.addWidget(info_label)
 
                 buttons_layout = QHBoxLayout()
-                edit_now_button = QPushButton("Edit Now")
+                edit_now_button = QPushButton(_("MainWindow", "Edit Now"))
                 edit_now_button.clicked.connect(lambda: dialog.accept())
                 buttons_layout.addWidget(edit_now_button)
 
-                skip_button = QPushButton("Skip")
+                skip_button = QPushButton(_("MainWindow", "Skip"))
                 def handle_skip():
                     dialog.reject()
                     QTimer.singleShot(200, self._force_normal_window_state)
@@ -1926,8 +1927,8 @@ class MainWindow(QMainWindow):
     def _edit_current_meeting(self):
         """Edit the currently selected meeting"""
         if not self.meeting_controller.current_meeting:
-            QTimer.singleShot(0, lambda: QMessageBox.warning(self, "No Meeting Selected",
-                                                            "Please select a meeting to edit."))
+            QTimer.singleShot(0, lambda: QMessageBox.warning(self, _("MainWindow", "No Meeting Selected"),
+                                                            _("MainWindow", "Please select a meeting to edit.")))
             return
 
         from src.views.meeting_editor_dialog import MeetingEditorDialog
@@ -1956,8 +1957,8 @@ class MainWindow(QMainWindow):
 
         # Check if we have a weekend meeting selected
         if not current_meeting or current_meeting.meeting_type != MeetingType.WEEKEND:
-            QTimer.singleShot(0, lambda: QMessageBox.warning(self, "Not a Weekend Meeting",
-                                                            "Please select a weekend meeting first."))
+            QTimer.singleShot(0, lambda: QMessageBox.warning(self, _("MainWindow", "Not a Weekend Meeting"),
+                                                            _("MainWindow", "Please select a weekend meeting first.")))
             return
 
         # Show the weekend song editor dialog
@@ -2118,7 +2119,7 @@ class MainWindow(QMainWindow):
             seconds = total_overtime_seconds % 60
             
             # Update and show the label
-            self.meeting_overtime_label.setText(f"Meeting Overtime: {minutes:02d}:{seconds:02d}")
+            self.meeting_overtime_label.setText(_("MainWindow", f"Meeting Overtime: {minutes:02d}:{seconds:02d}"))
             self.meeting_overtime_label.setStyleSheet("color: red; font-weight: bold;")
             self.meeting_overtime_label.setVisible(True)
     
@@ -2141,15 +2142,15 @@ class MainWindow(QMainWindow):
         # Set the text and color based on whether we're running over or under
         if diff_minutes > 0:
             # Running over time
-            self.predicted_end_time_label.setText(f"End: {predicted_time_str} (+{diff_minutes} min)")
+            self.predicted_end_time_label.setText(_("MainWindow", f"End: {predicted_time_str} (+{diff_minutes} min)"))
             self.predicted_end_time_label.setStyleSheet("color: red;")
         elif diff_minutes < 0:
             # Running under time
-            self.predicted_end_time_label.setText(f"End: {predicted_time_str} ({diff_minutes} min)")
+            self.predicted_end_time_label.setText(_("MainWindow", f"End: {predicted_time_str} ({diff_minutes} min)"))
             self.predicted_end_time_label.setStyleSheet("color: green;")
         else:
             # On time
-            self.predicted_end_time_label.setText(f"End: {predicted_time_str} (on time)")
+            self.predicted_end_time_label.setText(_("MainWindow", f"End: {predicted_time_str} (on time)"))
             self.predicted_end_time_label.setStyleSheet("color: black;")
         
         # Make the label visible
@@ -2158,18 +2159,18 @@ class MainWindow(QMainWindow):
     def _show_about(self):
         """Show the about dialog"""
         QMessageBox.about(
-            self, 
-            "About OnTime Meeting Timer",
-            "OnTime Meeting Timer\n\n"
+            self,
+            _("MainWindow", "About OnTime Meeting Timer"),
+            _("MainWindow", "OnTime Meeting Timer\n\n"
             "A cross-platform timer application for managing JW meeting schedules.\n\n"
-            "© 2025 Open Source"
+            "© 2025 Open Source")
         )
     
     def _show_error(self, message):
         """Show error message (thread-safe)"""
-        QTimer.singleShot(0, lambda: QMessageBox.critical(self, "Error", message))
-        
-    
+        QTimer.singleShot(0, lambda: QMessageBox.critical(self, _("MainWindow", "Error"), message))
+
+
     # ------------------------------------------------------------------
     # Ensure all child windows shut down cleanly when the main window
     # is closed (especially the secondary display, which otherwise keeps
@@ -2235,8 +2236,8 @@ class MainWindow(QMainWindow):
         if screen == primary_screen:
             QTimer.singleShot(0, lambda: QMessageBox.information(
                 self,
-                "Same Screen Selected",
-                "The primary and secondary screens are the same. This may cause overlapping windows."
+                _("MainWindow", "Same Screen Selected"),
+                _("MainWindow", "The primary and secondary screens are the same. This may cause overlapping windows.")
             ))
 
         geometry = screen.geometry()
