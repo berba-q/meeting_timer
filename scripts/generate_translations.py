@@ -49,7 +49,7 @@ def generate_ts(lang):
     sources = collect_sources()
     
     if not sources:
-        print(f"❌ No source files found for {lang}")
+        print(f"No source files found for {lang}")
         return None
     
     try:
@@ -59,17 +59,17 @@ def generate_ts(lang):
         
         if os.path.exists(ts_path):
             file_size = os.path.getsize(ts_path)
-            print(f"   ✅ Created {ts_path} ({file_size} bytes)")
+            print(f"Created {ts_path} ({file_size} bytes)")
             return ts_path
         else:
-            print(f"   ❌ File was not created: {ts_path}")
+            print(f"File was not created: {ts_path}")
             return None
             
     except subprocess.CalledProcessError as e:
-        print(f"   ❌ Error running pylupdate6: {e}")
+        print(f"Error running pylupdate6: {e}")
         return None
     except FileNotFoundError:
-        print(f"   ❌ pylupdate6 not found. Install with: pip install PyQt6-tools")
+        print(f"pylupdate6 not found. Install with: pip install PyQt6-tools")
         return None
 
 def install_translation_service():
@@ -77,32 +77,32 @@ def install_translation_service():
     if TRANSLATION_SERVICE == "googletrans":
         try:
             import googletrans
-            print(f"   ✅ googletrans already available")
+            print(f"googletrans already available")
             return True
         except ImportError:
-            print(f"   📦 Installing googletrans...")
+            print(f"Installing googletrans...")
             try:
                 subprocess.run([sys.executable, "-m", "pip", "install", "googletrans==4.0.0rc1"], 
                              check=True, capture_output=True)
-                print(f"   ✅ googletrans installed successfully")
+                print(f"googletrans installed successfully")
                 return True
             except Exception as e:
-                print(f"   ❌ Failed to install googletrans: {e}")
+                print(f"Failed to install googletrans: {e}")
                 return False
     
     elif TRANSLATION_SERVICE == "libretranslate":
         try:
             import requests
-            print(f"   ✅ requests available for LibreTranslate")
+            print(f"requests available for LibreTranslate")
             return True
         except ImportError:
-            print(f"   📦 Installing requests for LibreTranslate...")
+            print(f"Installing requests for LibreTranslate...")
             try:
                 subprocess.run([sys.executable, "-m", "pip", "install", "requests"], 
                              check=True, capture_output=True)
                 return True
             except Exception as e:
-                print(f"   ❌ Failed to install requests: {e}")
+                print(f"Failed to install requests: {e}")
                 return False
     
     return False
@@ -115,7 +115,7 @@ def translate_with_googletrans(text, target_lang):
         result = translator.translate(text, dest=target_lang)
         return result.text
     except Exception as e:
-        print(f"      ⚠️ Google Translate error: {e}")
+        print(f"Google Translate error: {e}")
         return None
 
 def translate_with_libretranslate(text, target_lang):
@@ -137,20 +137,20 @@ def translate_with_libretranslate(text, target_lang):
         if response.status_code == 200:
             return response.json()["translatedText"]
         else:
-            print(f"      ⚠️ LibreTranslate error: {response.status_code}")
+            print(f"LibreTranslate error: {response.status_code}")
             return None
             
     except Exception as e:
-        print(f"      ⚠️ LibreTranslate error: {e}")
+        print(f"LibreTranslate error: {e}")
         return None
 
 def auto_translate_ts_file(ts_file_path, target_language):
     """Auto-translate a Qt TS file"""
     if not AUTO_TRANSLATE:
-        print(f"   ⏭️ Auto-translation disabled")
+        print(f"Auto-translation disabled")
         return True
     
-    print(f"   🌍 Auto-translating to {target_language}")
+    print(f"Auto-translating to {target_language}")
     
     # Language mapping
     lang_mapping = {
@@ -162,12 +162,12 @@ def auto_translate_ts_file(ts_file_path, target_language):
     }
     
     if target_language not in lang_mapping:
-        print(f"   ❌ Unsupported language: {target_language}")
+        print(f"Unsupported language: {target_language}")
         return False
     
     # Install translation service if needed
     if not install_translation_service():
-        print(f"   ❌ Could not install translation service")
+        print(f"Could not install translation service")
         return False
     
     # Load and parse the TS file
@@ -175,7 +175,7 @@ def auto_translate_ts_file(ts_file_path, target_language):
         tree = ET.parse(ts_file_path)
         root = tree.getroot()
     except Exception as e:
-        print(f"   ❌ Error parsing TS file: {e}")
+        print(f"Error parsing TS file: {e}")
         return False
     
     # Find all unfinished messages
@@ -241,23 +241,23 @@ def auto_translate_ts_file(ts_file_path, target_language):
                 time.sleep(0.1)
                 
             except Exception as e:
-                print(f"   ❌ Translation failed for '{source_text}': {e}")
+                print(f"Translation failed for '{source_text}': {e}")
                 skipped_count += 1
                 continue
     
     # Save the updated file
     try:
         tree.write(ts_file_path, encoding='utf-8', xml_declaration=True)
-        print(f"   📊 Translated: {translated_count}, Skipped: {skipped_count}")
+        print(f"Translated: {translated_count}, Skipped: {skipped_count}")
         return True
         
     except Exception as e:
-        print(f"   ❌ Error saving file: {e}")
+        print(f"Error saving file: {e}")
         return False
 
 def compile_qm(ts_file):
     if not ts_file or not os.path.exists(ts_file):
-        print(f"   ❌ TS file does not exist: {ts_file}")
+        print(f"TS file does not exist: {ts_file}")
         return None
         
     qm_file = os.path.join(QM_DIR, Path(ts_file).with_suffix(".qm").name)
@@ -267,31 +267,31 @@ def compile_qm(ts_file):
         
         if os.path.exists(qm_file):
             file_size = os.path.getsize(qm_file)
-            print(f"   ✅ Compiled {qm_file} ({file_size} bytes)")
+            print(f"Compiled {qm_file} ({file_size} bytes)")
             return qm_file
         else:
-            print(f"   ❌ QM file was not created: {qm_file}")
+            print(f"QM file was not created: {qm_file}")
             return None
             
     except subprocess.CalledProcessError as e:
-        print(f"   ❌ Error running lrelease: {e}")
+        print(f"Error running lrelease: {e}")
         return None
     except FileNotFoundError:
-        print(f"   ❌ lrelease not found. Make sure Qt tools are installed.")
+        print(f"lrelease not found. Make sure Qt tools are installed.")
         return None
 
 if __name__ == "__main__":
-    print("🔁 Enhanced OnTime Translation Generator")
+    print("Enhanced OnTime Translation Generator")
     print("=" * 50)
     
     if AUTO_TRANSLATE:
-        print(f"🤖 Auto-translation: ENABLED ({TRANSLATION_SERVICE})")
+        print(f"Auto-translation: ENABLED ({TRANSLATION_SERVICE})")
     else:
-        print(f"📝 Auto-translation: DISABLED (manual only)")
+        print(f"Auto-translation: DISABLED (manual only)")
     
     # Collect and analyze source files
     sources = collect_sources()
-    print(f"\n📂 Found {len(sources)} source files")
+    print(f"Found {len(sources)} source files")
     
     # Check for translation strings
     translation_patterns = ['.tr(', 'QCoreApplication.translate(']
@@ -309,7 +309,7 @@ if __name__ == "__main__":
     print(f"🔍 Found ~{total_count} translation strings")
     
     if total_count == 0:
-        print("⚠️  No translation strings found! Make sure you're using self.tr() or QCoreApplication.translate()")
+        print("No translation strings found! Make sure you're using self.tr() or QCoreApplication.translate()")
     
     # Process each language
     success_count = 0
@@ -317,18 +317,18 @@ if __name__ == "__main__":
         if lang_code == 'en':  # Skip English
             continue
             
-        print(f"\n🌍 Processing {lang_code.upper()}:")
+        print(f"Processing {lang_code.upper()}:")
         
         # Generate TS file
         ts_path = generate_ts(lang_code)
         if not ts_path:
-            print(f"   ❌ Failed to generate TS file")
+            print(f"Failed to generate TS file")
             continue
         
         # Auto-translate if enabled
         if AUTO_TRANSLATE:
             if not auto_translate_ts_file(ts_path, lang_code):
-                print(f"   ❌ Auto-translation failed")
+                print(f"Auto-translation failed")
                 # Continue anyway - we can still compile what we have
         
         # Compile QM file
@@ -336,17 +336,17 @@ if __name__ == "__main__":
         if qm_path:
             success_count += 1
         else:
-            print(f"   ❌ Failed to compile QM file")
+            print(f"Failed to compile QM file")
     
-    print(f"\n🎉 Translation processing complete!")
-    print(f"   ✅ Successfully processed {success_count}/{len(AVAILABLE_LANGUAGES)-1} languages")
+    print(f"Translation processing complete!")
+    print(f"Successfully processed {success_count}/{len(AVAILABLE_LANGUAGES)-1} languages")
     
     if AUTO_TRANSLATE and success_count > 0:
-        print(f"\n💡 Next steps:")
+        print(f" Next steps:")
         print(f"   1. Review translations with: linguist translations/ontime_*.ts")
         print(f"   2. Test translations in your application")
         print(f"   3. Re-run this script to update after code changes")
     elif success_count > 0:
-        print(f"\n💡 Next steps:")
+        print(f" Next steps:")
         print(f"   1. Add translations to TS files manually or with Qt Linguist")
         print(f"   2. Re-run this script to compile updated translations")
