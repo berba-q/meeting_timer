@@ -111,8 +111,15 @@ class MainWindow(QMainWindow):
         self._create_menu_bar()
         self._create_tool_bar()
         # Initialize persistent system tray icon for notifications
+        from src.utils.resources import get_icon
         self.tray_icon = QSystemTrayIcon(self.windowIcon(), self)
         self.tray_icon.setToolTip("OnTime Meeting Timer")
+        if self.tray_icon:
+            self.tray_icon.setVisible(True)
+            if not self.tray_icon.icon().isNull():
+                pass # we already set the tray icon
+            else:
+                self.tray_icon.setIcon(get_icon("clock")) # Set a default icon if not set
         self.tray_icon.show()
         self._create_central_widget()
         self._create_status_bar()
@@ -1689,6 +1696,18 @@ class MainWindow(QMainWindow):
         widget._pulse_animations = [a for a in widget._pulse_animations if a.state() == QPropertyAnimation.State.Running]
         widget._pulse_animations.append(anim)
         
+    def _show_tray_notification(self, title, message):
+        """Show a tray notification with the given title and message."""
+        if hasattr(self, 'tray_icon') and self.tray_icon:
+            self.tray_icon.showMessage(
+                title,
+                message,
+                self.tray_icon.icon(),
+                5000  # 5 seconds
+            )
+        else:
+            print("No tray_icon found")
+        
     def _nudge_start(self):
         """Visual + tray nudge to remind the user to start the meeting."""
         if not getattr(self, 'start_button', None):
@@ -1698,15 +1717,12 @@ class MainWindow(QMainWindow):
         self._pulse_widget(self.start_button)
         
         # Show tray message
-        if hasattr(self, 'tray_icon') and self.tray_icon:
-            self.tray_icon.showMessage(
-                self.tr("⌛ Did We Forget Something?"),
-                self.tr("Click Start Meeting to launch the meeting timer and stay on track."),
-                self.tray_icon.icon(),
-                5000  # 5 seconds
-            )
-        else:
-            print("No tray_icon found")
+        self._show_tray_notification(
+        self.tr("⌛ Did We Forget Something?"),
+        self.tr("Click Start Meeting to launch the meeting timer and stay on track.")
+    )
+
+
             
     def _nudge_advance(self):
         """Visual + tray nudge to remind the user to advance to the next part."""
@@ -1729,16 +1745,10 @@ class MainWindow(QMainWindow):
                 part_title = part.title
         
         # Show tray message
-        if hasattr(self, 'tray_icon') and self.tray_icon:
-            print("Showing tray notification")
-            self.tray_icon.showMessage(
-                self.tr("😅 Time to move on!"),
-                self.tr(f"'{part_title}' is over — advance to next part?"),
-                self.tray_icon.icon(),
-                5000  # 5 seconds
-            )
-        else:
-            print("No tray_icon found")
+        self._show_tray_notification(
+        self.tr("😅 Time to move on!"),
+        self.tr(f"'{part_title}' is over — advance to next part?")
+    )
 
     
     def _create_new_meeting(self):
@@ -2112,15 +2122,18 @@ class MainWindow(QMainWindow):
     
     def _meeting_overtime(self, total_overtime_seconds):
         """Handle meeting overtime notification"""
-        # Only show if there's actual overtime
         if total_overtime_seconds > 0:
-            # Format the overtime
             minutes = total_overtime_seconds // 60
             seconds = total_overtime_seconds % 60
-            
-            # Update and show the label
+
+            # Set color based on severity
+            if total_overtime_seconds < 60:
+                color = "orange"
+            else:
+                color = "red"
+
             self.meeting_overtime_label.setText(self.tr(f"Meeting Overtime: {minutes:02d}:{seconds:02d}"))
-            self.meeting_overtime_label.setStyleSheet("color: red; font-weight: bold;")
+            self.meeting_overtime_label.setStyleSheet(f"color: {color}; font-weight: bold;")
             self.meeting_overtime_label.setVisible(True)
     
     def _update_predicted_end_time(self, original_end_time, predicted_end_time):
