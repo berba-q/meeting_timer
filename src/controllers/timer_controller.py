@@ -30,6 +30,7 @@ class TimerController(QObject):
     transition_started = pyqtSignal(str)  # transition description
     meeting_overtime = pyqtSignal(int)  # total overtime in seconds
     predicted_end_time_updated = pyqtSignal(datetime, datetime)  # original and predicted end times
+    meeting_countdown_updated = pyqtSignal(int, str)  # seconds remaining, formatted message
     
     def __init__(self, settings_controller: SettingsController):
         """Initialize the TimerController with a settings controller"""
@@ -120,6 +121,9 @@ class TimerController(QObject):
 
         target_datetime = datetime.combine(target_date, meeting_time)
 
+        # Step 1: Store the target meeting time in the Timer model for internal tracking
+        self.timer.target_meeting_time = target_datetime
+
         # Only set countdown if meeting is in the future
         if target_datetime > now:
             # Set countdown target - this will trigger countdown updates
@@ -140,7 +144,7 @@ class TimerController(QObject):
             self.countdown_started.emit(target_datetime)
         else:
             # Meeting time has passed, clear any countdown
-            self.timer._target_meeting_time = None
+            self.timer.target_meeting_time = None
 
             # Stop the countdown timer if it's running
             if self._countdown_timer.isActive():
@@ -148,7 +152,6 @@ class TimerController(QObject):
                 
     def _update_meeting_countdown(self):
         """Update the meeting countdown display"""
-        #print("[DEBUG] TimerController._update_meeting_countdown() was called")
         if not self.current_meeting:
             return
 
@@ -156,34 +159,23 @@ class TimerController(QObject):
         if not meeting_datetime:
             return
 
-        # Get current time
         now = datetime.now()
-
-        # Calculate time difference
         time_diff = meeting_datetime - now
         seconds_remaining = int(time_diff.total_seconds())
 
-        # Format countdown message
         if seconds_remaining > 0:
-            if seconds_remaining >= 3600:  # More than an hour
-                hours = seconds_remaining // 3600
-                minutes = (seconds_remaining % 3600) // 60
-                countdown_msg = f"Meeting starts in {hours}h {minutes}m"
-            else:  # Less than an hour
-                minutes = seconds_remaining // 60
-                seconds = seconds_remaining % 60
+            hours = seconds_remaining // 3600
+            minutes = (seconds_remaining % 3600) // 60
+            seconds = seconds_remaining % 60
+            if hours > 0:
+                countdown_msg = f"Meeting starts in {hours}h {minutes}m {seconds}s"
+            else:
                 countdown_msg = f"Meeting starts in {minutes}m {seconds}s"
-            #(f"[DEBUG] Emitting countdown: {seconds_remaining}s - {countdown_msg}")
-            # Emit the updated countdown signal
-            self.timer.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
-            # Removed auto-start logic: meeting must be started manually
+            self.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
         else:
             countdown_msg = "Meeting starts now!"
-            #print(f"[DEBUG] Emitting countdown: 0s - {countdown_msg}")
-            self.timer.meeting_countdown_updated.emit(0, countdown_msg)
-            # Stop the countdown timer
+            self.meeting_countdown_updated.emit(0, countdown_msg)
             self._countdown_timer.stop()
-            # Removed auto-start logic: meeting must be started manually
     
     def start_meeting(self):
         """Start the current meeting"""
@@ -369,29 +361,10 @@ class TimerController(QObject):
         self._transition_timer.start(transition_seconds * 1000)  # Convert to milliseconds
         
     def _complete_transition(self):
-        """Automatically move to the next part after the chairman transition"""
+        """Let transition enter overtime instead of moving to next part"""
         if self._in_transition:
             self._in_transition = False
-            
-            # Move to the next part
-            self.current_part_index = self._next_part_after_transition
-            
-            # Check if we're at the end
-            if self.current_part_index >= len(self.parts_list):
-                self.stop_meeting()
-                return
-            
-            # Get next part
-            current_part = self.parts_list[self.current_part_index]
-            
-            # Start timer for next part
-            self.timer.start(current_part.duration_seconds)
-            
-            # Emit signal
-            self.part_changed.emit(current_part, self.current_part_index)
-            
-            # Update predicted end time
-            self._update_predicted_end_time()
+            # Do not auto-advance. Allow the timer to go into overtime.
 
     
     def previous_part(self):

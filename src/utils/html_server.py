@@ -135,7 +135,7 @@ class NetworkHTTPServer(QObject):
         body {
             background-color: #000000;
             color: #ffffff;
-            font-family: 'Segoe UI', 'Arial', sans-serif;
+            font-family: 'Tahoma', 'Arial', sans-serif;
             margin: 0;
             padding: 0;
             display: flex;
@@ -149,10 +149,14 @@ class NetworkHTTPServer(QObject):
         
         #timer-display {
             font-family: 'Courier New', monospace;
-            font-size: 25vmin;
+            font-size: clamp(10vmin, 14vw, 20vmin);
             font-weight: bold;
             margin: 0;
             line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 90vw;
         }
         
         #info-label {

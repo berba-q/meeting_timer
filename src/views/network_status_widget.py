@@ -53,18 +53,18 @@ class NetworkStatusWidget(QWidget):
         
         # Status heading
         heading_layout = QHBoxLayout()
-        status_heading = QLabel("Network Display")
+        status_heading = QLabel(self.tr("Network Display"))
         status_heading.setStyleSheet("font-weight: bold; font-size: 14px;")
         heading_layout.addWidget(status_heading)
         
         # Status indicator
-        self.status_indicator = QLabel("Inactive")
+        self.status_indicator = QLabel(self.tr("Inactive"))
         self.status_indicator.setStyleSheet("color: #999999;")
         heading_layout.addWidget(self.status_indicator)
         heading_layout.addStretch()
         
         # Toggle button
-        self.toggle_button = QPushButton("Start")
+        self.toggle_button = QPushButton(self.tr("Start"))
         self.toggle_button.setMinimumWidth(100)
         heading_layout.addWidget(self.toggle_button)
         
@@ -80,7 +80,7 @@ class NetworkStatusWidget(QWidget):
         details_layout = QHBoxLayout()
         
         # Connection info
-        self.info_label = QLabel("Network display is not active")
+        self.info_label = QLabel(self.tr("Network display is not active"))
         self.info_label.setWordWrap(True)
         details_layout.addWidget(self.info_label, 1)
         
@@ -94,10 +94,11 @@ class NetworkStatusWidget(QWidget):
         status_layout.addLayout(details_layout)
         
         # Add help text
-        help_text = QLabel(
+        help_text = QLabel(self.tr(
             "Enable this to display the timer on other devices on the same network. "
             "Configure in Settings > Network Display."
-        )
+        ))
+        help_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         help_text.setWordWrap(True)
         help_text.setStyleSheet("color: #666666; font-size: 11px;")
         status_layout.addWidget(help_text)
@@ -149,7 +150,7 @@ class NetworkStatusWidget(QWidget):
                 # Also update the client count
                 _, client_count, _ = manager.get_connection_info()
                 client_text = f"{client_count} client{'s' if client_count != 1 else ''} connected"
-                self.info_label.setText(f"Network display running at:\n{url}\n{client_text}")
+                self.info_label.setText(self.tr(f"Network display running at:\n{url}\n{client_text}"))
         else:
             self._display_stopped()
     
@@ -157,7 +158,7 @@ class NetworkStatusWidget(QWidget):
         """Toggle network display on/off"""
         if self.is_active:
             self.network_manager.stop_network_display()
-            self.toggle_button.setText("Start")
+            self.toggle_button.setText(self.tr("Start"))
         else:
             # Start network display with current settings
             from src.models.settings import NetworkDisplayMode
@@ -166,18 +167,18 @@ class NetworkStatusWidget(QWidget):
             ws_port = self.network_manager.settings_manager.settings.network_display.ws_port
             
             self.network_manager.start_network_display(mode, http_port, ws_port)
-            self.toggle_button.setText("Stop")
-    
+            self.toggle_button.setText(self.tr("Stop"))
+
     def _display_started(self, url: str):
         """Handle network display started"""
         self.is_active = True
-        self.toggle_button.setText("Stop")
-        self.status_indicator.setText("Active")
+        self.toggle_button.setText(self.tr("Stop"))
+        self.status_indicator.setText(self.tr("Active"))
         self.status_indicator.setStyleSheet("color: #4caf50; font-weight: bold;")
         
         # Update info label
-        self.info_label.setText(f"Network display running at:\n{url}")
-        
+        self.info_label.setText(self.tr(f"Network display running at:\n{url}"))
+
         # Show QR code if enabled
         if self.network_manager.settings_manager.settings.network_display.qr_code_enabled:
             qr_pixmap = generate_qr_code(url, 100)
@@ -187,13 +188,13 @@ class NetworkStatusWidget(QWidget):
     def _display_stopped(self):
         """Handle network display stopped"""
         self.is_active = False
-        self.toggle_button.setText("Start")
-        self.status_indicator.setText("Inactive")
+        self.toggle_button.setText(self.tr("Start"))
+        self.status_indicator.setText(self.tr("Inactive"))
         self.status_indicator.setStyleSheet("color: #999999;")
         
         # Update info label
-        self.info_label.setText("Network display is not active")
-        
+        self.info_label.setText(self.tr("Network display is not active"))
+
         # Hide QR code
         self.qr_label.setVisible(False)
     
@@ -201,21 +202,21 @@ class NetworkStatusWidget(QWidget):
         """Handle status updates"""
         if self.is_active:
             client_text = f"{client_count} client{'s' if client_count != 1 else ''} connected"
-            self.info_label.setText(f"{message}\n{client_text}")
-    
+            self.info_label.setText(self.tr(f"{message}\n{client_text}"))
+
     def _client_connected(self, client_id: str):
         """Handle client connection"""
         # Update client count in status
         url, client_count, active_services = self.network_manager.get_connection_info()
         client_text = f"{client_count} client{'s' if client_count != 1 else ''} connected"
-        self.info_label.setText(f"Network display running at:\n{url}\n{client_text}")
-    
+        self.info_label.setText(self.tr(f"Network display running at:\n{url}\n{client_text}"))
+
     def _client_disconnected(self, client_id: str):
         """Handle client disconnection"""
         # Update client count in status
         url, client_count, active_services = self.network_manager.get_connection_info()
         client_text = f"{client_count} client{'s' if client_count != 1 else ''} connected"
-        self.info_label.setText(f"Network display running at:\n{url}\n{client_text}")
+        self.info_label.setText(self.tr(f"Network display running at:\n{url}\n{client_text}"))
 
 
 class NetworkInfoDialog(QDialog):
@@ -230,7 +231,7 @@ class NetworkInfoDialog(QDialog):
     
     def _setup_ui(self):
         """Setup the UI components"""
-        self.setWindowTitle("Network Display Information")
+        self.setWindowTitle(self.tr("Network Display Information"))
         self.setMinimumWidth(400)
         
         layout = QVBoxLayout(self)
@@ -276,7 +277,7 @@ class NetworkInfoDialog(QDialog):
             qr_layout = QVBoxLayout(qr_frame)
             
             # QR code heading
-            qr_heading = QLabel("QR Code for Easy Connection")
+            qr_heading = QLabel(self.tr("QR Code for Easy Connection"))
             qr_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
             qr_heading.setStyleSheet("font-weight: bold;")
             qr_layout.addWidget(qr_heading)
@@ -289,25 +290,25 @@ class NetworkInfoDialog(QDialog):
             qr_layout.addWidget(qr_label)
             
             # QR code instructions
-            qr_instructions = QLabel("Scan this code with your mobile device to connect")
+            qr_instructions = QLabel(self.tr("Scan this code with your mobile device to connect"))
             qr_instructions.setAlignment(Qt.AlignmentFlag.AlignCenter)
             qr_layout.addWidget(qr_instructions)
             
             layout.addWidget(qr_frame)
         
         # Connection instructions
-        instructions_label = QLabel(
+        instructions_label = QLabel(self.tr(
             "To connect from other devices:\n\n"
             "1. Make sure all devices are on the same network (LAN/WiFi)\n"
             "2. Open a web browser on the client device\n"
             "3. Enter the URL shown above in the browser\n"
             "4. The timer display should appear automatically\n\n"
             "If you have trouble connecting, check your network settings and firewall configuration."
-        )
+        ))
         instructions_label.setWordWrap(True)
         layout.addWidget(instructions_label)
         
         # Close button
-        close_button = QPushButton("Close")
+        close_button = QPushButton(self.tr("Close"))
         close_button.clicked.connect(self.accept)
         layout.addWidget(close_button)

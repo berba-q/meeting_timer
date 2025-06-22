@@ -40,7 +40,15 @@ MEETINGS_DIR.mkdir(exist_ok=True)
 # Web Scraping
 WOL_BASE_URL = "https://wol.jw.org"
 MEETINGS_PATH = "/en/wol/meetings/r1/lp-e"
-USER_AGENT = f"JWMeetingTimer/{APP_VERSION} (Python)"
+USER_AGENT = f"OntimeMeetingTimer/{APP_VERSION} (Python)"
+
+# Available UI languages
+AVAILABLE_LANGUAGES = {
+    "en": "English",
+    "it": "Italiano",
+    "fr": "Français",
+    "de": "Deutsch"
+}
 
 # Default settings
 DEFAULT_LANGUAGE = "en"

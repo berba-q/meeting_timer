@@ -29,10 +29,17 @@ class SettingsController(QObject):
     network_display_mode_changed = pyqtSignal(NetworkDisplayMode)
     network_display_ports_changed = pyqtSignal(int, int)  # HTTP port, WS port
     network_display_options_changed = pyqtSignal(bool, bool)  # Auto-start, QR code
+    tools_dock_state_changed = pyqtSignal(bool)  # Tools dock visibility changed
+    meeting_settings_changed = pyqtSignal()  # Midweek/weekend meeting times
+    reminder_settings_changed = pyqtSignal()  # Notification reminder settings
+    timing_settings_changed = pyqtSignal()  # Predicted end time, etc.
+    general_settings_changed = pyqtSignal()  # Language, etc.
     
     def __init__(self, settings_manager: SettingsManager):
         super().__init__()
         self.settings_manager = settings_manager
+        
+        self._updating_settings = False
         
         # Initialize correct screen indices if not already set
         self._initialize_screen_settings()
@@ -44,7 +51,8 @@ class SettingsController(QObject):
     def save_settings(self):
         """Save current settings"""
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        if not self._updating_settings:
+            self.settings_changed.emit()
     
     def reset_settings(self):
         """Reset settings to defaults"""
@@ -57,7 +65,7 @@ class SettingsController(QObject):
             self.settings_manager.settings.language = language
             self.settings_manager.save_settings()
             self.language_changed.emit(language)
-            self.settings_changed.emit()
+            self.general_settings_changed.emit()
     
     def set_midweek_meeting(self, day: DayOfWeek, meeting_time: time):
         """Set midweek meeting day and time"""
@@ -66,8 +74,8 @@ class SettingsController(QObject):
             time=meeting_time
         )
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
-    
+        self.meeting_settings_changed.emit()
+
     def set_weekend_meeting(self, day: DayOfWeek, meeting_time: time):
         """Set weekend meeting day and time"""
         self.settings_manager.settings.weekend_meeting = MeetingSettings(
@@ -75,14 +83,14 @@ class SettingsController(QObject):
             time=meeting_time
         )
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        self.meeting_settings_changed.emit()
     
     def set_display_mode(self, display_mode: TimerDisplayMode):
         """Set timer display mode"""
         self.settings_manager.settings.display.display_mode = display_mode
         self.settings_manager.save_settings()
         self.display_mode_changed.emit(display_mode)
-        self.settings_changed.emit()
+        #self.settings_changed.emit()
     
     def set_theme(self, theme: str):
         """Set application theme (light or dark)"""
@@ -98,7 +106,7 @@ class SettingsController(QObject):
         """Enable/disable predicted meeting end time"""
         self.settings_manager.settings.display.show_predicted_end_time = enabled
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        self.timing_settings_changed.emit()
     
     def set_primary_screen(self, screen_index: int):
         """Set primary screen index"""
@@ -113,7 +121,7 @@ class SettingsController(QObject):
             self.settings_manager.settings.display.primary_screen_index = screen_index
             self.settings_manager.save_settings()
             self.primary_screen_changed.emit(screen_index)
-            self.settings_changed.emit()
+            #self.settings_changed.emit()
     
     def set_secondary_screen(self, screen_index: int):
         """Set secondary screen index"""
@@ -132,14 +140,18 @@ class SettingsController(QObject):
             
             self.settings_manager.save_settings()
             self.secondary_screen_changed.emit(screen_index, True)
-            self.settings_changed.emit()
+            #self.settings_changed.emit()
     
     def toggle_secondary_screen(self, enabled: bool):
         """Enable/disable secondary screen"""
         self.settings_manager.settings.display.use_secondary_screen = enabled
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
-    
+        self.secondary_screen_changed.emit(
+            self.settings_manager.settings.display.secondary_screen_index or 0, 
+            enabled
+        )
+        #self.settings_changed.emit()
+
     # New methods for meeting source settings
     def set_meeting_source_mode(self, mode: MeetingSourceMode):
         """Set meeting source mode (web scraping, manual entry, template-based)"""
@@ -147,50 +159,50 @@ class SettingsController(QObject):
             self.settings_manager.settings.meeting_source.mode = mode
             self.settings_manager.save_settings()
             self.meeting_source_mode_changed.emit(mode)
-            self.settings_changed.emit()
+            #self.settings_changed.emit()
     
     def set_auto_update_meetings(self, enabled: bool):
         """Enable/disable auto-update of meetings from web"""
         self.settings_manager.settings.meeting_source.auto_update_meetings = enabled
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        self.meeting_settings_changed.emit()
     
     def set_save_scraped_as_template(self, enabled: bool):
         """Enable/disable saving scraped meetings as templates"""
         self.settings_manager.settings.meeting_source.save_scraped_as_template = enabled
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
-    
+        self.meeting_settings_changed.emit()
+
     def set_weekend_songs_manual(self, enabled: bool):
         """Enable/disable manual weekend song entry"""
         self.settings_manager.settings.meeting_source.weekend_songs_manual = enabled
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        self.meeting_settings_changed.emit()
 
     def set_start_reminder_enabled(self, enabled: bool):
         """Enable/disable start timer reminder"""
         self.settings_manager.settings.start_reminder_enabled = enabled
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        self.reminder_settings_changed.emit()
 
     def set_start_reminder_delay(self, delay: int):
         """Set delay (seconds) before start timer reminder"""
         self.settings_manager.settings.start_reminder_delay = delay
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        self.reminder_settings_changed.emit()
 
     def set_overrun_enabled(self, enabled: bool):
         """Enable/disable part overrun reminder"""
         self.settings_manager.settings.overrun_enabled = enabled
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
+        self.reminder_settings_changed.emit()
 
     def set_overrun_delay(self, delay: int):
         """Set delay (seconds) before part overrun reminder"""
         self.settings_manager.settings.overrun_delay = delay
         self.settings_manager.save_settings()
-        self.settings_changed.emit()
-    
+        self.reminder_settings_changed.emit()
+
     def get_all_screens(self):
         """Get information about all available screens"""
         return ScreenHandler.get_all_screens()
@@ -224,7 +236,7 @@ class SettingsController(QObject):
             self.settings_manager.settings.network_display.mode = mode
             self.settings_manager.save_settings()
             self.network_display_mode_changed.emit(mode)
-            self.settings_changed.emit()
+            #self.settings_changed.emit()
 
     def set_network_display_ports(self, http_port: int, ws_port: int):
         """Set network display ports"""
@@ -234,7 +246,7 @@ class SettingsController(QObject):
             settings.ws_port = ws_port
             self.settings_manager.save_settings()
             self.network_display_ports_changed.emit(http_port, ws_port)
-            self.settings_changed.emit()
+            #self.settings_changed.emit()
 
     def set_network_display_options(self, auto_start: bool, qr_code_enabled: bool):
         """Set network display options"""
@@ -244,7 +256,56 @@ class SettingsController(QObject):
             settings.qr_code_enabled = qr_code_enabled
             self.settings_manager.save_settings()
             self.network_display_options_changed.emit(auto_start, qr_code_enabled)
-            self.settings_changed.emit()
+            #self.settings_changed.emit()
         
         # Save updated settings
         self.settings_manager.save_settings()
+
+    def update_secondary_screen_config(self, use_secondary: bool, screen_index: int = None):
+        """Update and persist secondary screen configuration"""
+        # Prevent recursion
+        if self._updating_settings:
+            return
+            
+        self._updating_settings = True
+        try:
+            settings = self.get_settings()
+            changed = False
+
+            if settings.display.use_secondary_screen != use_secondary:
+                settings.display.use_secondary_screen = use_secondary
+                changed = True
+
+            if screen_index is not None and screen_index != settings.display.secondary_screen_index:
+                settings.display.secondary_screen_index = screen_index
+                changed = True
+
+            if changed:
+                self.settings_manager.save_settings() 
+                self.secondary_screen_changed.emit(settings.display.secondary_screen_index, use_secondary)
+        finally:
+            self._updating_settings = False
+            
+    def update_tools_dock_state(self, visible: bool):
+        """Update and persist the tools dock visibility if settings allow"""
+        # Prevent recursion - this is the source of the infinite loop
+        if self._updating_settings:
+            return
+            
+        self._updating_settings = True
+        try:
+            settings = self.get_settings()
+            if settings.display.remember_tools_dock_state:
+                if settings.display.show_tools_dock != visible:
+                    settings.display.show_tools_dock = visible
+                    self.settings_manager.save_settings()  
+                    self.tools_dock_state_changed.emit(visible)
+        finally:
+            self._updating_settings = False
+    
+
+    def set_force_secondary_cleanup(self, enabled: bool):
+        """Enable/disable forced cleanup of secondary display on close"""
+        self.settings_manager.settings.display.force_secondary_cleanup = enabled
+        self.settings_manager.save_settings()
+        #self.settings_changed.emit()
