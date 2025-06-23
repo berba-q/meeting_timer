@@ -581,7 +581,7 @@ jobs:
       - name: Generate version.json
         run: |
           VERSION_RAW="${{ needs.release-please.outputs.version }}"
-          TAG_NAME="v${VERSION}"
+          TAG_NAME="v${VERSION_RAW}"
           VERSION=$(echo "$VERSION_RAW" | sed 's/^timerV//;s/^v//')
           TODAY=$(date +"%Y-%m-%d")
           REPO="${GITHUB_REPOSITORY}"
