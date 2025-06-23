@@ -377,6 +377,9 @@ class MainWindow(QMainWindow):
             if mode != NetworkDisplayMode.DISABLED and self.network_display_manager:
                 QTimer.singleShot(500, self._auto_start_network_display)
                 
+        # silently check for updates after a short delay
+        QTimer.singleShot(3000, lambda: self._check_for_updates(silent=True))
+                
     def _connect_network_display_signals(self):
         """Connect timer controller signals to network display manager after it's loaded"""
         if self.network_display_manager:
