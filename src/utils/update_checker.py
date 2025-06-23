@@ -33,7 +33,9 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QTimer
 
 
 # URL to check for updates
-UPDATE_CHECK_URL = "https://raw.githubusercontent.com/berba-q/meeting_timer/main/version.json"
+# temporal for testing purposes remember to change it back to the original URL
+UPDATE_CHECK_URL = "file:///Users/griffithsobli-laryea/Documents/meeting_timer/test_version.json"
+#UPDATE_CHECK_URL = "https://raw.githubusercontent.com/berba-q/meeting_timer/main/version.json"
 
 class UpdateChecker(QObject):
     """Thread-safe update checker"""
@@ -53,6 +55,7 @@ class UpdateChecker(QObject):
         
         cache_buster = f"?t={int(time.time())}"
         url = UPDATE_CHECK_URL + cache_buster
+        
         for attempt in range(3):
             try:
                 with urllib.request.urlopen(url, timeout=15, context=SSL_CONTEXT) as response:
@@ -124,6 +127,26 @@ class UpdateDialog(QDialog):
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
         
+        # Links section
+        links_layout = QHBoxLayout()
+
+        # Release Notes button
+        release_notes_url = self.version_info.get('releaseNotesUrl')
+        if release_notes_url:
+            release_notes_btn = QPushButton("📋 View Release Notes")
+            release_notes_btn.clicked.connect(lambda: self._open_url(release_notes_url))
+            links_layout.addWidget(release_notes_btn)
+
+        # Changelog button
+        repo_url = release_notes_url.split('/releases/')[0] if release_notes_url else None
+        if repo_url:
+            changelog_url = f"{repo_url}/blob/main/CHANGELOG.md"
+            changelog_btn = QPushButton("📝 View Changelog")
+            changelog_btn.clicked.connect(lambda: self._open_url(changelog_url))
+            links_layout.addWidget(changelog_btn)
+
+        layout.addLayout(links_layout)
+        
         # Progress bar (hidden initially)
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
@@ -145,6 +168,14 @@ class UpdateDialog(QDialog):
         buttons_layout.addWidget(self.skip_button)
         
         layout.addLayout(buttons_layout)
+    
+    def _open_url(self, url):
+        """Open URL in the system's default browser"""
+        import webbrowser
+        try:
+            webbrowser.open(url)
+        except Exception as e:
+            QMessageBox.information(self, "URL", f"Could not open browser. Please visit:\n{url}")
     
     def _download_update(self):
         """Download the update file"""
@@ -420,7 +451,7 @@ def check_for_updates(parent=None, silent=False):
             print(f"Failed to check skipped version: {e}")
         
         # Show update dialog if not silent
-        if not silent and parent:
+        if parent:
             update_dialog = UpdateDialog(version_info, parent)
             update_dialog.exec()
         
