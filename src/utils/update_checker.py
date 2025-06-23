@@ -34,8 +34,8 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QTimer
 
 # URL to check for updates
 # temporal for testing purposes remember to change it back to the original URL
-UPDATE_CHECK_URL = "file:///Users/griffithsobli-laryea/Documents/meeting_timer/test_version.json"
-#UPDATE_CHECK_URL = "https://raw.githubusercontent.com/berba-q/meeting_timer/main/version.json"
+#UPDATE_CHECK_URL = "file:///Users/griffithsobli-laryea/Documents/meeting_timer/test_version.json"
+UPDATE_CHECK_URL = "https://raw.githubusercontent.com/berba-q/meeting_timer/main/version.json"
 
 class UpdateChecker(QObject):
     """Thread-safe update checker"""
