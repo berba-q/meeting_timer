@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - 'v*' # Run workflow on version tags, e.g., v1.0.0
-      - 'timerV*'
 permissions:
   contents: write
   packages: read
@@ -248,7 +247,7 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --collect-data src
+          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --add-data "translations;translations" --collect-data src
 
       - name: Download and Install Inno Setup
         run: |
@@ -363,7 +362,7 @@ jobs:
       - name: Build with PyInstaller
         run: |
         
-          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.icns --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
+          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.icns --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --add-data "translations:translations" --collect-data src
 
       
       - name: Create DMG settings file
@@ -443,7 +442,7 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name "ontime" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --collect-data src
+          pyinstaller --name "ontime" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --add-data "translations:translations" --collect-data src
       
       - name: Create .desktop file
         run: |
@@ -582,6 +581,7 @@ jobs:
       - name: Generate version.json
         run: |
           VERSION_RAW="${{ needs.release-please.outputs.version }}"
+          TAG_NAME="v${VERSION}"
           VERSION=$(echo "$VERSION_RAW" | sed 's/^timerV//;s/^v//')
           TODAY=$(date +"%Y-%m-%d")
           REPO="${GITHUB_REPOSITORY}"
@@ -590,11 +590,12 @@ jobs:
             "version": "'"$VERSION"'",
             "releaseDate": "'"$TODAY"'",
             "downloadUrl": {
-              "windows": "https://github.com/'"$REPO"'/releases/download/'"$VERSION_RAW"'/OnTimeMeetingTimer-'"$VERSION"'-setup.exe",
-              "macos": "https://github.com/'"$REPO"'/releases/download/'"$VERSION_RAW"'/OnTimeMeetingTimer-'"$VERSION"'.dmg",
-              "linux": "https://github.com/'"$REPO"'/releases/download/'"$VERSION_RAW"'/OnTimeMeetingTimer-'"$VERSION"'.AppImage"
+              "windows": "https://github.com/'"$REPO"'/releases/download/'"$TAG_NAME"'/OnTimeMeetingTimer-'"$VERSION"'-setup.exe",
+              "macos": "https://github.com/'"$REPO"'/releases/download/'"$TAG_NAME"'/OnTimeMeetingTimer-'"$VERSION"'.dmg",
+              "linux": "https://github.com/'"$REPO"'/releases/download/'"$TAG_NAME"'/OnTimeMeetingTimer-'"$VERSION"'.AppImage"
             },
-            "releaseNotes": "See GitHub Release for complete notes",
+            "releaseNotes": "See GitHub Release for complete notes at: https://github.com/'"$REPO"'/releases/tag/'"$TAG_NAME"'",
+            "releaseNotesUrl": "https://github.com/'"$REPO"'/releases/tag/'"$TAG_NAME"'",
             "sha256": {
               "windows": "'"${{ steps.sha.outputs.win_sha }}"'",
               "macos": "'"${{ steps.sha.outputs.mac_sha }}"'",
