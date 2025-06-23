@@ -379,7 +379,7 @@ class MainWindow(QMainWindow):
                 
         # silently check for updates after a short delay
         QTimer.singleShot(3000, lambda: self._check_for_updates(silent=True))
-                
+    
     def _connect_network_display_signals(self):
         """Connect timer controller signals to network display manager after it's loaded"""
         if self.network_display_manager:
@@ -482,11 +482,19 @@ class MainWindow(QMainWindow):
     
     
     def _check_for_updates(self, silent=False):
-        """Check for application updates"""
-        #from src.utils.update_checker import check_for_updates
-        
-        # Store the thread reference so it doesn't get garbage collected
-        self.update_thread = check_for_updates(self, silent)
+        """Check for application updates"""     
+        try:
+            from src.utils.update_checker import check_for_updates
+            
+            # Store the thread reference so it doesn't get garbage collected
+            self.update_thread = check_for_updates(self, silent)
+            return self.update_thread
+            
+        except Exception as e:
+            print(f"[DEBUG] Error in _check_for_updates: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
         
     
     def _show_update_dialog(self, version_info):
