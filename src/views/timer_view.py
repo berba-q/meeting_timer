@@ -76,6 +76,11 @@ class TimerView(QWidget):
         self.timer_controller.part_changed.connect(self._update_part)
         self.timer_controller.timer.current_time_updated.connect(self._update_current_time)
         self.timer_controller.meeting_countdown_updated.connect(self._update_countdown)
+        
+    def clear_countdown_message(self):
+        """Clear the countdown message"""
+        if hasattr(self, "countdown_label"):
+            self.countdown_label.setText("")
     
     def set_display_mode(self, mode: TimerDisplayMode):
         """Set the timer display mode"""
