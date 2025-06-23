@@ -1263,7 +1263,15 @@ class MainWindow(QMainWindow):
             self._store_pending_action('meeting_view', 'highlight_part', index)
 
         # Display part information in the central widget
-        self.timer_view.part_label.setText(f"{part.title}")
+        self.timer_view.part_label.setText(f"Current Part: {part.title}")
+        
+        # Show next part in bottom label (formerly countdown)
+        if index + 1 < len(self.timer_controller.parts_list):
+            next_part = self.timer_controller.parts_list[index + 1]
+            self.timer_view.countdown_label.setText(f"Next Part: {next_part.title}")
+        else:
+            self.timer_view.countdown_label.setText(self.tr("Meeting End"))
+            self.timer_view.countdown_label.setVisible(True)
 
         # Update secondary display if available
         if self.secondary_display:
@@ -1317,21 +1325,32 @@ class MainWindow(QMainWindow):
 
         # Clear any leftover countdown or status text in the status bar
         self.current_part_label.setText("")
-        
+
         # stop start reminder animation
         if hasattr(self, 'start_button') and hasattr(self.start_button, '_pulse_animations'):
             for anim in self.start_button._pulse_animations:
                 anim.stop()
             self.start_button._pulse_animations.clear()
             self.start_button.graphicsEffect().setOpacity(1.0)
-        
+
         # If secondary display exists, update it to show meeting info
         self.timer_view.show_clock = False
+        self.timer_view.clear_countdown_message()
+        # Insert: Display current and next part in timer view
+        parts = self.timer_controller.parts_list
+        if parts:
+            self.timer_view.part_label.setText(self.tr(f"Current Part: {parts[0].title}"))
+            if len(parts) > 1:
+                self.timer_view.countdown_label.setText(self.tr(f"Next Part: {parts[1].title}"))
+                self.timer_view.countdown_label.setVisible(True)
+            else:
+                self.timer_view.countdown_label.setText(self.tr("Last Part"))
+                self.timer_view.countdown_label.setVisible(True)
         if self.secondary_display:
             self.secondary_display.show_clock = False
             # Hide countdown, show part info
             self.secondary_display.show_countdown = False
-            
+
             # Set part information
             parts = self.timer_controller.parts_list
             if len(parts) > 1:
@@ -1348,12 +1367,10 @@ class MainWindow(QMainWindow):
 
             # Ensure both labels are visible
             self.secondary_display.info_label2.setVisible(True)
-        
 
         # Disconnect countdown update signal so countdown label updates stop after meeting starts
         try:
             self.timer_controller.meeting_countdown_updated.disconnect(self._update_countdown)
-            
         except TypeError:
             print("Countdown update already disconnected or never connected")
     
@@ -1367,39 +1384,43 @@ class MainWindow(QMainWindow):
         self.start_button.setStyleSheet("")  # Force style refresh
         self.start_button.clicked.disconnect()
         self.start_button.clicked.connect(self._start_meeting)
-        
+
         # Enable meeting selector and remove blur
         self.meeting_selector.setEnabled(True)
         if isinstance(self.meeting_selector.graphicsEffect(), QGraphicsOpacityEffect):
             self.meeting_selector.setGraphicsEffect(None)
-        
+
         # Disable controls
         self.pause_resume_button.setEnabled(False)
         self.prev_button.setEnabled(False)
         self.next_button.setEnabled(False)
         self.decrease_button.setEnabled(False)
         self.increase_button.setEnabled(False)
-        
+
         # Reset pause/resume button
         self.pause_resume_button.setText(self.tr("Pause"))
         self.pause_resume_button.setIcon(get_icon("pause"))
         self.pause_resume_button.setObjectName("pauseButton")  # Change style
         self.pause_resume_button.setStyleSheet("")  # Force style refresh
-        
+
         # Reset overtime indicator
         self.meeting_overtime_label.setVisible(False)
-        
+
         # Reset predicted end time
         self.predicted_end_time_label.setVisible(False)
-        
+
+        # Clean up center display after meeting ends
+        self.timer_view.part_label.setText(self.tr("Meeting Ended"))
+        self.timer_view.countdown_label.setText("")
+        self.timer_view.countdown_label.setVisible(False)
         # show the clock in the timer view
         self.timer_view.show_clock = True
-        
+
         # Update secondary display
         if self.secondary_display:
             self.secondary_display.show_clock = True
             # Show meeting completed message
-            self.secondary_display.info_label1.setText(self.tr("Meeting Completed"))
+            self.secondary_display.info_label1.setText(self.tr("Meeting Ended"))
             self.secondary_display.info_label1.setStyleSheet("""
                 color: #ffffff; 
                 font-size: 60px;
@@ -1583,7 +1604,24 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, lambda: QMessageBox.warning(self, self.tr("No Meeting Selected"),
                                                             self.tr("Please select a meeting to start.")))
             return
-
+        
+        # Stop countdown updates immediately
+        try:
+            self.timer_controller.meeting_countdown_updated.disconnect(self._update_countdown)
+        except TypeError:
+            pass  # Already disconnected
+        
+        # Clear countdown from main window immediately
+        self.current_part_label.setText("")
+        
+         # Clear countdown from secondary display immediately
+        if self.secondary_display:
+            self.secondary_display.show_countdown = False
+            self.secondary_display._show_countdown = False
+            # Clear any countdown text immediately
+            self.secondary_display.info_label1.setText("")
+            self.secondary_display.info_label2.setText("")
+        
         self.timer_controller.start_meeting()
     
     def _stop_meeting(self):
