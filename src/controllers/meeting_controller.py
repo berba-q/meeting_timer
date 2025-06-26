@@ -114,57 +114,43 @@ class MeetingController(QObject):
     
     def process_weekend_meeting_songs(self, meeting: Meeting):
         """
-        Process weekend meeting songs to ensure they're properly displayed
-        - Formats song titles consistently
-        - Highlights missing song numbers
-        - Returns True if songs need manual entry
+        Process weekend meeting songs using data already extracted by scraper
+        - Simply checks if song numbers are present in the scraped data
+        - Returns True if songs need manual entry (no numbers detected)
         """
         if meeting.meeting_type != MeetingType.WEEKEND:
             return False
         
         needs_manual_update = False
         
+        # Check if any song parts are missing numbers
+        # The scraper already positioned and localized everything correctly
         for section in meeting.sections:
             for part in section.parts:
-                part_title_lower = part.title.lower()
-                
-                if "song" in part_title_lower:
-                    # Check if there's a song number
-                    song_num_match = re.search(r'song\s+(\d+)', part_title_lower)
-                    
-                    if not song_num_match:
-                        # No song number found
+                if self._is_song_part(part.title):
+                    if not self._has_song_number_simple(part.title):
                         needs_manual_update = True
-                        
-                        # Format the title to indicate missing song number
-                        if "song" == part_title_lower.strip():
-                            # Very generic title, enhance it based on position
-                            if "public" in section.title.lower():
-                                if "prayer" in part_title_lower:
-                                    part.title = "Opening Song and Prayer"
-                                else:
-                                    part.title = "Opening Song"
-                            elif "watchtower" in section.title.lower():
-                                if "concluding" in part_title_lower or "prayer" in part_title_lower:
-                                    part.title = "Concluding Song and Prayer"
-                                else:
-                                    part.title = "Song"
-                    else:
-                        # Song number found, ensure consistent formatting
-                        song_num = song_num_match.group(1)
-                        
-                        # Format based on whether it includes prayer
-                        if "prayer" in part_title_lower:
-                            if "opening" in part_title_lower or "public" in section.title.lower():
-                                part.title = f"Song {song_num} and Opening Prayer"
-                            elif "concluding" in part_title_lower or "watchtower" in section.title.lower():
-                                part.title = f"Song {song_num} and Concluding Prayer"
-                            else:
-                                part.title = f"Song {song_num} and Prayer"
-                        else:
-                            part.title = f"Song {song_num}"
+                        break
+            if needs_manual_update:
+                break
         
         return needs_manual_update
+    
+    def _is_song_part(self, title: str) -> bool:
+        """Check if a part is a song part (language-agnostic)"""
+        # The scraper already uses localized terms, so we check for them
+        song_indicators = [
+            "song", "cantico", "cantique", "canción", "lied",
+            "prayer", "preghiera", "prière", "oración", "gebet"
+        ]
+        
+        title_lower = title.lower()
+        return any(indicator in title_lower for indicator in song_indicators)
+    
+    def _has_song_number_simple(self, title: str) -> bool:
+        """Simple check for song numbers in title"""
+        # Look for any number in the title - much simpler than before
+        return bool(re.search(r'\b\d{1,3}\b', title))
     
     def _show_weekend_song_editor(self, meeting: Meeting):
         """Show the weekend song editor dialog"""
@@ -183,39 +169,38 @@ class MeetingController(QObject):
     
     def _clear_weekend_songs(self, meeting: Meeting):
         """
-        Clear song information from weekend meeting to be manually entered
-        but preserve songs that already have numbers
+        Clear song numbers from weekend meeting for manual entry
+        Uses the localized titles already provided by scraper
         """
-        # First check if all songs already have numbers - if so, preserve them
+        if meeting.meeting_type != MeetingType.WEEKEND:
+            return
+        
+        # Check if all songs already have numbers
         all_songs_have_numbers = True
         
         for section in meeting.sections:
             for part in section.parts:
-                part_title_lower = part.title.lower()
-                if "song" in part_title_lower:
-                    # Check if it has a song number
-                    song_match = re.search(r'song\s+(\d+)', part_title_lower)
-                    if not song_match:
+                if self._is_song_part(part.title):
+                    if not self._has_song_number_simple(part.title):
                         all_songs_have_numbers = False
                         break
+            if not all_songs_have_numbers:
+                break
         
-        # If all songs already have numbers, keep them!
+        # If all songs already have numbers, keep them
         if all_songs_have_numbers:
             return
         
-        # Otherwise, clear songs as before for manual entry
+        # Clear song numbers while preserving the localized structure
         for section in meeting.sections:
             for part in section.parts:
-                part_title_lower = part.title.lower()
-                if "song" in part_title_lower or "song" in section.title.lower():
-                    # Keep the part but clear specific song number
-                    if part_title_lower.startswith("song"):
-                        # Try to preserve the structure (e.g., "Song 123" -> "Song")
-                        part.title = "Song"
-                    elif "song" in part_title_lower:
-                        # If song is mentioned in the middle, preserve the text
-                        # E.g., "Opening Song and Prayer" stays the same
-                        pass
+                if self._is_song_part(part.title):
+                    # Remove any numbers from the title, keep the localized text
+                    part.title = re.sub(r'\b\d{1,3}\b', '', part.title).strip()
+                    # Clean up any extra spaces
+                    part.title = re.sub(r'\s+', ' ', part.title)
+                    # Fix any formatting issues (like "Song  and Prayer" -> "Song and Prayer")
+                    part.title = part.title.replace('  ', ' ')
     
     def _save_meetings_as_templates(self, meetings: Dict[MeetingType, Meeting]):
         """Save fetched meetings as templates for future use"""
@@ -366,9 +351,9 @@ class MeetingController(QObject):
     
     def save_meeting(self, meeting: Meeting):
         """Save a meeting to a file"""
-        # Create filename with date and meeting type
+        # Create filename with date, meeting type, and language
         date_str = meeting.date.strftime("%Y-%m-%d")
-        filename = f"{meeting.meeting_type.value}_{date_str}.json"
+        filename = f"{meeting.meeting_type.value}_{date_str}_{meeting.language}.json"
         file_path = os.path.join(self.meetings_dir, filename)
         
         # Save meeting data
