@@ -418,7 +418,7 @@ class EPUBMeetingScraper:
             for match in matches:
                 try:
                     song_num = int(match)
-                    if 1 <= song_num <= 151:  # Valid song range
+                    if 1 <= song_num <= 200:  # Valid song range
                         songs.append(song_num)
                 except ValueError:
                     continue
@@ -853,19 +853,23 @@ class EPUBMeetingScraper:
         return meetings
     
     def _build_weekend_meeting(self, watchtower_title: str, songs: List[int]) -> List[Dict]:
-        """Build weekend meeting structure with proper song placement"""
+        """Build weekend meeting structure with correct song placement"""
         meeting_parts = []
         
-        # Opening song and prayer
-        opening_song = songs[0] if songs else 1
+        # Limit to only 2 songs maximum for weekend meetings
+        if len(songs) > 2:
+            songs = songs[:2]  # Take only first 2 songs found
+            print(f"[{self.language}] ⚠️ Limited weekend songs to 2: {songs}")
+        
+        # 1. Opening Song and Prayer (GENERIC - no specific number)
         meeting_parts.append({
-            'title': f"Song {opening_song} and Prayer",
+            'title': "Opening Song and Prayer",
             'duration_minutes': 3,
             'type': 'song_prayer',
             'section': 'public_talk'
         })
         
-        # Public talk
+        # 2. Public Talk
         meeting_parts.append({
             'title': self.trans['public_talk'],
             'duration_minutes': 30,
@@ -873,16 +877,24 @@ class EPUBMeetingScraper:
             'section': 'public_talk'
         })
         
-        # Middle song
-        middle_song = songs[1] if len(songs) > 1 else (songs[0] + 1 if songs else 2)
-        meeting_parts.append({
-            'title': f"Song {middle_song}",
-            'duration_minutes': 3,
-            'type': 'song',
-            'section': 'watchtower'
-        })
+        # 3. Watchtower Opening Song (FIRST song from EPUB - e.g., Song 87)
+        watchtower_song = songs[0] if songs else None
+        if watchtower_song:
+            meeting_parts.append({
+                'title': f"Song {watchtower_song}",
+                'duration_minutes': 3,
+                'type': 'song',
+                'section': 'watchtower'
+            })
+        else:
+            meeting_parts.append({
+                'title': "Song",
+                'duration_minutes': 3,
+                'type': 'song',
+                'section': 'watchtower'
+            })
         
-        # Watchtower study
+        # 4. Watchtower Study
         meeting_parts.append({
             'title': watchtower_title,
             'duration_minutes': 60,
@@ -890,14 +902,22 @@ class EPUBMeetingScraper:
             'section': 'watchtower'
         })
         
-        # Closing song and prayer
-        closing_song = songs[2] if len(songs) > 2 else (middle_song + 1 if middle_song else 3)
-        meeting_parts.append({
-            'title': f"Song {closing_song} and Prayer",
-            'duration_minutes': 3,
-            'type': 'song_prayer',
-            'section': 'watchtower'
-        })
+        # 5. Closing Song and Prayer (SECOND song from EPUB - e.g., Song 90)
+        closing_song = songs[1] if len(songs) > 1 else watchtower_song
+        if closing_song:
+            meeting_parts.append({
+                'title': f"Song {closing_song} and Prayer",
+                'duration_minutes': 3,
+                'type': 'song_prayer',
+                'section': 'watchtower'
+            })
+        else:
+            meeting_parts.append({
+                'title': "Closing Song and Prayer",
+                'duration_minutes': 3,
+                'type': 'song_prayer',
+                'section': 'watchtower'
+            })
         
         return meeting_parts
     
@@ -925,15 +945,157 @@ class EPUBMeetingScraper:
         
         return {}
     
+    def _post_process_midweek_meetings(self, meetings_data: Dict):
+        """Post-process midweek meetings using position-based logic (no language dependencies)"""
+        
+        if 'midweek' not in meetings_data:
+            return
+        
+        for issue, issue_meetings in meetings_data['midweek'].items():
+            for meeting_date, parts_list in issue_meetings.items():
+                if not parts_list or len(parts_list) < 3:
+                    continue
+                    
+                print(f"[{self.language}] 🔄 Post-processing midweek meeting {meeting_date}")
+                
+                # Extract all song numbers using universal pattern
+                song_numbers = []
+                for part in parts_list:
+                    song_num = self._extract_song_number(part['title'])
+                    if song_num:
+                        song_numbers.append(song_num)
+                
+                print(f"[{self.language}] 🎵 Found songs: {song_numbers}")
+                
+                if len(song_numbers) < 2:
+                    print(f"[{self.language}] ⚠️ Not enough songs found, skipping post-processing")
+                    continue
+                
+                # Process based on POSITION and DURATION patterns
+                new_parts = []
+                
+                for i, part in enumerate(parts_list):
+                    title = part['title']
+                    duration = part.get('duration_minutes', 0)
+                    
+                    # RULE 1: First part with song number 
+                    if (i == 0 and 
+                        self._extract_song_number(title) and 
+                        duration <= 3):  # Combined opening is usually 1 minutes
+                        
+                        opening_song = song_numbers[0]
+                        print(f"[{self.language}] 🔄 Splitting opening part by position/duration")
+                        
+                        new_parts.extend([
+                            {
+                                'title': f"OPENING_SONG_PRAYER|{opening_song}",
+                                'duration_minutes': 5,
+                                'type': 'song_prayer',
+                                'section': part.get('section', 'treasures')
+                            },
+                            {
+                                'title': "OPENING_COMMENTS",
+                                'duration_minutes': 1,
+                                'type': 'comments',
+                                'section': part.get('section', 'treasures')
+                            }
+                        ])
+                        
+                    # RULE 2: Last part with song number + long duration (likely combined closing)
+                    elif (i >= len(parts_list) - 2 and 
+                        self._extract_song_number(title) and 
+                        duration <= 4):  # Combined closing is usually 4+ minutes
+                        
+                        closing_song = song_numbers[-1]
+                        print(f"[{self.language}] 🔄 Splitting closing part by position/duration")
+                        
+                        new_parts.extend([
+                            {
+                                'title': "CONCLUDING_COMMENTS",
+                                'duration_minutes': 3,
+                                'type': 'comments',
+                                'section': part.get('section', 'christian_living')
+                            },
+                            {
+                                'title': f"CLOSING_SONG_PRAYER|{closing_song}r",
+                                'duration_minutes': 5,
+                                'type': 'song_prayer',
+                                'section': part.get('section', 'christian_living')
+                            }
+                        ])
+                        
+                    # RULE 3: Middle part with song number + short duration (standalone song)
+                    elif (self._extract_song_number(title) and 
+                        duration <= 3 and  # Short duration = standalone song
+                        i > 0 and i < len(parts_list) - 2):  # Not first or last
+                        
+                        song_num = self._extract_song_number(title)
+                        print(f"[{self.language}] 🎵 Processing middle song by position/duration")
+                        
+                        new_parts.append({
+                            'title': f"MIDDLE_SONG|{song_num}",
+                            'duration_minutes': 3,
+                            'type': 'song',
+                            'section': part.get('section', 'christian_living')
+                        })
+                        
+                    else:
+                        # Regular part - keep as is
+                        new_parts.append(part)
+                
+                # Replace the original parts list
+                meetings_data['midweek'][issue][meeting_date] = new_parts
+                print(f"[{self.language}] ✅ Post-processed {meeting_date}: {len(parts_list)} → {len(new_parts)} parts")
+    
+    def _extract_song_number(self, text: str) -> Optional[int]:
+        """Extract song number from text with improved precision"""
+        # Multi-language song word patterns
+        song_patterns = [
+            r'(?:Song|SONG|Cantico|CANTICO|Cantique|CANTIQUE|Canción|CANCIÓN|Lied|LIED)\s+(\d{1,3})',
+            r'(\d{1,3})\s*(?:Song|SONG|Cantico|CANTICO|Cantique|CANTIQUE|Canción|CANCIÓN|Lied|LIED)',
+        ]
+        
+        for pattern in song_patterns:
+            song_match = re.search(pattern, text, re.IGNORECASE)
+            if song_match:
+                try:
+                    song_num = int(song_match.group(1))
+                    if 1 <= song_num <= 200:  # Valid song range
+                        return song_num
+                except ValueError:
+                    continue
+        
+        return None
+    
     def _save_cached_meetings(self, meetings_data: Dict):
-        """Save meeting data to JSON cache"""
+        """Save meeting data with two-stage process: raw → processed"""
+        
         cache_file = self.CACHE_DIR / f"{self.language}_meetings_cache.json"
         
         try:
+            # STAGE 1: Save original raw data first
+            print(f"[{self.language}] Saving raw cache data...")
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(meetings_data, f, ensure_ascii=False, indent=2)
+            print(f"[{self.language}] Raw cache saved: {cache_file}")
+            
+            # STAGE 2: Read back, post-process, and save updated version
+            print(f"[{self.language}] Reading back for post-processing...")
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                loaded_data = json.load(f)
+            
+            # Post-process the loaded data
+            self._post_process_midweek_meetings(loaded_data)
+            
+            # Save the processed version
+            print(f"[{self.language}] Saving processed cache data...")
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(loaded_data, f, ensure_ascii=False, indent=2)
+            print(f"[{self.language}] Processed cache saved: {cache_file}")
+
         except Exception as e:
-            print(f"[{self.language}] Error saving cache: {e}")
+            print(f"[{self.language}] Error in two-stage save process: {e}")
+
     
     def update_meetings_cache(self) -> bool:
         """Update the meetings cache with latest EPUB content"""
