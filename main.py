@@ -225,8 +225,8 @@ def main():
         timer_controller,
         settings_controller
     )
-    _select_meeting_by_day(controller, main_window)
     splash.finish(main_window)
+    _select_meeting_by_day(controller, main_window)
     main_window.show()
 
     elapsed = time.perf_counter() - start_time
