@@ -399,9 +399,14 @@ class SecondaryDisplay(QMainWindow):
                     # Minutes and seconds
                     time_text = f"Predicted End: {predicted_time_str} (+{minutes}m {seconds}s)"
 
-            # Red color for overtime
-            self.info_label2.setStyleSheet("""
-                color: #ff4d4d;
+            # Choose label colour based on how much overtime we are in:
+            if diff_seconds <= 60:
+                colour = "#ffaa00"   # orange  (≤ 1 min overtime)
+            else:
+                colour = "#ff4d4d"   # red     (> 1 min overtime)
+
+            self.info_label2.setStyleSheet(f"""
+                color: {colour};
                 font-weight: bold;
             """)
         elif diff_seconds < 0:
@@ -430,7 +435,7 @@ class SecondaryDisplay(QMainWindow):
             # On time
             time_text = f"Predicted End: {predicted_time_str} (on time)"
             self.info_label2.setStyleSheet("""
-                color: #ffffff;
+                color: #4caf50;
                 font-weight: bold;
             """)
 
