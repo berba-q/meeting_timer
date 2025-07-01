@@ -2,7 +2,8 @@
 Complete EPUB-based Meeting Scraper using JW API endpoint
 Language-agnostic implementation using HTML structure and date arithmetic
 """
-
+import calendar
+import locale
 import dateparser
 import json
 import re
@@ -260,57 +261,229 @@ class EPUBMeetingScraper:
             return {}
     
     def _parse_meeting_date_from_workbook(self, date_text: str) -> Optional[str]:
-        """Simplified date parsing that's more reliable"""
+        """Language-agnostic date parsing using locale and dateparser"""
         try:
-            # Extract start day from the range
+            date_text = date_text.strip()
+            print(f"[{self.language}] 📅 Parsing date text: '{date_text}'")
+            
+            # Method 1: Try with dateparser library (handles most languages automatically)
+            try:
+                import dateparser
+                
+                # Extract date range patterns
+                # Pattern 1: Same month range (e.g., "MAY 5-11", "MAGGIO 5-11", "MAI 5-11")
+                same_month_match = re.search(r'([A-ZÀ-ÿ]+)\s+(\d{1,2})\s*[-–]\s*(\d{1,2})', date_text, re.IGNORECASE)
+                
+                if same_month_match:
+                    month_name, start_day, end_day = same_month_match.groups()
+                    start_day = int(start_day)
+                    
+                    # Create a test date string with the month name and start day
+                    # Use current year as baseline
+                    current_year = datetime.now().year
+                    test_date_str = f"{start_day} {month_name} {current_year}"
+                    
+                    # Parse using dateparser with the document's language
+                    parsed_date = dateparser.parse(
+                        test_date_str, 
+                        languages=[self.language, 'en'],  # Try document language first, then English
+                        settings={'PREFER_DAY_OF_MONTH': 'first'}
+                    )
+                    
+                    if parsed_date:
+                        # Adjust year if needed (if the date is in the past, try next year)
+                        if parsed_date < datetime.now() - timedelta(days=30):
+                            parsed_date = parsed_date.replace(year=current_year + 1)
+                        
+                        # Ensure we get the Monday of that week
+                        monday_date = self._get_monday_of_week(parsed_date)
+                        result = monday_date.strftime('%Y-%m-%d')
+                        print(f"[{self.language}] Dateparser same-month: {date_text} → {result}")
+                        return result
+                
+                # Pattern 2: Cross-month range (e.g., "JUNE 30--JULY 6", "GIUGNO 30--LUGLIO 6")
+                cross_month_match = re.search(
+                    r'([A-ZÀ-ÿ]+)\s+(\d{1,2})\s*[-–]+\s*([A-ZÀ-ÿ]+)\s+(\d{1,2})', 
+                    date_text, re.IGNORECASE
+                )
+                
+                if cross_month_match:
+                    start_month_name, start_day, end_month_name, end_day = cross_month_match.groups()
+                    start_day = int(start_day)
+                    
+                    # Parse the start date
+                    current_year = datetime.now().year
+                    test_date_str = f"{start_day} {start_month_name} {current_year}"
+                    
+                    parsed_date = dateparser.parse(
+                        test_date_str,
+                        languages=[self.language, 'en'],
+                        settings={'PREFER_DAY_OF_MONTH': 'first'}
+                    )
+                    
+                    if parsed_date:
+                        # Adjust year if needed
+                        if parsed_date < datetime.now() - timedelta(days=30):
+                            parsed_date = parsed_date.replace(year=current_year + 1)
+                        
+                        # Ensure we get the Monday of that week
+                        monday_date = self._get_monday_of_week(parsed_date)
+                        result = monday_date.strftime('%Y-%m-%d')
+                        print(f"[{self.language}] Dateparser cross-month: {date_text} → {result}")
+                        return result
+                        
+            except ImportError:
+                print(f"[{self.language}] dateparser not available, falling back to locale method")
+            
+            # Method 2: Use locale-based parsing (fallback)
+            return self._parse_with_locale(date_text)
+            
+        except Exception as e:
+            print(f"[{self.language}] Error parsing date '{date_text}': {e}")
+            return None
+    
+    def _parse_with_locale(self, date_text: str) -> Optional[str]:
+        """Fallback method using locale settings"""
+        try:
+            # Map language codes to locale codes
+            locale_map = {
+                'en': ['en_US.UTF-8', 'en_GB.UTF-8', 'C'],
+                'it': ['it_IT.UTF-8', 'it_CH.UTF-8'],
+                'fr': ['fr_FR.UTF-8', 'fr_CA.UTF-8'],
+                'es': ['es_ES.UTF-8', 'es_MX.UTF-8'],
+                'de': ['de_DE.UTF-8', 'de_CH.UTF-8'],
+                'pt': ['pt_PT.UTF-8', 'pt_BR.UTF-8'],
+                'ja': ['ja_JP.UTF-8'],
+                'ko': ['ko_KR.UTF-8'],
+                'zh': ['zh_CN.UTF-8', 'zh_TW.UTF-8']
+            }
+            
+            locales_to_try = locale_map.get(self.language, ['C'])
+            
+            # Save current locale
+            original_locale = locale.getlocale()
+            
+            for loc in locales_to_try:
+                try:
+                    locale.setlocale(locale.LC_TIME, loc)
+                    
+                    # Get month names in the current locale
+                    month_names = {}
+                    for i in range(1, 13):
+                        full_name = calendar.month_name[i].upper()
+                        abbr_name = calendar.month_abbr[i].upper()
+                        month_names[full_name] = i
+                        month_names[abbr_name] = i
+                    
+                    # Try to parse with this locale
+                    result = self._parse_with_month_names(date_text, month_names)
+                    if result:
+                        return result
+                        
+                except locale.Error:
+                    continue
+                finally:
+                    # Restore original locale
+                    try:
+                        locale.setlocale(locale.LC_TIME, original_locale)
+                    except:
+                        pass
+            
+            # Final fallback: use position-based parsing
+            return self._parse_by_position(date_text)
+            
+        except Exception as e:
+            print(f"[{self.language}] Locale parsing failed: {e}")
+            return self._parse_by_position(date_text)
+        
+    def _parse_with_month_names(self, date_text: str, month_names: dict) -> Optional[str]:
+        """Parse using provided month name mappings"""
+        # Same month pattern
+        same_month_match = re.search(r'([A-ZÀ-ÿ]+)\s+(\d{1,2})\s*[-–]\s*(\d{1,2})', date_text, re.IGNORECASE)
+        
+        if same_month_match:
+            month_name, start_day, end_day = same_month_match.groups()
+            month_name_upper = month_name.upper()
+            
+            month_num = month_names.get(month_name_upper)
+            if month_num:
+                start_day = int(start_day)
+                current_year = datetime.now().year
+                
+                # Create date and find Monday
+                try:
+                    parsed_date = datetime(current_year, month_num, start_day)
+                    
+                    # Adjust year if needed
+                    if parsed_date < datetime.now() - timedelta(days=30):
+                        parsed_date = parsed_date.replace(year=current_year + 1)
+                    
+                    monday_date = self._get_monday_of_week(parsed_date)
+                    result = monday_date.strftime('%Y-%m-%d')
+                    print(f"[{self.language}] Locale parsing: {date_text} → {result}")
+                    return result
+                    
+                except ValueError:
+                    pass
+        
+        return None
+
+    def _parse_by_position(self, date_text: str) -> Optional[str]:
+        """Final fallback: parse by position and context"""
+        try:
+            # Extract the first number as start day
             day_match = re.search(r'(\d{1,2})', date_text)
             if not day_match:
                 return None
                 
             start_day = int(day_match.group(1))
             
-            # For now, assume current year and determine month contextually
+            # Use current date context to guess month
             now = datetime.now()
-            current_year = now.year
             current_month = now.month
+            current_year = now.year
             
-            # Simple month estimation - try current month first, then next
-            for month_offset in [0, 1, -1]:  # Current, next, previous
+            # Try current month, then next few months
+            for month_offset in range(4):  # Try current and next 3 months
                 try:
                     test_month = current_month + month_offset
                     test_year = current_year
                     
-                    # Handle year boundaries
                     if test_month > 12:
                         test_month = test_month - 12
                         test_year += 1
-                    elif test_month < 1:
-                        test_month = test_month + 12
-                        test_year -= 1
                     
-                    # Create date and align to Monday
-                    date_obj = datetime(test_year, test_month, start_day)
+                    # Try to create a valid date
+                    test_date = datetime(test_year, test_month, start_day)
                     
-                    # Find the Monday of that week
-                    while date_obj.weekday() != 0:  # 0 = Monday
-                        date_obj -= timedelta(days=1)
+                    # Find Monday of that week
+                    monday_date = self._get_monday_of_week(test_date)
                     
-                    # Check if this makes sense (not too far from today)
-                    days_diff = abs((date_obj - now).days)
-                    if days_diff <= 90:  # Within 3 months
-                        result = date_obj.strftime('%Y-%m-%d')
-                        print(f"[{self.language}] 📅 Parsed '{date_text}' → start_day={start_day}, month={test_month} → Monday={result}")
+                    # Check if this seems reasonable (not too far in past/future)
+                    days_diff = abs((monday_date - now).days)
+                    if days_diff <= 120:  # Within 4 months
+                        result = monday_date.strftime('%Y-%m-%d')
+                        print(f"[{self.language}] Position fallback: {date_text} → {result}")
                         return result
                         
                 except ValueError:
                     continue
-                    
-            print(f"[{self.language}] ❌ Could not parse date '{date_text}' with start_day={start_day}")
+            
             return None
             
         except Exception as e:
-            print(f"[{self.language}] Error parsing date '{date_text}': {e}")
+            print(f"[{self.language}]  Position parsing failed: {e}")
             return None
+        
+    def _get_monday_of_week(self, date_obj: datetime) -> datetime:
+        """Get the Monday of the week containing the given date"""
+        # Calculate days since Monday (0 = Monday, 6 = Sunday)
+        days_since_monday = date_obj.weekday()
+        
+        # Subtract days to get to Monday
+        monday_date = date_obj - timedelta(days=days_since_monday)
+        
+        return monday_date
     
     def _determine_section_by_structure(self, header, container) -> str:
         """Determine section based on HTML structure rather than text"""
