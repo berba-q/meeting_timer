@@ -395,7 +395,23 @@ class NetworkDisplayManager(QObject):
             self.timer_controller.current_part_index < 0 and
             not self._updating_display):
             
-            # Update broadcaster with current time display
+            # Build countdown message if we have a target meeting time
+            current_dt = datetime.now()
+            countdown_message = ""
+            if hasattr(self.timer_controller.timer, '_target_meeting_time'):
+                target = self.timer_controller.timer._target_meeting_time
+                if target and target > current_dt:
+                    delta = target - current_dt
+                    total_seconds = int(delta.total_seconds())
+                    if total_seconds > 0:
+                        hours, remainder = divmod(total_seconds, 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        if hours > 0:
+                            countdown_message = f"Meeting starts in {hours}h {minutes}m {seconds}s"
+                        else:
+                            countdown_message = f"Meeting starts in {minutes}m {seconds}s"
+
+            # Broadcast update (ensure part/nextPart are blank so client doesn’t show “LAST PART”)
             self.broadcaster.update_timer_data(
                 time_str=time_str,
                 state="stopped",
@@ -403,7 +419,7 @@ class NetworkDisplayManager(QObject):
                 next_part="",
                 end_time="",
                 overtime_seconds=0,
-                countdown_message="",
+                countdown_message=countdown_message,
                 meeting_ended=False
             )
     
@@ -443,9 +459,12 @@ class NetworkDisplayManager(QObject):
             countdown_message = ""
             meeting_ended = False
 
-            # Check if we're in STOPPED state with no active part (pre-meeting)
+            # Check if we're in STOPPED state with no active part (pre-meeting, or pre-meeting countdown)
             if (self.timer_controller.timer.state == TimerState.STOPPED and
-                self.timer_controller.current_part_index < 0):
+                (self.timer_controller.current_part_index < 0 or
+                 (hasattr(self.timer_controller.timer, '_target_meeting_time') and
+                  getattr(self.timer_controller.timer, '_target_meeting_time') and
+                  getattr(self.timer_controller.timer, '_target_meeting_time') > current_time))):
 
                 # Use current time for display in stopped state
                 time_str = current_time.strftime("%H:%M:%S")
@@ -465,6 +484,10 @@ class NetworkDisplayManager(QObject):
                                 countdown_message = f"Meeting starts in {hours}h {minutes}m {seconds}s"
                             else:
                                 countdown_message = f"Meeting starts in {minutes}m {seconds}s"
+
+                # Clear titles so we don’t show an old part name
+                part_title = ""
+                next_part_title = ""
 
             # Check if meeting has ended (after last part completed)
             elif (self.timer_controller.timer.state == TimerState.STOPPED and
@@ -531,6 +554,10 @@ class NetworkDisplayManager(QObject):
                 # Get overtime seconds
                 overtime_seconds = getattr(self.timer_controller, '_total_overtime_seconds', 0)
 
+            # Clear stale part titles when timer is stopped *before* the meeting
+            if state_str == "stopped" and not countdown_message and not meeting_ended:
+                part_title = ""
+                next_part_title = ""
             # Update broadcaster with current state
             self.broadcaster.update_timer_data(
                 time_str=time_str,
