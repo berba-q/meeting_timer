@@ -3,6 +3,10 @@
 # [](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v) (2025-07-02)
 
 
+
+## [1.0.5](https://github.com/berba-q/meeting_timer/compare/v1.0.4...v1.0.5) (2025-07-02)
+
+
 ### Bug Fixes
 
 * add SSL certificate dependency to requirements.txt ([cb7c41f](https://github.com/berba-q/meeting_timer/commit/cb7c41fc9403a25315759e5a105302194bb8a39e))
@@ -13,6 +17,7 @@
 * correct update check URL ([69eeacc](https://github.com/berba-q/meeting_timer/commit/69eeacc9951af07be9a892c96c6ee88d8a158156))
 * correct variable reference for TAG_NAME in version.json generation ([09ef7bf](https://github.com/berba-q/meeting_timer/commit/09ef7bf31ffedddee45c353f9ab1f7fcdba83838))
 * enhance current time update handling and prevent recursion in timer updates ([c30116c](https://github.com/berba-q/meeting_timer/commit/c30116c13f1ca593ed48fb014ea00152203ace3f))
+* enhance PyInstaller build commands to include additional dependencies ([55628b6](https://github.com/berba-q/meeting_timer/commit/55628b62f5716a01bb1e87d674281f7c658b80f3))
 * enhance settings signal handling for meeting and reminder updates ([e0f7ea4](https://github.com/berba-q/meeting_timer/commit/e0f7ea4aa0a604608c5e3d0bd439aa5c55ce26c5))
 * enhance timer state handling to reset reminders when stopped ([6a70b50](https://github.com/berba-q/meeting_timer/commit/6a70b5050a4a9921cf0fa033fa9fa8d50556ab58))
 * enhance update check with error handling and silent mode ([354ef77](https://github.com/berba-q/meeting_timer/commit/354ef77a0cd6eb2a5600d62a89fab886260ceeb7))
@@ -33,6 +38,8 @@
 * stop visual animations for buttons when stopping the meeting ([b06b568](https://github.com/berba-q/meeting_timer/commit/b06b5680ba04169b2ee30f1c140fcd25f51bb959))
 * update download URLs and release notes in version.json ([acaca24](https://github.com/berba-q/meeting_timer/commit/acaca24ac4c7926db0a9f011b44ea69a74fc53ec))
 * update font size and styling for timer display to enhance readability and prevent overflow ([fe0523e](https://github.com/berba-q/meeting_timer/commit/fe0523e49f7b8ed7af04396f3a8787a199192c33))
+* update log message formatting in EPUBMeetingScraper ([85d28ec](https://github.com/berba-q/meeting_timer/commit/85d28ec9d8047484115cd535adedbc36df0ee7c0))
+* update meeting cache generation to use EPUBMeetingScraper ([056037e](https://github.com/berba-q/meeting_timer/commit/056037ea47e0aa1339fa904a3c04f85eab6c312b))
 * update PyInstaller commands to include translations data and adjust version handling in version.json ([d2ea3c4](https://github.com/berba-q/meeting_timer/commit/d2ea3c4dd41343412cf4aca5d86450af9c9cf770))
 * update settings handling to show or hide secondary display based on configuration ([369af8e](https://github.com/berba-q/meeting_timer/commit/369af8ef09895fab70f0023a897f370d7892cf7e))
 * update signal connection for current time and enhance secondary screen handling ([602aadd](https://github.com/berba-q/meeting_timer/commit/602aadd61131a5d9d6243b36ec27778904df82c8))
