@@ -247,7 +247,7 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --add-data "translations;translations" --collect-data src
+          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.ico --noconfirm --onedir --clean main.py --add-data "assets;assets" --add-data "resources;resources" --add-data "translations;translations" --collect-data src --collect-data dateparser --collect-data dateutil --hidden-import=dateparser.data
 
       - name: Download and Install Inno Setup
         run: |
@@ -362,7 +362,7 @@ jobs:
       - name: Build with PyInstaller
         run: |
         
-          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.icns --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --add-data "translations:translations" --collect-data src
+          pyinstaller --name "OnTime Meeting Timer" --windowed --icon=assets/icons/app-icon.icns --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --add-data "translations:translations" --collect-data src --collect-data dateparser --collect-data dateutil --hidden-import=dateparser.data
 
       
       - name: Create DMG settings file
@@ -442,7 +442,7 @@ jobs:
           
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name "ontime" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --add-data "translations:translations" --collect-data src
+          pyinstaller --name "ontime" --windowed --icon=assets/icons/app-icon.png --noconfirm --onedir --clean main.py --add-data "assets:assets" --add-data "resources:resources" --add-data "translations:translations" --collect-data src --collect-data dateparser --collect-data dateutil --hidden-import=dateparser.data
       
       - name: Create .desktop file
         run: |
