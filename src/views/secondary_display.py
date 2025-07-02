@@ -325,7 +325,7 @@ class SecondaryDisplay(QMainWindow):
         if index + 1 < len(parts):
             self.next_part = parts[index + 1]
             # Format text once and cache to prevent flickering
-            next_part_text = f"NEXT PART: {self.next_part.title.upper()}"
+            next_part_text = f"{self.tr('NEXT PART')}: {self.next_part.title.upper()}"
             formatted_text = self._format_text_for_display_stable(next_part_text)
             
             # Only update if text actually changed
@@ -339,7 +339,7 @@ class SecondaryDisplay(QMainWindow):
             # No next part (this is the last part)
             self.next_part = None
             if self.info_label1.text() != "LAST PART":
-                self.info_label1.setText("LAST PART")
+                self.info_label1.setText(self.tr("LAST PART"))
                 self.info_label1.setStyleSheet("""
                     color: #ffffff;
                     font-weight: bold;
@@ -353,90 +353,55 @@ class SecondaryDisplay(QMainWindow):
             pass
         else:
             # If this is the last transition
-            formatted_text = self._format_text_for_display_stable("MEETING CONCLUSION")
+            formatted_text = self._format_text_for_display_stable(self.tr("MEETING CONCLUSION"))
             if self.info_label1.text() != formatted_text:
                 self.info_label1.setText(formatted_text)
 
     def _update_predicted_end_time(self, original_end_time, predicted_end_time):
-        """Update the predicted end time display with improved precision"""
-        # Format the times
-        original_time_str = original_end_time.strftime("%H:%M")
-        predicted_time_str = predicted_end_time.strftime("%H:%M")
-        
-        # Calculate the difference
-        time_diff = predicted_end_time - original_end_time
-        diff_seconds = int(time_diff.total_seconds())
-        
-        # Get the exact overtime seconds from the timer controller
-        overtime_seconds = 0
-        if hasattr(self.timer_controller, '_total_overtime_seconds'):
-            overtime_seconds = self.timer_controller._total_overtime_seconds
-            
-            # Ensure display matches exactly what's in the main UI
-            if self.timer_controller.timer.state == TimerState.OVERTIME:
-                # Use the exact value from the timer
-                diff_seconds = overtime_seconds
+        """Simply display the predicted end time calculated by timer controller"""
         
         # Don't show predicted end during countdown
         if self.show_countdown:
             self.info_label2.setText("")
             return
-            
-        # Format the display text with appropriate precision
+        
+        # Just format and display the received values - NO calculations!
+        predicted_time_str = predicted_end_time.strftime("%H:%M")
+        original_time_str = original_end_time.strftime("%H:%M")
+        
+        # Calculate difference for display formatting only
+        time_diff = predicted_end_time - original_end_time
+        diff_seconds = int(time_diff.total_seconds())
+        
+        # Format the display text
         if diff_seconds > 0:
-            # Show precise time for small overruns, minutes for larger ones
-            if diff_seconds < 60:
-                # Less than a minute - show seconds
-                time_text = f"Predicted End: {predicted_time_str} (+{diff_seconds}s)"
+            # Running late
+            minutes = diff_seconds // 60
+            seconds = diff_seconds % 60
+            if seconds == 0:
+                time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (+{minutes}M)"
             else:
-                # Minutes and seconds format
-                minutes = diff_seconds // 60
-                seconds = diff_seconds % 60
-                if seconds == 0:
-                    # Even minutes
-                    time_text = f"Predicted End: {predicted_time_str} (+{minutes}m)"
-                else:
-                    # Minutes and seconds
-                    time_text = f"Predicted End: {predicted_time_str} (+{minutes}m {seconds}s)"
-
-            # Red color for overtime
-            self.info_label2.setStyleSheet("""
-                color: #ff4d4d;
-                font-weight: bold;
-            """)
+                time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (+{minutes}M)"
+            color = "#ffaa00" if diff_seconds <= 60 else "#ff4d4d"
         elif diff_seconds < 0:
-            # Running under time (negative diff)
+            # Running early
             abs_diff = abs(diff_seconds)
-            if abs_diff < 60:
-                # Less than a minute - show seconds
-                time_text = f"Predicted End: {predicted_time_str} (-{abs_diff}s)"
+            minutes = abs_diff // 60
+            seconds = abs_diff % 60
+            if seconds == 0:
+                time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (-{minutes}M)"
             else:
-                # Minutes and seconds format
-                minutes = abs_diff // 60
-                seconds = abs_diff % 60
-                if seconds == 0:
-                    # Even minutes
-                    time_text = f"Predicted End: {predicted_time_str} (-{minutes}m)"
-                else:
-                    # Minutes and seconds
-                    time_text = f"Predicted End: {predicted_time_str} (-{minutes}m {seconds}s)"
-
-            # Green color for under time
-            self.info_label2.setStyleSheet("""
-                color: #4caf50;
-                font-weight: bold;
-            """)
+                time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (-{minutes}M)"
+            color = "#4caf50"
         else:
             # On time
-            time_text = f"Predicted End: {predicted_time_str} (on time)"
-            self.info_label2.setStyleSheet("""
-                color: #ffffff;
-                font-weight: bold;
-            """)
+            time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (ON TIME)"
+            color = "#4caf50"
 
-        # Set the text, and make it uppercase like info_label1
+        # Display the formatted text
         self.info_label2.setText(time_text)
         self.info_label2.setText(time_text.upper())
+        self.info_label2.setStyleSheet(f"color: {color}; font-weight: bold;")
         
     def _meeting_started(self):
         """Handle meeting start event"""
@@ -456,7 +421,7 @@ class SecondaryDisplay(QMainWindow):
         # Set initial next part info with stable formatting
         if len(self.timer_controller.parts_list) > 1:
             next_part = self.timer_controller.parts_list[1]
-            next_part_text = f"NEXT PART: {next_part.title.upper()}"
+            next_part_text = f"{self.tr('NEXT PART')}: {next_part.title.upper()}"
             formatted_text = self._format_text_for_display_stable(next_part_text)
             self.info_label1.setText(formatted_text)
             self.info_label1.setStyleSheet("""
@@ -467,7 +432,7 @@ class SecondaryDisplay(QMainWindow):
             self.info_label2.setVisible(True)
         else:
             # No next part (only one part in the meeting)
-            self.info_label1.setText("LAST PART")
+            self.info_label1.setText(self.tr("LAST PART"))
             self.info_label2.setVisible(True)
 
         # Force‑refresh the "next part" panel in case the part‑changed signal
@@ -486,7 +451,7 @@ class SecondaryDisplay(QMainWindow):
         self.show_clock = True
         self.show_countdown = False
         # Show meeting completed message
-        self.info_label1.setText("MEETING COMPLETED")
+        self.info_label1.setText(self.tr("MEETING COMPLETED"))
         self.info_label2.setText("")
         # Re‑enable the countdown signal for the next meeting
         try:

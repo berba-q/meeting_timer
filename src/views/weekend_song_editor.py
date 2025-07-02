@@ -11,7 +11,7 @@ class WeekendSongEditorDialog(QDialog):
     
     def __init__(self, meeting, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit Weekend Meeting Songs")
+        self.setWindowTitle(self.tr("Edit Weekend Meeting Songs"))
         self.meeting = meeting
         self.song_fields = []
         
@@ -24,8 +24,8 @@ class WeekendSongEditorDialog(QDialog):
         
         # Add description
         description = QLabel(
-            "Enter song numbers for the weekend meeting. Leave empty for songs "
-            "that don't require a number (like theme songs or musical items)."
+            self.tr("Enter song numbers for the weekend meeting. Leave empty for songs "
+            "that don't require a number (like theme songs or musical items).")
         )
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -59,13 +59,13 @@ class WeekendSongEditorDialog(QDialog):
             # Create label with context
             if "prayer" in part.title.lower():
                 if "opening" in part.title.lower() or "public" in section_title.lower():
-                    label_text = f"Opening Song ({section_title}):"
+                    label_text = f"{self.tr('Opening Song')} ({section_title}):"
                 elif "concluding" in part.title.lower() or "watchtower" in section_title.lower():
-                    label_text = f"Concluding Song ({section_title}):"
+                    label_text = f"{self.tr('Concluding Song')} ({section_title}):"
                 else:
-                    label_text = f"Song and Prayer ({section_title}):"
+                    label_text = f"{self.tr('Song and Prayer')} ({section_title}):"
             else:
-                label_text = f"Song ({section_title}):"
+                label_text = f"{self.tr('Song')} ({section_title}):"
             
             # Add to form
             form_layout.addRow(label_text, spin_box)
@@ -96,12 +96,12 @@ class WeekendSongEditorDialog(QDialog):
                 # Format based on whether it includes prayer
                 if "prayer" in part_title_lower:
                     if "opening" in part_title_lower:
-                        part.title = f"Song {song_number} and Opening Prayer"
+                        part.title = f"{self.tr('Song')} {song_number} {self.tr('and Opening Prayer')}"
                     elif "concluding" in part_title_lower:
-                        part.title = f"Song {song_number} and Concluding Prayer"
+                        part.title = f"{self.tr('Song')} {song_number} {self.tr('and Concluding Prayer')}"
                     else:
-                        part.title = f"Song {song_number} and Prayer"
+                        part.title = f"{self.tr('Song')} {song_number} {self.tr('and Prayer')}"
                 else:
-                    part.title = f"Song {song_number}"
+                    part.title = f"{self.tr('Song')} {song_number}"
         
         super().accept()

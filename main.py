@@ -57,12 +57,12 @@ class CustomSplashScreen(QSplashScreen):
         self.title_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.status_label = QLabel("Initializing...", self)
+        self.status_label = QLabel(self.tr("Initializing..."), self)
         self.status_label.setFont(QFont("Arial", 12))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setStyleSheet("color: #333;")
 
-        self.version_label = QLabel(f"Version {__version__}", self)
+        self.version_label = QLabel(self.tr("Version") + f" {__version__}", self)
         self.version_label.setFont(QFont("Arial", 10))
         self.version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.version_label.setStyleSheet("color: #888;")
@@ -77,11 +77,11 @@ class CustomSplashScreen(QSplashScreen):
         layout.addWidget(self.version_label)
 
         self.witty_lines = [
-            "Warming up the mic...",
-            "Checking the speaker notes...",
-            "Counting backwards from 10...",
-            "Synchronizing timers...",
-            "Just a moment more..."
+            self.tr("Warming up the mic..."),
+            self.tr("Checking the speaker notes..."),
+            self.tr("Counting backwards from 10..."),
+            self.tr("Synchronizing timers..."),
+            self.tr("Just a moment more...")
         ]
         self._start_witty_messages()
 
@@ -169,7 +169,9 @@ def _select_meeting_by_day(controller, main_window):
                 break
         
         # Update status bar
-        main_window.current_part_label.setText(f"Meeting: {meeting_to_select.title}")
+        main_window.current_part_label.setText(
+            main_window.tr("Meeting:") + f" {meeting_to_select.title}"
+        )
         
 
 def main():
@@ -215,7 +217,7 @@ def main():
         else:
             print(f"[LANG] Loaded translation for {saved_language}")
 
-    splash.status_label.setText("Loading complete...")
+    splash.status_label.setText(splash.tr("Loading complete..."))
 
     # Pass both MeetingController and its TimerController to MainWindow
     main_window = MainWindow(
@@ -223,8 +225,8 @@ def main():
         timer_controller,
         settings_controller
     )
-    _select_meeting_by_day(controller, main_window)
     splash.finish(main_window)
+    _select_meeting_by_day(controller, main_window)
     main_window.show()
 
     elapsed = time.perf_counter() - start_time

@@ -42,7 +42,7 @@ class SettingsDialog(QDialog):
     
     def _setup_ui(self):
         """Setup the UI components"""
-        self.setWindowTitle("Settings")
+        self.setWindowTitle(self.tr("Settings"))
         self.setMinimumWidth(540)
         self.setMinimumHeight(600)
         
@@ -65,12 +65,12 @@ class SettingsDialog(QDialog):
         self._setup_network_display_tab()  # Setup network display tab
         
         # Add tabs to tab widget
-        self.tab_widget.addTab(self.general_tab, "General")
-        self.tab_widget.addTab(self.meetings_tab, "Meetings")
-        self.tab_widget.addTab(self.display_tab, "Display")
-        self.tab_widget.addTab(self.meeting_source_tab, "Meeting Source")
-        self.tab_widget.addTab(self.network_display_tab, "Network Display")
-        
+        self.tab_widget.addTab(self.general_tab, self.tr("General"))
+        self.tab_widget.addTab(self.meetings_tab, self.tr("Meetings"))
+        self.tab_widget.addTab(self.display_tab, self.tr("Display"))
+        self.tab_widget.addTab(self.meeting_source_tab, self.tr("Meeting Source"))
+        self.tab_widget.addTab(self.network_display_tab, self.tr("Network Display"))
+
         
         # Add tab widget to layout with ScrollArea support
         scroll_area = QScrollArea()
@@ -108,15 +108,15 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self.general_tab)
         
         # Language selection
-        language_group = QGroupBox("Language")
+        language_group = QGroupBox(self.tr("Language"))
         language_layout = QFormLayout(language_group)
         
         self.language_combo = QComboBox()
         for lang_code, lang_name in self.available_languages.items():
             self.language_combo.addItem(lang_name, lang_code)
-        
-        language_layout.addRow("Interface Language:", self.language_combo)
-        
+
+        language_layout.addRow(self.tr("Interface Language:"), self.language_combo)
+
         # Add groups to layout
         layout.addWidget(language_group)
         layout.addStretch()
@@ -126,7 +126,7 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self.meetings_tab)
         
         # Midweek meeting settings
-        midweek_group = QGroupBox("Midweek Meeting")
+        midweek_group = QGroupBox(self.tr("Midweek Meeting"))
         midweek_layout = QFormLayout(midweek_group)
         
         self.midweek_day_combo = QComboBox()
@@ -135,12 +135,12 @@ class SettingsDialog(QDialog):
         
         self.midweek_time_edit = QTimeEdit()
         self.midweek_time_edit.setDisplayFormat("hh:mm AP")
-        
-        midweek_layout.addRow("Day:", self.midweek_day_combo)
-        midweek_layout.addRow("Time:", self.midweek_time_edit)
-        
+
+        midweek_layout.addRow(self.tr("Day:"), self.midweek_day_combo)
+        midweek_layout.addRow(self.tr("Time:"), self.midweek_time_edit)
+
         # Weekend meeting settings
-        weekend_group = QGroupBox("Weekend Meeting")
+        weekend_group = QGroupBox(self.tr("Weekend Meeting"))
         weekend_layout = QFormLayout(weekend_group)
         
         self.weekend_day_combo = QComboBox()
@@ -149,39 +149,39 @@ class SettingsDialog(QDialog):
         
         self.weekend_time_edit = QTimeEdit()
         self.weekend_time_edit.setDisplayFormat("hh:mm AP")
-        
-        weekend_layout.addRow("Day:", self.weekend_day_combo)
-        weekend_layout.addRow("Time:", self.weekend_time_edit)
+
+        weekend_layout.addRow(self.tr("Day:"), self.weekend_day_combo)
+        weekend_layout.addRow(self.tr("Time:"), self.weekend_time_edit)
 
         # Initialize notification reminder controls
         from PyQt6.QtWidgets import QCheckBox, QSpinBox  # ensure imports at top if missing
 
-        self.start_reminder_check = QCheckBox("Remind to start timer after delay")
+        self.start_reminder_check = QCheckBox(self.tr("Remind to start timer after delay"))
         self.start_delay_spin = QSpinBox()
         self.start_delay_spin.setRange(1, 300)
         self.start_delay_spin.setSuffix(" s")
         self.start_delay_spin.setMaximumWidth(60)
         self.start_reminder_check.setToolTip(
-            "When enabled, shows a reminder if you haven't started the timer after the specified delay."
+            self.tr("When enabled, shows a reminder if you haven't started the timer after the specified delay.")
         )
         self.start_delay_spin.setToolTip(
-            "Delay in seconds before reminding to start the timer."
+            self.tr("Delay in seconds before reminding to start the timer.")
         )
 
-        self.overrun_reminder_check = QCheckBox("Remind on part overrun after delay")
+        self.overrun_reminder_check = QCheckBox(self.tr("Remind on part overrun after delay"))
         self.overrun_delay_spin = QSpinBox()
         self.overrun_delay_spin.setRange(1, 300)
         self.overrun_delay_spin.setSuffix(" s")
         self.overrun_delay_spin.setMaximumWidth(60)
         self.overrun_reminder_check.setToolTip(
-            "When enabled, shows a reminder if a meeting part exceeds its allocated time."
+            self.tr("When enabled, shows a reminder if a meeting part exceeds its allocated time.")
         )
         self.overrun_delay_spin.setToolTip(
-            "Delay in seconds before reminding to move to the next part."
+            self.tr("Delay in seconds before reminding to move to the next part.")
         )
         
         # Notification reminders settings
-        notif_group = QGroupBox("Notification Reminders")
+        notif_group = QGroupBox(self.tr("Notification Reminders"))
         notif_layout = QFormLayout(notif_group)
         #notif_group.setLayout(notif_layout)
         #notif_layout.setContentsMargins(10, 5, 10, 10)
@@ -203,39 +203,39 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self.display_tab)
 
         # Timer display mode
-        display_mode_group = QGroupBox("Timer Display")
+        display_mode_group = QGroupBox(self.tr("Timer Display"))
         display_mode_layout = QVBoxLayout(display_mode_group)
         # Digital is the only supported mode, so no need for a checkbox.
 
         # Theme selection
         theme_layout = QHBoxLayout()
-        theme_layout.addWidget(QLabel("Theme:"))
+        theme_layout.addWidget(QLabel(self.tr("Theme:")))
 
         self.theme_combo = QComboBox()
-        self.theme_combo.addItem("Light Theme", "light")
-        self.theme_combo.addItem("Dark Theme", "dark")
+        self.theme_combo.addItem(self.tr("Light Theme"), "light")
+        self.theme_combo.addItem(self.tr("Dark Theme"), "dark")
 
         theme_layout.addWidget(self.theme_combo)
         display_mode_layout.addLayout(theme_layout)
 
         # Tools dock options
-        tools_dock_group = QGroupBox("Tools Dock")
+        tools_dock_group = QGroupBox(self.tr("Tools Dock"))
         tools_dock_layout = QVBoxLayout(tools_dock_group)
 
-        self.remember_tools_dock_check = QCheckBox("Remember tools dock state between sessions")
-        self.remember_tools_dock_check.setToolTip("When enabled, the dock will be shown or hidden based on its state when you last closed the application")
+        self.remember_tools_dock_check = QCheckBox(self.tr("Remember tools dock state between sessions"))
+        self.remember_tools_dock_check.setToolTip(self.tr("When enabled, the dock will be shown or hidden based on its state when you last closed the application"))
         tools_dock_layout.addWidget(self.remember_tools_dock_check)
 
         # Meeting timing options
-        timing_group = QGroupBox("Meeting Timing")
+        timing_group = QGroupBox(self.tr("Meeting Timing"))
         timing_layout = QVBoxLayout(timing_group)
 
-        self.show_end_time_check = QCheckBox("Show predicted meeting end time")
-        self.show_end_time_check.setToolTip("Display the predicted meeting end time based on current progress")
+        self.show_end_time_check = QCheckBox(self.tr("Show predicted meeting end time"))
+        self.show_end_time_check.setToolTip(self.tr("Display the predicted meeting end time based on current progress"))
         timing_layout.addWidget(self.show_end_time_check)
 
         # Screen selection
-        screen_group = QGroupBox("Screen Selection")
+        screen_group = QGroupBox(self.tr("Screen Selection"))
         screen_layout = QFormLayout(screen_group)
 
         # Get available screens
@@ -262,11 +262,11 @@ class SettingsDialog(QDialog):
         # Connect signal to handle selection changes
         self.secondary_screen_combo.currentIndexChanged.connect(self._secondary_screen_selection_changed)
 
-        self.use_secondary_check = QCheckBox("Use Secondary Display")
+        self.use_secondary_check = QCheckBox(self.tr("Use Secondary Display"))
         self.use_secondary_check.toggled.connect(self._toggle_secondary_screen)
 
-        screen_layout.addRow("Primary Screen:", self.primary_screen_combo)
-        screen_layout.addRow("Secondary Screen:", self.secondary_screen_combo)
+        screen_layout.addRow(self.tr("Primary Screen:"), self.primary_screen_combo)
+        screen_layout.addRow(self.tr("Secondary Screen:"), self.secondary_screen_combo)
         screen_layout.addRow("", self.use_secondary_check)
 
         # Add groups to layout
@@ -304,7 +304,7 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self.meeting_source_tab)
         
         # Meeting source mode
-        source_mode_group = QGroupBox("Meeting Data Source")
+        source_mode_group = QGroupBox(self.tr("Meeting Data Source"))
         source_mode_layout = QVBoxLayout(source_mode_group)
         
         # Create radio buttons for each mode
@@ -318,25 +318,25 @@ class SettingsDialog(QDialog):
             source_mode_layout.addWidget(radio)
         
         # Web scraping options
-        self.web_options_group = QGroupBox("Web Scraping Options")
+        self.web_options_group = QGroupBox(self.tr("Web Scraping Options"))
         web_options_layout = QVBoxLayout(self.web_options_group)
-        
-        self.auto_update_check = QCheckBox("Automatically update meetings from the web")
-        self.auto_update_check.setToolTip("Update meetings from wol.jw.org when the application starts")
-        
-        self.save_scraped_check = QCheckBox("Save scraped meetings as templates")
-        self.save_scraped_check.setToolTip("Save scraped meeting data as templates for future use")
-        
+
+        self.auto_update_check = QCheckBox(self.tr("Automatically update meetings from the web"))
+        self.auto_update_check.setToolTip(self.tr("Update meetings from jw.org when the application starts"))
+
+        self.save_scraped_check = QCheckBox(self.tr("Save scraped meetings as templates"))
+        self.save_scraped_check.setToolTip(self.tr("Save scraped meeting data as templates for future use"))
+
         web_options_layout.addWidget(self.auto_update_check)
         web_options_layout.addWidget(self.save_scraped_check)
         
         # Song options
-        self.song_options_group = QGroupBox("Song Entry Options")
+        self.song_options_group = QGroupBox(self.tr("Song Entry Options"))
         song_options_layout = QVBoxLayout(self.song_options_group)
-        
-        self.weekend_songs_manual_check = QCheckBox("Always manually enter weekend songs")
-        self.weekend_songs_manual_check.setToolTip("Weekend songs must be entered manually for each meeting")
-        
+
+        self.weekend_songs_manual_check = QCheckBox(self.tr("Always manually enter weekend songs"))
+        self.weekend_songs_manual_check.setToolTip(self.tr("Weekend songs must be entered manually for each meeting"))
+
         song_options_layout.addWidget(self.weekend_songs_manual_check)
         
         # Connect source mode changes to toggle option groups
@@ -352,11 +352,11 @@ class SettingsDialog(QDialog):
     def _get_source_mode_display_name(self, mode: MeetingSourceMode) -> str:
         """Get a user-friendly display name for source modes"""
         if mode == MeetingSourceMode.WEB_SCRAPING:
-            return "Web Scraping (Automatically download from wol.jw.org)"
+            return self.tr("Web Scraping (Automatically download from jw.org)")
         elif mode == MeetingSourceMode.MANUAL_ENTRY:
-            return "Manual Entry (Enter meeting parts manually)"
+            return self.tr("Manual Entry (Enter meeting parts manually)")
         elif mode == MeetingSourceMode.TEMPLATE_BASED:
-            return "Template-Based (Use templates with modifications)"
+            return self.tr("Template-Based (Use templates with modifications)")
         return str(mode)
     
     def _update_source_options_visibility(self):
@@ -378,10 +378,10 @@ class SettingsDialog(QDialog):
         
         # Song options are always visible, but context changes
         if selected_mode == MeetingSourceMode.WEB_SCRAPING:
-            self.weekend_songs_manual_check.setText("Always manually enter weekend songs")
+            self.weekend_songs_manual_check.setText(self.tr("Always manually enter weekend songs"))
         else:
-            self.weekend_songs_manual_check.setText("Include song placeholders in templates")
-    
+            self.weekend_songs_manual_check.setText(self.tr("Include song placeholders in templates"))
+
     def _secondary_screen_selection_changed(self, index):
         """Handle changes to the secondary screen selection"""
         if index < 0:  # Invalid index
@@ -589,7 +589,7 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self.network_display_tab)
 
         # Network Display Mode group
-        mode_group = QGroupBox("Network Display Mode")
+        mode_group = QGroupBox(self.tr("Network Display Mode"))
         mode_layout = QVBoxLayout(mode_group)
         mode_layout.setSpacing(8)
         mode_layout.setContentsMargins(10, 10, 10, 10)
@@ -599,28 +599,28 @@ class SettingsDialog(QDialog):
         self.network_mode_group = QButtonGroup(self)
 
         # Disabled mode
-        self.disabled_radio = QRadioButton("Disabled (No network display)")
+        self.disabled_radio = QRadioButton(self.tr("Disabled (No network display)"))
         self.network_mode_radios[NetworkDisplayMode.DISABLED] = self.disabled_radio
         self.network_mode_group.addButton(self.disabled_radio)
         mode_layout.addWidget(self.disabled_radio)
-        self.disabled_radio.setToolTip("No network display is provided.")
+        self.disabled_radio.setToolTip(self.tr("No network display is provided."))
 
         # WebSocket only mode
-        self.ws_only_radio = QRadioButton("WebSocket Only (Use your own web page)")
+        self.ws_only_radio = QRadioButton(self.tr("WebSocket Only (Use your own web page)"))
         self.network_mode_radios[NetworkDisplayMode.WEB_SOCKET_ONLY] = self.ws_only_radio
         self.network_mode_group.addButton(self.ws_only_radio)
         mode_layout.addWidget(self.ws_only_radio)
-        self.ws_only_radio.setToolTip("Broadcasts timer data over WebSocket only. Use this if you have your own HTML/JS client.")
+        self.ws_only_radio.setToolTip(self.tr("Broadcasts timer data over WebSocket only. Use this if you have your own HTML/JS client."))
 
         # HTTP and WebSocket mode
-        self.http_ws_radio = QRadioButton("HTTP and WebSocket (Complete solution)")
+        self.http_ws_radio = QRadioButton(self.tr("HTTP and WebSocket (Complete solution)"))
         self.network_mode_radios[NetworkDisplayMode.HTTP_AND_WS] = self.http_ws_radio
         self.network_mode_group.addButton(self.http_ws_radio)
         mode_layout.addWidget(self.http_ws_radio)
-        self.http_ws_radio.setToolTip("Provides both a WebSocket server and an HTTP server to serve a built-in display page.")
+        self.http_ws_radio.setToolTip(self.tr("Provides both a WebSocket server and an HTTP server to serve a built-in display page."))
 
         # Ports group
-        ports_group = QGroupBox("Network Ports")
+        ports_group = QGroupBox(self.tr("Network Ports"))
         ports_layout = QFormLayout(ports_group)
         ports_layout.setSpacing(8)
         ports_layout.setContentsMargins(10, 10, 10, 10)
@@ -629,40 +629,40 @@ class SettingsDialog(QDialog):
         self.http_port_spin = QSpinBox()
         self.http_port_spin.setRange(1024, 65535)  # Common non-privileged port range
         self.http_port_spin.setValue(8080)
-        self.http_port_spin.setToolTip("Port for the HTTP server (client web page)")
-        ports_layout.addRow("HTTP Port:", self.http_port_spin)
+        self.http_port_spin.setToolTip(self.tr("Port for the HTTP server (client web page)"))
+        ports_layout.addRow(self.tr("HTTP Port:"), self.http_port_spin)
 
         # WebSocket port
         self.ws_port_spin = QSpinBox()
         self.ws_port_spin.setRange(1024, 65535)
         self.ws_port_spin.setValue(8765)
-        self.ws_port_spin.setToolTip("Port for the WebSocket server (timer data)")
-        ports_layout.addRow("WebSocket Port:", self.ws_port_spin)
+        self.ws_port_spin.setToolTip(self.tr("Port for the WebSocket server (timer data)"))
+        ports_layout.addRow(self.tr("WebSocket Port:"), self.ws_port_spin)
 
         # Options group
-        options_group = QGroupBox("Network Options")
+        options_group = QGroupBox(self.tr("Network Options"))
         options_layout = QVBoxLayout(options_group)
         options_layout.setSpacing(8)
         options_layout.setContentsMargins(10, 10, 10, 10)
 
         # Auto-start option
-        self.auto_start_check = QCheckBox("Auto-start network display when application launches")
-        self.auto_start_check.setToolTip("Automatically start the network display when the application starts")
+        self.auto_start_check = QCheckBox(self.tr("Auto-start network display when application launches"))
+        self.auto_start_check.setToolTip(self.tr("Automatically start the network display when the application starts"))
         options_layout.addWidget(self.auto_start_check)
 
         # QR code option
-        self.qr_code_check = QCheckBox("Show QR code for easy connection")
-        self.qr_code_check.setToolTip("Display a QR code in the main window for easy connection from mobile devices")
+        self.qr_code_check = QCheckBox(self.tr("Show QR code for easy connection"))
+        self.qr_code_check.setToolTip(self.tr("Display a QR code in the main window for easy connection from mobile devices"))
         options_layout.addWidget(self.qr_code_check)
 
         # Help button for connection help
-        help_button = QPushButton("Connection Help")
-        help_button.setToolTip("Click to view connection instructions for the network display")
+        help_button = QPushButton(self.tr("Connection Help"))
+        help_button.setToolTip(self.tr("Click to view connection instructions for the network display"))
         help_button.clicked.connect(self._show_network_help_dialog)
         layout.addWidget(help_button, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # QR code preview (will be populated when network display is active)
-        self.qr_placeholder = QLabel("QR Code will be shown here when network display is active")
+        self.qr_placeholder = QLabel(self.tr("QR Code will be shown here when network display is active"))
         self.qr_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.qr_placeholder.setMinimumHeight(150)
 
@@ -681,12 +681,12 @@ class SettingsDialog(QDialog):
         from PyQt6.QtWidgets import QMessageBox
         QMessageBox.information(
             self,
-            "Network Display Help",
-            "To connect to the network display:\n\n"
-            "1. Make sure all devices are on the same network (LAN/WiFi)\n"
-            "2. Start the network display from the main window\n"
-            "3. On client devices, open a web browser and enter the URL shown\n"
-            "4. For easy connection from mobile devices, scan the QR code"
+            self.tr("Network Display Help"),
+            self.tr("To connect to the network display:\n\n"
+                    "1. Make sure all devices are on the same network (LAN/WiFi)\n"
+                    "2. Start the network display from the main window\n"
+                    "3. On client devices, open a web browser and enter the URL shown\n"
+                    "4. For easy connection from mobile devices, scan the QR code")
         )
     
     def _update_network_display_ui_state(self):
@@ -737,4 +737,4 @@ class SettingsDialog(QDialog):
             pixmap = QPixmap.fromImage(QImage(qr_image))
             self.qr_placeholder.setPixmap(pixmap.scaled(150, 150, Qt.AspectRatioMode.KeepAspectRatio))
         else:
-            self.qr_placeholder.setText("QR Code will be shown here when network display is active")
+            self.qr_placeholder.setText(self.tr("QR Code will be shown here when network display is active"))

@@ -147,8 +147,8 @@ class TimerView(QWidget):
         if self.timer_state == TimerState.STOPPED:
             if seconds_remaining > 0:
                 # Show countdown in part label
-                self.part_label.setText("MEETING STARTING SOON")
-                
+                self.part_label.setText(self.tr("MEETING STARTING SOON"))
+
                 # Show countdown message
                 self.countdown_label.setText(message)
                 self.countdown_label.setVisible(True)

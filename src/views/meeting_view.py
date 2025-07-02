@@ -21,7 +21,7 @@ class PartEditDialog(QDialog):
     def __init__(self, part: MeetingPart, parent=None):
         super().__init__(parent)
         self.part = part
-        self.setWindowTitle("Edit Part")
+        self.setWindowTitle(self.tr("Edit Part"))
         self.setup_ui()
     
     def setup_ui(self):
@@ -30,19 +30,19 @@ class PartEditDialog(QDialog):
         
         # Title field
         self.title_edit = QLineEdit(self.part.title)
-        layout.addRow("Title:", self.title_edit)
+        layout.addRow(self.tr("Title:"), self.title_edit)
         
         # Duration field
         self.duration_spin = QSpinBox()
         self.duration_spin.setMinimum(1)
         self.duration_spin.setMaximum(120)
         self.duration_spin.setValue(self.part.duration_minutes)
-        layout.addRow("Duration (minutes):", self.duration_spin)
-        
+        layout.addRow(self.tr("Duration (minutes):"), self.duration_spin)
+
         # Presenter field
         self.presenter_edit = QLineEdit(self.part.presenter)
-        layout.addRow("Presenter:", self.presenter_edit)
-        
+        layout.addRow(self.tr("Presenter:"), self.presenter_edit)
+
         # Buttons
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | 
@@ -88,7 +88,7 @@ class MeetingView(QWidget):
         # Meeting header
         header_layout = QHBoxLayout()
         
-        self.title_label = QLabel("No Meeting Selected")
+        self.title_label = QLabel(self.tr("No Meeting Selected"))
         self.title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
         header_layout.addWidget(self.title_label)
         
@@ -99,7 +99,7 @@ class MeetingView(QWidget):
         
         # Parts tree
         self.parts_tree = QTreeWidget()
-        self.parts_tree.setHeaderLabels(["Title", "Duration", "Status"])
+        self.parts_tree.setHeaderLabels([self.tr("Title"), self.tr("Duration"), self.tr("Status")])
         self.parts_tree.setColumnWidth(0, 400)  # Set width for title column
         self.parts_tree.setColumnWidth(1, 100)  # Set width for duration column
         self.parts_tree.setAlternatingRowColors(True)
@@ -136,13 +136,13 @@ class MeetingView(QWidget):
     def _update_display(self):
         """Update the display with current meeting data"""
         if not self.meeting:
-            self.title_label.setText("No Meeting Selected")
+            self.title_label.setText(self.tr("No Meeting Selected"))
             self.parts_tree.clear()
             return
         
         # Update title
         date_str = self.meeting.date.strftime("%Y-%m-%d")
-        self.title_label.setText(f"{self.meeting.title} ({date_str})")
+        self.title_label.setText(self.tr(f"{self.meeting.title} ({date_str})"))
         
         # Clear existing items
         self.parts_tree.clear()
@@ -185,11 +185,11 @@ class MeetingView(QWidget):
                 
                 # Set status
                 if part.is_completed:
-                    part_item.setText(2, "Completed")
+                    part_item.setText(2, self.tr("Completed"))
                     part_item.setForeground(2, QBrush(QColor(0, 128, 0)))  # Green
                 else:
-                    part_item.setText(2, "Pending")
-        
+                    part_item.setText(2, self.tr("Pending"))
+
         # Expand all sections
         self.parts_tree.expandAll()
     
@@ -217,7 +217,7 @@ class MeetingView(QWidget):
                     self.parts_tree.scrollToItem(part_item)
                     
                     # Update status text
-                    part_item.setText(2, "Current")
+                    part_item.setText(2, self.tr("Current"))
                     part_item.setForeground(2, QBrush(QColor(0, 0, 255)))  # Blue
                 else:
                     # Reset background if not the current part
@@ -243,7 +243,7 @@ class MeetingView(QWidget):
                 
                 if item_type == "part" and item_index == global_part_index:
                     # Update status
-                    part_item.setText(2, "Completed")
+                    part_item.setText(2, self.tr("Completed"))
                     part_item.setForeground(2, QBrush(QColor(0, 128, 0)))  # Green
                     break
     
@@ -274,17 +274,17 @@ class MeetingView(QWidget):
                 
                 if item_type == "part":
                     # Part context menu
-                    start_action = QAction("Start This Part", self)
+                    start_action = QAction(self.tr("Start This Part"), self)
                     start_action.triggered.connect(lambda: self.timer_controller.jump_to_part(item_index))
                     menu.addAction(start_action)
                     
                     # Add edit action
-                    edit_action = QAction("Edit Part", self)
+                    edit_action = QAction(self.tr("Edit Part"), self)
                     edit_action.triggered.connect(lambda: self._edit_part(item))
                     menu.addAction(edit_action)
                     
                     # Add remove action
-                    remove_action = QAction("Remove Part", self)
+                    remove_action = QAction(self.tr("Remove Part"), self)
                     remove_action.triggered.connect(lambda: self._remove_part(item))
                     menu.addAction(remove_action)
                     
@@ -295,13 +295,13 @@ class MeetingView(QWidget):
                     
                     # Move up action (if not the first part)
                     if part_index > 0:
-                        move_up_action = QAction("Move Up", self)
+                        move_up_action = QAction(self.tr("Move Up"), self)
                         move_up_action.triggered.connect(lambda: self._move_part_up(item))
                         menu.addAction(move_up_action)
                     
                     # Move down action (if not the last part)
                     if part_index < len(section.parts) - 1:
-                        move_down_action = QAction("Move Down", self)
+                        move_down_action = QAction(self.tr("Move Down"), self)
                         move_down_action.triggered.connect(lambda: self._move_part_down(item))
                         menu.addAction(move_down_action)
                 
@@ -355,8 +355,8 @@ class MeetingView(QWidget):
         from PyQt6.QtWidgets import QMessageBox
         confirm = QMessageBox.question(
             self, 
-            "Confirm Remove Part", 
-            "Are you sure you want to remove this part?",
+            self.tr("Confirm Remove Part"), 
+            self.tr("Are you sure you want to remove this part?"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         

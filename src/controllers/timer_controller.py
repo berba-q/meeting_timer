@@ -168,12 +168,12 @@ class TimerController(QObject):
             minutes = (seconds_remaining % 3600) // 60
             seconds = seconds_remaining % 60
             if hours > 0:
-                countdown_msg = f"Meeting starts in {hours}h {minutes}m {seconds}s"
+                countdown_msg = f"{self.tr('Meeting starts in')} {hours}h {minutes}m"
             else:
-                countdown_msg = f"Meeting starts in {minutes}m {seconds}s"
+                countdown_msg = f"{self.tr('Meeting starts in')} {minutes}m"
             self.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
         else:
-            countdown_msg = "Meeting starts now!"
+            countdown_msg = self.tr("Meeting starts now!")
             self.meeting_countdown_updated.emit(0, countdown_msg)
             self._countdown_timer.stop()
     
@@ -228,41 +228,160 @@ class TimerController(QObject):
         self._original_end_time = self._meeting_start_time + timedelta(seconds=total_seconds)
     
     def _update_predicted_end_time(self):
-        """Update the predicted end time based on current progress"""
+        """Update the predicted end time based on current progress and real-time data"""
         if not self._meeting_start_time or self.current_part_index < 0:
             return
         
-        # Calculate remaining parts duration
-        self._remaining_parts_duration = 0
-        for i in range(self.current_part_index + 1, len(self.parts_list)):
-            self._remaining_parts_duration += self.parts_list[i].duration_seconds
-        
-        # Add remaining transition times (1 minute per transition between sections)
-        remaining_transitions = 0
-        if self.current_part_index < len(self.parts_list) - 1:
-            # Count transitions between remaining sections
-            current_section_index = -1
-            for section_index, section in enumerate(self.current_meeting.sections):
-                for part in section.parts:
-                    if current_section_index == -1 and part == self.parts_list[self.current_part_index]:
-                        current_section_index = section_index
-                        break
-                if current_section_index != -1:
-                    break
-            
-            if current_section_index != -1:
-                remaining_transitions = len(self.current_meeting.sections) - current_section_index - 1
-        
-        # Add transition times
-        self._remaining_parts_duration += remaining_transitions * 60
-        
-        # Current time + remaining time + any accumulated overtime
         now = datetime.now()
-        self._predicted_end_time = now + timedelta(seconds=self._remaining_parts_duration)
+        
+        # CRITICAL FIX: Predicted end time must NEVER be earlier than current time
+        # Calculate remaining time from current position forward
+        
+        remaining_time = 0.0
+        
+        # 1. Add remaining time from current part
+        if (self.current_part_index < len(self.parts_list) and 
+            self.timer.state in [TimerState.RUNNING, TimerState.PAUSED]):
+            # Only count remaining time if not in overtime
+            remaining_time += max(0, self.timer.remaining_seconds)
+        elif (self.current_part_index < len(self.parts_list) and 
+            self.timer.state == TimerState.OVERTIME):
+            # If in overtime, no remaining time for current part
+            remaining_time += 0
+        
+        # 2. Add duration of all future parts
+        for i in range(self.current_part_index + 1, len(self.parts_list)):
+            remaining_time += self.parts_list[i].duration_seconds
+        
+        # 3. Add remaining transitions
+        remaining_transitions = self._calculate_remaining_transitions()
+        remaining_time += remaining_transitions * 60
+        
+        # 4. GUARANTEE: Predicted end = current time + remaining time
+        # This ensures predicted end is ALWAYS >= current time
+        self._predicted_end_time = now + timedelta(seconds=remaining_time)
+        
+        # 5. Calculate overtime relative to original schedule
+        if self._original_end_time and self._predicted_end_time > self._original_end_time:
+            overtime_seconds = (self._predicted_end_time - self._original_end_time).total_seconds()
+        else:
+            overtime_seconds = 0
         
         # Emit signal with updated prediction
         self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time)
-
+        
+        # Debug logging to catch issues
+        print(f"[TIMER] Predicted end time update:")
+        print(f"  Current time: {now.strftime('%H:%M:%S')}")
+        print(f"  Current part: {self.current_part_index + 1}/{len(self.parts_list)}")
+        print(f"  Timer state: {self.timer.state}")
+        print(f"  Current part remaining: {max(0, self.timer.remaining_seconds) if self.timer.state != TimerState.OVERTIME else 0:.0f}s")
+        print(f"  Future parts time: {sum(self.parts_list[i].duration_seconds for i in range(self.current_part_index + 1, len(self.parts_list))):.0f}s")
+        print(f"  Transitions remaining: {remaining_transitions}")
+        print(f"  Total remaining: {remaining_time:.0f}s ({remaining_time/60:.1f}m)")
+        print(f"  Predicted end: {self._predicted_end_time.strftime('%H:%M:%S')}")
+        print(f"  Original end: {self._original_end_time.strftime('%H:%M:%S') if self._original_end_time else 'N/A'}")
+        
+        # SAFETY CHECK: This should never happen now
+        if self._predicted_end_time < now:
+            print(f"[ERROR] Predicted end time is in the past! This should not happen.")
+            print(f"  Predicted: {self._predicted_end_time}")
+            print(f"  Current: {now}")
+    
+    def _calculate_planned_elapsed_time(self) -> float:
+        """Calculate how much time should have elapsed based on current part position"""
+        if self.current_part_index < 0:
+            return 0.0
+        
+        planned_elapsed = 0.0
+        
+        # Add duration of all completed parts
+        for i in range(self.current_part_index):
+            if i < len(self.parts_list):
+                planned_elapsed += self.parts_list[i].duration_seconds
+        
+        # Add transitions that should have occurred
+        completed_transitions = self._get_completed_transitions_count()
+        planned_elapsed += completed_transitions * 60
+        
+        # Add elapsed time of current part
+        if self.current_part_index < len(self.parts_list):
+            current_part = self.parts_list[self.current_part_index]
+            
+            if self.timer.state == TimerState.OVERTIME:
+                # If in overtime, we've used the full planned duration plus overtime
+                planned_elapsed += current_part.duration_seconds
+                # Note: overtime is handled by the drift calculation
+            elif self.timer.state in [TimerState.RUNNING, TimerState.PAUSED]:
+                # Add the elapsed portion of current part
+                current_part_elapsed = current_part.duration_seconds - self.timer.remaining_seconds
+                planned_elapsed += max(0, current_part_elapsed)
+        
+        return planned_elapsed
+    
+    def _calculate_remaining_planned_time(self) -> float:
+        """Calculate remaining planned time from current position"""
+        if self.current_part_index < 0:
+            return sum(part.duration_seconds for part in self.parts_list)
+        
+        remaining_time = 0.0
+        
+        # Add remaining time from current part
+        if (self.current_part_index < len(self.parts_list) and 
+            self.timer.state in [TimerState.RUNNING, TimerState.PAUSED]):
+            remaining_time += max(0, self.timer.remaining_seconds)
+        
+        # Add duration of future parts
+        for i in range(self.current_part_index + 1, len(self.parts_list)):
+            remaining_time += self.parts_list[i].duration_seconds
+        
+        # Add remaining transitions
+        remaining_transitions = self._calculate_remaining_transitions()
+        remaining_time += remaining_transitions * 60
+        
+        return remaining_time
+    
+    def _get_total_transitions_count(self) -> int:
+        """Get total number of transitions in the meeting"""
+        if not self.current_meeting:
+            return 0
+        
+        if self.current_meeting.meeting_type == MeetingType.WEEKEND:
+            return min(1, len(self.current_meeting.sections) - 1)  # Max 1 for weekend
+        else:
+            return max(0, len(self.current_meeting.sections) - 1)  # Between sections for midweek
+    
+    def _calculate_remaining_transitions(self) -> int:
+        """Calculate how many chairman transitions are left"""
+        if not self.current_meeting or self.current_part_index < 0:
+            return 0
+        
+        remaining_transitions = 0
+        current_section_index = -1
+        
+        # Find which section we're currently in
+        part_count = 0
+        for section_index, section in enumerate(self.current_meeting.sections):
+            for part in section.parts:
+                if part_count == self.current_part_index:
+                    current_section_index = section_index
+                    break
+                part_count += 1
+            if current_section_index != -1:
+                break
+        
+        if current_section_index != -1:
+            # Count transitions from current section to end
+            if self.current_meeting.meeting_type == MeetingType.WEEKEND:
+                # Weekend meetings have fewer transitions
+                remaining_sections = len(self.current_meeting.sections) - current_section_index - 1
+                remaining_transitions = min(remaining_sections, 1)  # Max 1 transition for weekend
+            else:
+                # Midweek meetings have transitions between sections
+                remaining_sections = len(self.current_meeting.sections) - current_section_index - 1
+                remaining_transitions = remaining_sections
+        
+        return remaining_transitions
     
     def _should_add_chairman_transition(self):
         """Check if we should add a chairman transition between parts"""
@@ -473,6 +592,9 @@ class TimerController(QObject):
     
     def _handle_time_update(self, seconds: int):
         """Handle timer time updates to track meeting progress"""
+        # Update predicted end time on every timer update for real-time accuracy
+        self._update_predicted_end_time()
+        
         # Check if we're in overtime
         if self.timer.state == TimerState.OVERTIME:
             # Use the exact value from the timer instead of incrementing
@@ -482,8 +604,6 @@ class TimerController(QObject):
             # Emit signal about total meeting overtime
             self.meeting_overtime.emit(self._total_overtime_seconds)
             
-            # Update predicted end time
-            self._update_predicted_end_time()
     def apply_current_part_update(self):
         """Apply updated duration to the currently running part without restarting timer"""
         if 0 <= self.current_part_index < len(self.parts_list):

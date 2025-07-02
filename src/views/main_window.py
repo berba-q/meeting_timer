@@ -631,10 +631,10 @@ class MainWindow(QMainWindow):
         
         # Update status bar
         if meeting.meeting_type == MeetingType.WEEKEND:
-            self.current_meeting_label.setText(f"Current Meeting: Public Talk and Watchtower Study ({meeting.date.strftime('%Y-%m-%d')})")
+            self.current_meeting_label.setText(f"{self.tr('Current Meeting: Public Talk and Watchtower Study')} ({self.tr(meeting.date.strftime('%Y-%m-%d'))})")
         else:
-            self.current_meeting_label.setText(f"Current Meeting: {meeting.title}")
-        
+            self.current_meeting_label.setText(f"{self.tr('Current Meeting:')} {self.tr(meeting.title)}")
+
         # Re‑enable countdown on the secondary display for the newly selected meeting
         if self.secondary_display:
             self.secondary_display.show_countdown = True
@@ -717,9 +717,9 @@ class MainWindow(QMainWindow):
             seen_meeting_types.add(meeting_type)
             date_str = meeting.date.strftime("%Y-%m-%d")
             if meeting_type == MeetingType.WEEKEND:
-                display_title = f"Public Talk and Watchtower Study ({date_str})"
+                display_title = f"{self.tr('Public Talk and Watchtower Study')} ({self.tr(date_str)})"
             else:
-                display_title = f"{meeting.title} ({date_str})"
+                display_title = f"{self.tr(meeting.title)} ({self.tr(date_str)})"
             self.meeting_selector.addItem(display_title, meeting)
         
         # Select the first item
@@ -1217,7 +1217,7 @@ class MainWindow(QMainWindow):
         self.meeting_selector.clear()
         
         if not meetings:
-            self.meeting_selector.addItem("No meetings available")
+            self.meeting_selector.addItem(self.tr("No meetings available"))
             return
         
         for meeting_type, meeting in meetings.items():
