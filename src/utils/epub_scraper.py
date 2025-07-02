@@ -1036,7 +1036,7 @@ class EPUBMeetingScraper:
         
         # 1. Opening Song and Prayer (GENERIC - no specific number)
         meeting_parts.append({
-            'title': "Opening Song and Prayer",
+            'title': "OPENING_SONG_PRAYER",
             'duration_minutes': 3,
             'type': 'song_prayer',
             'section': 'public_talk'
@@ -1054,14 +1054,14 @@ class EPUBMeetingScraper:
         watchtower_song = songs[0] if songs else None
         if watchtower_song:
             meeting_parts.append({
-                'title': f"Song {watchtower_song}",
+                'title': f"MIDDLE_SONG {watchtower_song}",
                 'duration_minutes': 3,
                 'type': 'song',
                 'section': 'watchtower'
             })
         else:
             meeting_parts.append({
-                'title': "Song",
+                'title': "MIDDLE_SONG",
                 'duration_minutes': 3,
                 'type': 'song',
                 'section': 'watchtower'
@@ -1079,14 +1079,14 @@ class EPUBMeetingScraper:
         closing_song = songs[1] if len(songs) > 1 else watchtower_song
         if closing_song:
             meeting_parts.append({
-                'title': f"Song {closing_song} and Prayer",
+                'title': f"CLOSING_SONG_PRAYER |{closing_song}",
                 'duration_minutes': 3,
                 'type': 'song_prayer',
                 'section': 'watchtower'
             })
         else:
             meeting_parts.append({
-                'title': "Closing Song and Prayer",
+                'title': "CLOSING_SONG_PRAYER",
                 'duration_minutes': 3,
                 'type': 'song_prayer',
                 'section': 'watchtower'
