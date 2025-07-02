@@ -617,7 +617,7 @@ class EPUBMeetingScraper:
                     continue
                 match = re.search(r'(\d{1,2})\s*(?:[.–\-–]|bis)?\s*(\d{1,2})[.,]?\s*(\w+)?', date_text, re.IGNORECASE)
                 if match:
-                    print(f"[{self.language}] TOC entry: '{date_text}' → {href}")
+                    print(f"[{self.language}] TOC entry: '{date_text}'  {href}")
         # (Original full-body soup scanning logic removed as requested)
         # --- Begin: Populate meetings dict with parsed meeting parts
         from bs4 import BeautifulSoup
