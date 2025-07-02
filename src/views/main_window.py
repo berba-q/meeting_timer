@@ -631,10 +631,10 @@ class MainWindow(QMainWindow):
         
         # Update status bar
         if meeting.meeting_type == MeetingType.WEEKEND:
-            self.current_meeting_label.setText(f"Current Meeting: Public Talk and Watchtower Study ({meeting.date.strftime('%Y-%m-%d')})")
+            self.current_meeting_label.setText(f"{self.tr('Current Meeting: Public Talk and Watchtower Study')} ({self.tr(meeting.date.strftime('%Y-%m-%d'))})")
         else:
-            self.current_meeting_label.setText(f"Current Meeting: {meeting.title}")
-        
+            self.current_meeting_label.setText(f"{self.tr('Current Meeting:')} {self.tr(meeting.title)}")
+
         # Re‑enable countdown on the secondary display for the newly selected meeting
         if self.secondary_display:
             self.secondary_display.show_countdown = True
