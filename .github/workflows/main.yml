@@ -236,7 +236,7 @@ jobs:
           pip install pyinstaller
 
       - name: Generate meeting cache
-        run: python -c "from src.utils.scraper import MeetingScraper; MeetingScraper().update_meetings()"
+        run: python -c "from src.utils.epub_scraper import EPUBMeetingScraper; EPUBMeetingScraper().update_meetings_cache()"
 
       - name: Copy cache for build
         run: |
