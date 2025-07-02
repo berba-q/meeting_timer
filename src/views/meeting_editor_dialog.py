@@ -40,18 +40,18 @@ class MeetingEditorDialog(QDialog):
     
     def _setup_ui(self):
         """Setup the UI components"""
-        self.setWindowTitle("Meeting Editor")
+        self.setWindowTitle(self.tr("Meeting Editor"))
         self.resize(800, 600)
         
         main_layout = QVBoxLayout(self)
         
         # Meeting details section
-        details_group = QGroupBox("Meeting Details")
+        details_group = QGroupBox(self.tr("Meeting Details"))
         details_layout = QFormLayout(details_group)
         
         # Title
         self.title_edit = QLineEdit()
-        details_layout.addRow("Title:", self.title_edit)
+        details_layout.addRow(self.tr("Title:"), self.title_edit)
         
         # Type
         self.type_combo = QComboBox()
@@ -66,31 +66,31 @@ class MeetingEditorDialog(QDialog):
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setDate(QDate.currentDate())
-        details_layout.addRow("Date:", self.date_edit)
+        details_layout.addRow(self.tr("Date:"), self.date_edit)
         
         # Time
         self.time_edit = QTimeEdit()
         self.time_edit.setDisplayFormat("hh:mm AP")
         self.time_edit.setTime(QTime(19, 0))  # Default to 7:00 PM
-        details_layout.addRow("Time:", self.time_edit)
-        
+        details_layout.addRow(self.tr("Time:"), self.time_edit)
+
         # Templates
         template_layout = QHBoxLayout()
         self.template_combo = QComboBox()
         self._populate_template_combo()
         template_layout.addWidget(self.template_combo, 2)
-        
-        self.load_template_btn = QPushButton("Load Template")
+
+        self.load_template_btn = QPushButton(self.tr("Load Template"))
         self.load_template_btn.clicked.connect(self._load_template)
         template_layout.addWidget(self.load_template_btn, 1)
-        
-        details_layout.addRow("Template:", template_layout)
-        
+
+        details_layout.addRow(self.tr("Template:"), template_layout)
+
         # Add details group to main layout
         main_layout.addWidget(details_group)
         
         # Meeting structure section
-        structure_group = QGroupBox("Meeting Structure")
+        structure_group = QGroupBox(self.tr("Meeting Structure"))
         structure_layout = QVBoxLayout(structure_group)
         
         # Split view with sections list on left, parts on right
@@ -98,7 +98,7 @@ class MeetingEditorDialog(QDialog):
         
         # Sections list (left side)
         sections_layout = QVBoxLayout()
-        sections_label = QLabel("Sections:")
+        sections_label = QLabel(self.tr("Sections:"))
         sections_layout.addWidget(sections_label)
         
         self.sections_list = QListWidget()
@@ -108,15 +108,15 @@ class MeetingEditorDialog(QDialog):
         
         # Section buttons
         section_buttons_layout = QHBoxLayout()
-        self.add_section_btn = QPushButton("Add Section")
+        self.add_section_btn = QPushButton(self.tr("Add Section"))
         self.add_section_btn.clicked.connect(self._add_section)
         section_buttons_layout.addWidget(self.add_section_btn)
         
-        self.edit_section_btn = QPushButton("Edit")
+        self.edit_section_btn = QPushButton(self.tr("Edit"))
         self.edit_section_btn.clicked.connect(self._edit_section)
         section_buttons_layout.addWidget(self.edit_section_btn)
-        
-        self.remove_section_btn = QPushButton("Remove")
+
+        self.remove_section_btn = QPushButton(self.tr("Remove"))
         self.remove_section_btn.clicked.connect(self._remove_section)
         section_buttons_layout.addWidget(self.remove_section_btn)
         
@@ -125,12 +125,12 @@ class MeetingEditorDialog(QDialog):
         
         # Parts table (right side)
         parts_layout = QVBoxLayout()
-        
-        self.current_section_label = QLabel("No section selected")
+
+        self.current_section_label = QLabel(self.tr("No section selected"))
         parts_layout.addWidget(self.current_section_label)
         
         self.parts_table = QTableWidget(0, 3)  # 0 rows, 3 columns (Title, Duration, Presenter)
-        self.parts_table.setHorizontalHeaderLabels(["Title", "Minutes", "Presenter"])
+        self.parts_table.setHorizontalHeaderLabels([self.tr("Title"), self.tr("Minutes"), self.tr("Presenter")])
         self.parts_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.parts_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.parts_table.setColumnWidth(1, 80)
@@ -143,15 +143,15 @@ class MeetingEditorDialog(QDialog):
         
         # Part buttons
         part_buttons_layout = QHBoxLayout()
-        self.add_part_btn = QPushButton("Add Part")
+        self.add_part_btn = QPushButton(self.tr("Add Part"))
         self.add_part_btn.clicked.connect(self._add_part)
         part_buttons_layout.addWidget(self.add_part_btn)
-        
-        self.edit_part_btn = QPushButton("Edit Part")
+
+        self.edit_part_btn = QPushButton(self.tr("Edit Part"))
         self.edit_part_btn.clicked.connect(self._edit_part)
         part_buttons_layout.addWidget(self.edit_part_btn)
-        
-        self.remove_part_btn = QPushButton("Remove Part")
+
+        self.remove_part_btn = QPushButton(self.tr("Remove Part"))
         self.remove_part_btn.clicked.connect(self._remove_part)
         part_buttons_layout.addWidget(self.remove_part_btn)
         
@@ -170,7 +170,7 @@ class MeetingEditorDialog(QDialog):
         button_box.rejected.connect(self.reject)
         
         # Add save as template button
-        self.save_template_btn = QPushButton("Save as Template")
+        self.save_template_btn = QPushButton(self.tr("Save as Template"))
         self.save_template_btn.clicked.connect(self._save_as_template)
         button_box.addButton(self.save_template_btn, QDialogButtonBox.ButtonRole.ActionRole)
         
@@ -184,17 +184,17 @@ class MeetingEditorDialog(QDialog):
         self.template_combo.clear()
         
         if self.type_combo.currentData() == MeetingType.MIDWEEK.value:
-            self.template_combo.addItem("Default Midweek Template", TemplateType.MIDWEEK.value)
+            self.template_combo.addItem(self.tr("Default Midweek Template"), TemplateType.MIDWEEK.value)
         elif self.type_combo.currentData() == MeetingType.WEEKEND.value:
-            self.template_combo.addItem("Default Weekend Template", TemplateType.WEEKEND.value)
+            self.template_combo.addItem(self.tr("Default Weekend Template"), TemplateType.WEEKEND.value)
         else:
-            self.template_combo.addItem("Default Custom Template", TemplateType.CUSTOM.value)
-        
+            self.template_combo.addItem(self.tr("Default Custom Template"), TemplateType.CUSTOM.value)
+
         # TODO: Add user-defined templates here
         
         # Add blank option
-        self.template_combo.addItem("Start Blank", "blank")
-    
+        self.template_combo.addItem(self.tr("Start Blank"), "blank")
+
     def _update_template_options(self):
         """Update template options when meeting type changes"""
         self._populate_template_combo()
@@ -207,7 +207,7 @@ class MeetingEditorDialog(QDialog):
             # Clear all sections and parts
             self.sections_list.clear()
             self.parts_table.setRowCount(0)
-            self.current_section_label.setText("No section selected")
+            self.current_section_label.setText(self.tr("No section selected"))
             return
         
         # Convert string to template type enum
@@ -246,7 +246,7 @@ class MeetingEditorDialog(QDialog):
         self.parts_table.clearSelection()
         
         if index < 0:
-            self.current_section_label.setText("No section selected")
+            self.current_section_label.setText(self.tr("No section selected"))
             self.parts_table.setRowCount(0)
             self._update_controls_state()
             return
@@ -254,8 +254,8 @@ class MeetingEditorDialog(QDialog):
         # Get selected section
         item = self.sections_list.item(index)
         section_title = item.text()
-        self.current_section_label.setText(f"Parts in section: {section_title}")
-        
+        self.current_section_label.setText(self.tr(f"Parts in section: {section_title}"))
+
         # Get parts for this section
         parts_data = item.data(Qt.ItemDataRole.UserRole)
         
@@ -292,7 +292,7 @@ class MeetingEditorDialog(QDialog):
     
     def _add_section(self):
         """Add a new section"""
-        section_title, ok = QInputDialog.getText(self, "Add Section", "Section Title:")
+        section_title, ok = QInputDialog.getText(self, self.tr("Add Section"), self.tr("Section Title:"))
         if ok and section_title:
             self._add_section_item(section_title)
             # Select the newly added section
@@ -306,8 +306,8 @@ class MeetingEditorDialog(QDialog):
         
         item = self.sections_list.item(current_row)
         old_title = item.text()
-        
-        new_title, ok = QInputDialog.getText(self, "Edit Section", "Section Title:", text=old_title)
+
+        new_title, ok = QInputDialog.getText(self, self.tr("Edit Section"), self.tr("Section Title:"), text=old_title)
         if ok and new_title:
             item.setText(new_title)
     
@@ -318,8 +318,8 @@ class MeetingEditorDialog(QDialog):
             return
         
         reply = QMessageBox.question(
-            self, "Confirm Removal", 
-            "Remove this section and all its parts?",
+            self, self.tr("Confirm Removal"),
+            self.tr("Remove this section and all its parts?"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
@@ -330,26 +330,26 @@ class MeetingEditorDialog(QDialog):
         """Add a new part to the current section"""
         current_row = self.sections_list.currentRow()
         if current_row < 0:
-            QMessageBox.warning(self, "No Section Selected", "Please select a section first.")
+            QMessageBox.warning(self, self.tr("No Section Selected"), self.tr("Please select a section first."))
             return
         
         # Simple dialog for part details
         dialog = QDialog(self)
-        dialog.setWindowTitle("Add Part")
+        dialog.setWindowTitle(self.tr("Add Part"))
         dialog_layout = QFormLayout(dialog)
         
         title_edit = QLineEdit()
-        dialog_layout.addRow("Title:", title_edit)
-        
+        dialog_layout.addRow(self.tr("Title:"), title_edit)
+
         duration_spin = QSpinBox()
         duration_spin.setMinimum(1)
         duration_spin.setMaximum(120)
         duration_spin.setValue(5)
-        dialog_layout.addRow("Duration (minutes):", duration_spin)
+        dialog_layout.addRow(self.tr("Duration (minutes):"), duration_spin)
         
         presenter_edit = QLineEdit()
-        dialog_layout.addRow("Presenter:", presenter_edit)
-        
+        dialog_layout.addRow(self.tr("Presenter:"), presenter_edit)
+
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | 
             QDialogButtonBox.StandardButton.Cancel
@@ -404,12 +404,12 @@ class MeetingEditorDialog(QDialog):
         
         # Simple dialog for part details
         dialog = QDialog(self)
-        dialog.setWindowTitle("Edit Part")
+        dialog.setWindowTitle(self.tr("Edit Part"))
         dialog_layout = QFormLayout(dialog)
         
         title_edit = QLineEdit(title_item.text())
-        dialog_layout.addRow("Title:", title_edit)
-        
+        dialog_layout.addRow(self.tr("Title:"), title_edit)
+
         duration_spin = QSpinBox()
         duration_spin.setMinimum(1)
         duration_spin.setMaximum(120)
@@ -417,11 +417,11 @@ class MeetingEditorDialog(QDialog):
             duration_spin.setValue(int(duration_item.text()))
         except (ValueError, TypeError):
             duration_spin.setValue(5)
-        dialog_layout.addRow("Duration (minutes):", duration_spin)
-        
+        dialog_layout.addRow(self.tr("Duration (minutes):"), duration_spin)
+
         presenter_edit = QLineEdit(presenter_item.text() if presenter_item else "")
-        dialog_layout.addRow("Presenter:", presenter_edit)
-        
+        dialog_layout.addRow(self.tr("Presenter:"), presenter_edit)
+
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | 
             QDialogButtonBox.StandardButton.Cancel
@@ -456,8 +456,8 @@ class MeetingEditorDialog(QDialog):
         selected_row = selected_items[0].row()
         
         reply = QMessageBox.question(
-            self, "Confirm Removal", 
-            "Remove this part?",
+            self, self.tr("Confirm Removal"),
+            self.tr("Remove this part?"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
@@ -475,21 +475,21 @@ class MeetingEditorDialog(QDialog):
         
         # Create context menu
         menu = QMenu(self)
-        
-        edit_action = QAction("Edit Part", self)
+
+        edit_action = QAction(self.tr("Edit Part"), self)
         edit_action.triggered.connect(self._edit_part)
         menu.addAction(edit_action)
-        
-        remove_action = QAction("Remove Part", self)
+
+        remove_action = QAction(self.tr("Remove Part"), self)
         remove_action.triggered.connect(self._remove_part)
         menu.addAction(remove_action)
         
         # Add move up/down actions
-        move_up_action = QAction("Move Up", self)
+        move_up_action = QAction(self.tr("Move Up"), self)
         move_up_action.triggered.connect(self._move_part_up)
         menu.addAction(move_up_action)
-        
-        move_down_action = QAction("Move Down", self)
+
+        move_down_action = QAction(self.tr("Move Down"), self)
         move_down_action.triggered.connect(self._move_part_down)
         menu.addAction(move_down_action)
         
@@ -637,12 +637,12 @@ class MeetingEditorDialog(QDialog):
         success = self.template_manager.save_template(template_type, template_data)
         
         if success:
-            QMessageBox.information(self, "Template Saved", 
-                                   f"Template saved as {template_type.value} template.")
+            QMessageBox.information(self, self.tr("Template Saved"),
+                                   self.tr(f"Template saved as {template_type.value} template."))
         else:
-            QMessageBox.warning(self, "Save Failed", 
-                               "Failed to save template. Please check permissions.")
-    
+            QMessageBox.warning(self, self.tr("Save Failed"),
+                               self.tr("Failed to save template. Please check permissions."))
+
     def _update_controls_state(self):
         """Update enabled/disabled state of controls"""
         has_section = self.sections_list.currentRow() >= 0
@@ -775,11 +775,11 @@ class MeetingEditorDialog(QDialog):
     def accept(self):
         """Handle dialog acceptance"""
         if not self.title_edit.text():
-            QMessageBox.warning(self, "Missing Data", "Please enter a meeting title.")
+            QMessageBox.warning(self, self.tr("Missing Data"), self.tr("Please enter a meeting title."))
             return
         
         if self.sections_list.count() == 0:
-            QMessageBox.warning(self, "Missing Data", "Please add at least one section.")
+            QMessageBox.warning(self, self.tr("Missing Data"), self.tr("Please add at least one section."))
             return
         
         # Check if any section has no parts
@@ -788,8 +788,8 @@ class MeetingEditorDialog(QDialog):
             parts_data = item.data(Qt.ItemDataRole.UserRole)
             if not parts_data:
                 QMessageBox.warning(
-                    self, "Missing Data", 
-                    f"Section '{item.text()}' has no parts. Please add at least one part."
+                    self, self.tr("Missing Data"),
+                    self.tr(f"Section '{item.text()}' has no parts. Please add at least one part.")
                 )
                 return
         
