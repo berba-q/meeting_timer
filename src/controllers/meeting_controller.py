@@ -141,7 +141,7 @@ class MeetingController(QObject):
                 "opening_comments": "开场白",
                 "concluding_comments": "结束语"
             }
-            # Add more languages here!
+            # Add more languages as needed
         }  
         return translations.get(language, translations["en"])  # Fallback to English
     
