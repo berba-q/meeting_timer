@@ -1,6 +1,6 @@
 # Changelog
 
-# [](https://github.com/berba-q/meeting_timer/compare/v1.0.4...v) (2025-06-23)
+# [](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v) (2025-07-02)
 
 
 ### Bug Fixes
@@ -11,10 +11,13 @@
 * correct download URLs in version.json to include 'v' prefix for version ([041d3c8](https://github.com/berba-q/meeting_timer/commit/041d3c8964cb23744c869f7f0cf171268d782d92))
 * correct signal disconnection for meeting countdown updates ([b090281](https://github.com/berba-q/meeting_timer/commit/b09028145adec2cf78a9ae0a3c242652752b8b6f))
 * correct update check URL ([69eeacc](https://github.com/berba-q/meeting_timer/commit/69eeacc9951af07be9a892c96c6ee88d8a158156))
+* correct variable reference for TAG_NAME in version.json generation ([09ef7bf](https://github.com/berba-q/meeting_timer/commit/09ef7bf31ffedddee45c353f9ab1f7fcdba83838))
 * enhance current time update handling and prevent recursion in timer updates ([c30116c](https://github.com/berba-q/meeting_timer/commit/c30116c13f1ca593ed48fb014ea00152203ace3f))
 * enhance settings signal handling for meeting and reminder updates ([e0f7ea4](https://github.com/berba-q/meeting_timer/commit/e0f7ea4aa0a604608c5e3d0bd439aa5c55ce26c5))
 * enhance timer state handling to reset reminders when stopped ([6a70b50](https://github.com/berba-q/meeting_timer/commit/6a70b5050a4a9921cf0fa033fa9fa8d50556ab58))
 * enhance update check with error handling and silent mode ([354ef77](https://github.com/berba-q/meeting_timer/commit/354ef77a0cd6eb2a5600d62a89fab886260ceeb7))
+* ensure meeting selection occurs before showing main window ([ab1789e](https://github.com/berba-q/meeting_timer/commit/ab1789e5b3381e8ca6c3b59b6c323f13ec589d94))
+* fix issue with locale parsing for weekend songs ([3eab2f2](https://github.com/berba-q/meeting_timer/commit/3eab2f2676e5d90a14a41df75768b6e78a17a1e0))
 * fixed a bug in chairman transition that prevented moving to the next part with the next button ([c7ab12a](https://github.com/berba-q/meeting_timer/commit/c7ab12ab3241e8ef3ef41680b25971e207a7acd3))
 * fixed a bug that caused automatic update checks to fail ([6476f25](https://github.com/berba-q/meeting_timer/commit/6476f2511a3f79325e08b00a40f06a62431672c4))
 * fixed the url ([5d46bc8](https://github.com/berba-q/meeting_timer/commit/5d46bc86374b688ea39a8dc67abc5abfe360ce96))
@@ -24,9 +27,11 @@
 * modify transition completion behavior to allow overtime instead of auto-advancing ([bd3c2a3](https://github.com/berba-q/meeting_timer/commit/bd3c2a362b3899207396b9f63019e317ac6a3eef))
 * prevent recursion during secondary screen configuration updates ([4866b64](https://github.com/berba-q/meeting_timer/commit/4866b64bc179810589d116ce7197daa6c9a3df18))
 * prevent recursion in settings and network display updates ([7dc4bed](https://github.com/berba-q/meeting_timer/commit/7dc4bed5f0e0eb7b9989badad4aac8860c148663))
+* remove debug print statement for network display startup ([5402d2e](https://github.com/berba-q/meeting_timer/commit/5402d2efeef6d02df31ab67431825ed975c26207))
 * replace hardcoded available languages with imported configuration ([d463d5e](https://github.com/berba-q/meeting_timer/commit/d463d5ed25329349960d126654678e6c038b2e8d))
 * silently check for updates after a short delay in the main window ([f542e49](https://github.com/berba-q/meeting_timer/commit/f542e4914aa951b333a3cf061f623ddde59e7455))
 * stop visual animations for buttons when stopping the meeting ([b06b568](https://github.com/berba-q/meeting_timer/commit/b06b5680ba04169b2ee30f1c140fcd25f51bb959))
+* update download URLs and release notes in version.json ([acaca24](https://github.com/berba-q/meeting_timer/commit/acaca24ac4c7926db0a9f011b44ea69a74fc53ec))
 * update font size and styling for timer display to enhance readability and prevent overflow ([fe0523e](https://github.com/berba-q/meeting_timer/commit/fe0523e49f7b8ed7af04396f3a8787a199192c33))
 * update PyInstaller commands to include translations data and adjust version handling in version.json ([d2ea3c4](https://github.com/berba-q/meeting_timer/commit/d2ea3c4dd41343412cf4aca5d86450af9c9cf770))
 * update settings handling to show or hide secondary display based on configuration ([369af8e](https://github.com/berba-q/meeting_timer/commit/369af8ef09895fab70f0023a897f370d7892cf7e))
@@ -40,18 +45,38 @@
 ### Features
 
 * add confirmation dialog for stopping a meeting ([e676fbb](https://github.com/berba-q/meeting_timer/commit/e676fbb0ff3c0124e95bfc0ce656d16259537bdf))
+* add custom translation overrides for multiple languages ([c23d94d](https://github.com/berba-q/meeting_timer/commit/c23d94d6d0eed33f8990b27f26ad4c17859798f0))
 * add language change handling to restart app with new language ([8bf192b](https://github.com/berba-q/meeting_timer/commit/8bf192b64203b83c12aeeec96ff919573545398c))
 * Add language support for italian, french, german and spanish ([2b40d3d](https://github.com/berba-q/meeting_timer/commit/2b40d3d6a29b2f937f2e694cafaf26cecac653b3))
 * add method to clear countdown message in central widget ([c3dc638](https://github.com/berba-q/meeting_timer/commit/c3dc638666a433d360392700a8fb5a9b8d0ebd4e))
 * add reminder functionality for meeting start and next part with user-configurable settings ([1bb1c9f](https://github.com/berba-q/meeting_timer/commit/1bb1c9fdcad4de4f4c808b96622993a38ecde578))
 * add translation loading and fallback mechanism ([f3767b3](https://github.com/berba-q/meeting_timer/commit/f3767b337a8d28948986cb8b32e22fa6d4fb6368))
 * Add translation support for network status widget UI elements ([f3c3a59](https://github.com/berba-q/meeting_timer/commit/f3c3a59c6f6dab42d45f1e1520a9695cfc6d55af))
+* add translation support for splash screen messages ([f09f6c5](https://github.com/berba-q/meeting_timer/commit/f09f6c58c8e0bcfd634b588db5c8dfc81a7115f1))
+* enhance countdown message for upcoming meetings in network display ([47e8264](https://github.com/berba-q/meeting_timer/commit/47e82649ac5c019457a5912f3be354e0caa019d3))
+* enhance countdown message localization for meeting start notifications ([e2b2510](https://github.com/berba-q/meeting_timer/commit/e2b2510c455de039ffda11b571200bc5d1cc1352))
+* enhance date parsing with locale support and improved fallback methods ([1f0cb8f](https://github.com/berba-q/meeting_timer/commit/1f0cb8f4e310e025cc817026c0b88dcc972eaa89))
+* enhance localization for "No meetings available" message in meeting selector ([f484ec5](https://github.com/berba-q/meeting_timer/commit/f484ec5d084dcfa1aa94274423647b44cdd88118))
+* enhance localization for current meeting display in main window ([007708f](https://github.com/berba-q/meeting_timer/commit/007708fbb64c65394b941f2ac6ec8fd5f255de89))
+* enhance localization for meeting starting soon message ([1155b91](https://github.com/berba-q/meeting_timer/commit/1155b91234e19e3af13dcf0608b90d3281e23153))
+* enhance localization for meeting type display titles ([6840cdd](https://github.com/berba-q/meeting_timer/commit/6840cdd5321ea5e01fe4114688927671d29e3130))
+* enhance localization for secondary display ([7dce535](https://github.com/berba-q/meeting_timer/commit/7dce535fe4b5fd22954c1ddcbfb166c90744e017))
+* enhance localization for settings dialog and related components ([8e9847a](https://github.com/berba-q/meeting_timer/commit/8e9847a3c4e8b4f5e9a1dd94b955cb83276ecd18))
+* enhance localization for weekend song editor dialog and descriptions ([ca84059](https://github.com/berba-q/meeting_timer/commit/ca840596cce71c205c58e31bf63ef08d6c08f19c))
+* enhance localization in part editing and meeting management ([113c7df](https://github.com/berba-q/meeting_timer/commit/113c7df85b121a55b6ae20d75311b0a8c32118dd))
 * enhance reminder functionality with improved timer management and visual cues ([c961457](https://github.com/berba-q/meeting_timer/commit/c9614575c68f167a27381962b6e86b4b1f9fc386))
 * Enhance system tray notifications and improve icon handling ([3dc4e12](https://github.com/berba-q/meeting_timer/commit/3dc4e1224e2fe883dea5ebae683dc118d97b56d0))
 * enhance timer controls with pause state management and visual feedback ([9e4b06e](https://github.com/berba-q/meeting_timer/commit/9e4b06e614348733920f23b2bd2bd0ff1d0c812d))
+* enhance UI localization for meeting editor dialog ([0a35159](https://github.com/berba-q/meeting_timer/commit/0a35159856c88875efd0d0f1eaaf82821d90c2bb))
+* enhanced meeting scraping with even faster response times ([92a4868](https://github.com/berba-q/meeting_timer/commit/92a486848adc3b3708a35f7a8970170bb0dc379a))
+* implement localization for meeting parts ([4d41a05](https://github.com/berba-q/meeting_timer/commit/4d41a056f5f11e02a51d0d1b64d3c7114e0429a9))
 * implement translation loading functionality ([5479d92](https://github.com/berba-q/meeting_timer/commit/5479d92e2215c450165c6f0623946608bba199e3))
+* improve predicted end time calculation with real-time updates and safety checks ([5769957](https://github.com/berba-q/meeting_timer/commit/57699573c6f57285f47312cae86d193fda5ba91b))
 * update central widget  to display current and next parts, clear countdown messages after meeting starts/ends ([ab42eb5](https://github.com/berba-q/meeting_timer/commit/ab42eb5af68dc3f3c9ab3a2737e44c10678f27fa))
+* update localization for meeting controller ([402e4bf](https://github.com/berba-q/meeting_timer/commit/402e4bf64d9ecc4ec17e8412b34d86f70eab1858))
 * update meeting selector behavior with blur effect during meeting start ([e6c2b8a](https://github.com/berba-q/meeting_timer/commit/e6c2b8a54d0459ded22bcac799435e70c3eec4eb))
+* update overtime color coding for timer display ([c07cfe9](https://github.com/berba-q/meeting_timer/commit/c07cfe902f7970c7e44c2666dc90fce3714b58d2))
+* version1.0 of scraper using api and scraping from epubs instead of wol.jw.org ([c394604](https://github.com/berba-q/meeting_timer/commit/c394604622f7345263f6b4ee252170683d3bc004))
 
 
 
