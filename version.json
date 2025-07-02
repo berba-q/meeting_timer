@@ -1,16 +1,16 @@
 {
-  "version": "1.0.4.1",
-  "releaseDate": "2025-06-23",
+  "version": "1.0.5",
+  "releaseDate": "2025-07-02",
   "downloadUrl": {
-    "windows": "https://github.com/berba-q/meeting_timer/releases/download/v1.0.4.1/OnTimeMeetingTimer-1.0.4.1-setup.exe",
-    "macos": "https://github.com/berba-q/meeting_timer/releases/download/v1.0.4.1/OnTimeMeetingTimer-1.0.4.1.dmg",
-    "linux": "https://github.com/berba-q/meeting_timer/releases/download/v1.0.4.1/OnTimeMeetingTimer-1.0.4.1.AppImage"
+    "windows": "https://github.com/berba-q/meeting_timer/releases/download/v1.0.5/OnTimeMeetingTimer-1.0.5-setup.exe",
+    "macos": "https://github.com/berba-q/meeting_timer/releases/download/v1.0.5/OnTimeMeetingTimer-1.0.5.dmg",
+    "linux": "https://github.com/berba-q/meeting_timer/releases/download/v1.0.5/OnTimeMeetingTimer-1.0.5.AppImage"
   },
-  "releaseNotes": "See GitHub Release for complete notes at: https://github.com/berba-q/meeting_timer/releases/tag/v1.0.4.1",
-  "releaseNotesUrl": "https://github.com/berba-q/meeting_timer/releases/tag/v1.0.4.1",
+  "releaseNotes": "See GitHub Release for complete notes at: https://github.com/berba-q/meeting_timer/releases/tag/v1.0.5",
+  "releaseNotesUrl": "https://github.com/berba-q/meeting_timer/releases/tag/v1.0.5",
   "sha256": {
-    "windows": "b2edfd1dd6714593888b0bf44cf5db2df71581a289b4090e841146f77ef23969",
-    "macos": "aaa90bd6192be139ae112b683bbfb5f924071e22da53a94f6997325139c8215d",
-    "linux": "f5d18ec985c3f161c101f6cb56938b64415c5d9c78257fc7c38980465283cb2d"
+    "windows": "b5a142ed9e1a02191f6b462e4bd3a702880d606eaaa400ff7b06723ae92798d6",
+    "macos": "79f2c95dd87705675df07df363626926516233e449473d3066bcef94ab05c352",
+    "linux": "fbb2d0ef037f85bd800e48880c68f1d310a94a2f33e8bae41032f89c2ba8ea27"
   }
 }
