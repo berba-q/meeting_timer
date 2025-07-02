@@ -1217,7 +1217,7 @@ class MainWindow(QMainWindow):
         self.meeting_selector.clear()
         
         if not meetings:
-            self.meeting_selector.addItem("No meetings available")
+            self.meeting_selector.addItem(self.tr("No meetings available"))
             return
         
         for meeting_type, meeting in meetings.items():
