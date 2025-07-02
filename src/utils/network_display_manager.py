@@ -287,7 +287,7 @@ class NetworkDisplayManager(QObject):
 
             # Prevent double start
             if self.broadcaster.is_broadcasting:
-                print("[DEBUG] Network display already running. Skipping startup.")
+                
                 return True
 
             # Start services based on mode
