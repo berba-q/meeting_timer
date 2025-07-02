@@ -168,12 +168,12 @@ class TimerController(QObject):
             minutes = (seconds_remaining % 3600) // 60
             seconds = seconds_remaining % 60
             if hours > 0:
-                countdown_msg = f"Meeting starts in {hours}h {minutes}m {seconds}s"
+                countdown_msg = f"{self.tr('Meeting starts in')} {hours}h {minutes}m"
             else:
-                countdown_msg = f"Meeting starts in {minutes}m {seconds}s"
+                countdown_msg = f"{self.tr('Meeting starts in')} {minutes}m"
             self.meeting_countdown_updated.emit(seconds_remaining, countdown_msg)
         else:
-            countdown_msg = "Meeting starts now!"
+            countdown_msg = self.tr("Meeting starts now!")
             self.meeting_countdown_updated.emit(0, countdown_msg)
             self._countdown_timer.stop()
     
