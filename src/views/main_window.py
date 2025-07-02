@@ -717,9 +717,9 @@ class MainWindow(QMainWindow):
             seen_meeting_types.add(meeting_type)
             date_str = meeting.date.strftime("%Y-%m-%d")
             if meeting_type == MeetingType.WEEKEND:
-                display_title = f"Public Talk and Watchtower Study ({date_str})"
+                display_title = f"{self.tr('Public Talk and Watchtower Study')} ({self.tr(date_str)})"
             else:
-                display_title = f"{meeting.title} ({date_str})"
+                display_title = f"{self.tr(meeting.title)} ({self.tr(date_str)})"
             self.meeting_selector.addItem(display_title, meeting)
         
         # Select the first item
