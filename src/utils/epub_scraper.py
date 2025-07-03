@@ -166,17 +166,46 @@ class EPUBMeetingScraper:
         return mwb_issue, w_issue
 
     def _get_relevant_watchtower_issues(self) -> List[str]:
-        """Return a list of Watchtower issues to try, starting with the oldest potentially relevant one"""
+        """Get Watchtower issue based on 5-week study periods, 2-month lead time"""
         today = datetime.now()
+        
+        # Each WT covers ~5 weeks, published exactly 2 months before study period
+        # So we need to go back 2 months from current date
+        
+        target_month = today.month - 2
+        target_year = today.year
+        
+        # Handle year rollover
+        if target_month <= 0:
+            target_month += 12
+            target_year -= 1
+        
+        # The main candidate
+        primary_issue = f"{target_year}{target_month:02d}"
+        
+        # Add adjacent months as backup (for week boundaries)
         candidates = []
-
-        # Go back 2 months to capture future-planned studies
-        for offset in range(2, -1, -1):  # e.g., [2, 1, 0]
-            issue_date = today - timedelta(days=30 * offset)
-            issue_code = f"{issue_date.year}{issue_date.month:02d}"
+        for offset in [-1, 0, 1]:
+            candidate_month = target_month + offset
+            candidate_year = target_year
+            
+            if candidate_month <= 0:
+                candidate_month += 12
+                candidate_year -= 1
+            elif candidate_month > 12:
+                candidate_month -= 12
+                candidate_year += 1
+                
+            issue_code = f"{candidate_year}{candidate_month:02d}"
             candidates.append(issue_code)
-
-        print(f"[{self.language}] Trying Watchtower issues: {candidates}")
+        
+        # Remove duplicates and sort, with primary issue first
+        candidates = sorted(list(set(candidates)))
+        if primary_issue in candidates:
+            candidates.remove(primary_issue)
+            candidates.insert(0, primary_issue)
+        
+        print(f"[{self.language}] For {today.strftime('%B %d')}, trying Watchtower issues: {candidates}")
         return candidates
     
     def _download_epub(self, publication: str, issue: str) -> Optional[Path]:
@@ -1273,7 +1302,8 @@ class EPUBMeetingScraper:
     def update_meetings_cache(self) -> bool:
         """Update the meetings cache with latest EPUB content"""
         print(f"[{self.language}] Updating meetings cache...")
-
+        today = datetime.now()
+        
         # Get current issue dates
         mwb_issue, _ = self._get_current_issue_dates()
 
@@ -1302,9 +1332,28 @@ class EPUBMeetingScraper:
             print(f"[{self.language}] Attempting to download Watchtower EPUB for issue {w_candidate}...")
             temp_epub = self._download_epub('w', w_candidate)
             if temp_epub:
-                w_epub = temp_epub
-                w_issue_selected = w_candidate
-                break
+                # Parse the content to check if it has studies for our target date
+                w_content = self._parse_epub_content(temp_epub)
+                weekend_meetings = self._extract_weekend_meetings(w_content)
+                
+                # Check if this Watchtower contains studies for our target date
+                contains_current_studies = False
+                for meeting_date_str in weekend_meetings.keys():
+                    meeting_date = datetime.strptime(meeting_date_str, '%Y-%m-%d')
+                    week_start = meeting_date - timedelta(days=6)  # Sunday is end of week
+                    week_end = meeting_date
+                    
+                    if week_start <= today <= week_end:
+                        contains_current_studies = True
+                        break
+                
+                if contains_current_studies:
+                    print(f"[{self.language}] Found relevant studies in {w_candidate}")
+                    w_epub = temp_epub
+                    w_issue_selected = w_candidate
+                    break
+                else:
+                    print(f"[{self.language}] No relevant studies in {w_candidate}, trying next...")
 
         if 'weekend' not in meetings_data:
             meetings_data['weekend'] = {}
