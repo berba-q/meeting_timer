@@ -63,24 +63,51 @@ class MeetingController(QObject):
             for part in section.parts:
                 title = part.title
                 
-                # Replace patterns with localized text
-                if title.startswith("OPENING_SONG_PRAYER|"):
-                    song_num = title.split("|")[1]
-                    part.title = f"{translations['song']} {song_num} {translations['and_prayer']}"
-                    
+                # Handle opening song and prayer
+                if title.startswith("OPENING_SONG_PRAYER"):
+                    if "|" in title:
+                        # Format: "OPENING_SONG_PRAYER|99"
+                        song_num = title.split("|")[1]
+                        part.title = f"{translations['song']} {song_num} {translations['and_prayer']}"
+                    else:
+                        # Format: "OPENING_SONG_PRAYER" (no song number)
+                        part.title = f"{translations['opening_song_prayer']}"
+                
+                # Handle middle song
+                elif title.startswith("MIDDLE_SONG"):
+                    if "|" in title:
+                        # Format: "MIDDLE_SONG|99"
+                        song_num = title.split("|")[1]
+                        part.title = f"{translations['song']} {song_num}"
+                    else:
+                        # Format: "MIDDLE_SONG 99" or "MIDDLE_SONG"
+                        song_match = re.search(r'MIDDLE_SONG\s+(\d+)', title)
+                        if song_match:
+                            song_num = song_match.group(1)
+                            part.title = f"{translations['song']} {song_num}"
+                        else:
+                            part.title = translations['song']
+                
+                # Handle closing song and prayer
+                elif title.startswith("CLOSING_SONG_PRAYER"):
+                    if "|" in title:
+                        # Format: "CLOSING_SONG_PRAYER|100"
+                        song_num = title.split("|")[1]
+                        part.title = f"{translations['song']} {song_num} {translations['and_prayer']}"
+                    else:
+                        # Format: "CLOSING_SONG_PRAYER [100" or just "CLOSING_SONG_PRAYER"
+                        song_match = re.search(r'CLOSING_SONG_PRAYER\s*\[?(\d+)', title)
+                        if song_match:
+                            song_num = song_match.group(1)
+                            part.title = f"{translations['song']} {song_num} {translations['and_prayer']}"
+                        else:
+                            part.title = f"{translations['closing_song_prayer']}"
+                
+                # Handle comments
                 elif title == "OPENING_COMMENTS":
                     part.title = translations['opening_comments']
-                    
-                elif title.startswith("MIDDLE_SONG|"):
-                    song_num = title.split("|")[1]
-                    part.title = f"{translations['song']} {song_num}"
-                    
                 elif title == "CONCLUDING_COMMENTS":
                     part.title = translations['concluding_comments']
-                    
-                elif title.startswith("CLOSING_SONG_PRAYER|"):
-                    song_num = title.split("|")[1]
-                    part.title = f"{translations['song']} {song_num} {translations['and_prayer']}"
         
         return meeting
 
@@ -91,58 +118,76 @@ class MeetingController(QObject):
                 "song": "Song",
                 "and_prayer": "and Prayer",
                 "opening_comments": "Opening Comments",
-                "concluding_comments": "Concluding Comments"
+                "concluding_comments": "Concluding Comments",
+                "opening_song_prayer": "Opening Song and Prayer",
+                "closing_song_prayer": "Closing Song and Prayer"
             },
             "it": {
                 "song": "Cantico",
                 "and_prayer": "e preghiera",
                 "opening_comments": "Commenti introduttivi",
-                "concluding_comments": "Commenti conclusivi"
+                "concluding_comments": "Commenti conclusivi",
+                "opening_song_prayer": "Cantico iniziale e preghiera",
+                "closing_song_prayer": "Cantico finale e preghiera"
             },
             "fr": {
                 "song": "Cantique",
                 "and_prayer": "et prière",
                 "opening_comments": "Paroles d'introduction",
-                "concluding_comments": "Commentaires de conclusion"
+                "concluding_comments": "Commentaires de conclusion",
+                "opening_song_prayer": "Cantique d'ouverture et prière",
+                "closing_song_prayer": "Cantique de clôture et prière"
             },
             "es": {
                 "song": "Canción",
                 "and_prayer": "y oración",
                 "opening_comments": "Palabras de introducción",
-                "concluding_comments": "Comentarios finales"
+                "concluding_comments": "Comentarios finales",
+                "opening_song_prayer": "Canción inicial y oración",
+                "closing_song_prayer": "Canción final y oración"
             },
             "de": {
                 "song": "Lied",
                 "and_prayer": "und Gebet",
                 "opening_comments": "Einleitende Worte",
-                "concluding_comments": "Schlussworte"
+                "concluding_comments": "Schlussworte",
+                "opening_song_prayer": "Eingangslied und Gebet",
+                "closing_song_prayer": "Schlusslied und Gebet"
             },
             "pt": {
                 "song": "Cântico",
                 "and_prayer": "e oração",
                 "opening_comments": "Comentários introdutórios",
-                "concluding_comments": "Comentários finais"
+                "concluding_comments": "Comentários finais",
+                "opening_song_prayer": "Cântico inicial e oração",
+                "closing_song_prayer": "Cântico final e oração"
             },
             "ja": {
                 "song": "歌",
                 "and_prayer": "と祈り",
                 "opening_comments": "開会の言葉",
-                "concluding_comments": "結びの言葉"
+                "concluding_comments": "結びの言葉",
+                "opening_song_prayer": "開会の歌と祈り",
+                "closing_song_prayer": "閉会の歌と祈り"
             },
             "ko": {
                 "song": "노래",
                 "and_prayer": "및 기도",
                 "opening_comments": "개회사",
-                "concluding_comments": "폐회사"
+                "concluding_comments": "폐회사",
+                "opening_song_prayer": "개회 노래 및 기도",
+                "closing_song_prayer": "폐회 노래 및 기도"
             },
             "zh": {
                 "song": "歌曲",
                 "and_prayer": "和祈祷",
                 "opening_comments": "开场白",
-                "concluding_comments": "结束语"
+                "concluding_comments": "结束语",
+                "opening_song_prayer": "开场歌曲和祈祷",
+                "closing_song_prayer": "结束歌曲和祈祷"
             }
             # Add more languages as needed
-        }  
+        }
         return translations.get(language, translations["en"])  # Fallback to English
     
     def load_meetings(self):
