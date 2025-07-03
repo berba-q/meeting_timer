@@ -1,10 +1,10 @@
 # Changelog
 
-# [](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v) (2025-07-02)
+# [](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v) (2025-07-03)
 
 
 
-## [1.0.5](https://github.com/berba-q/meeting_timer/compare/v1.0.4...v1.0.5) (2025-07-02)
+## [1.0.5](https://github.com/berba-q/meeting_timer/compare/v1.0.4...v1.0.5) (2025-07-03)
 
 
 ### Bug Fixes
@@ -17,6 +17,7 @@
 * correct update check URL ([69eeacc](https://github.com/berba-q/meeting_timer/commit/69eeacc9951af07be9a892c96c6ee88d8a158156))
 * correct variable reference for TAG_NAME in version.json generation ([09ef7bf](https://github.com/berba-q/meeting_timer/commit/09ef7bf31ffedddee45c353f9ab1f7fcdba83838))
 * enhance current time update handling and prevent recursion in timer updates ([c30116c](https://github.com/berba-q/meeting_timer/commit/c30116c13f1ca593ed48fb014ea00152203ace3f))
+* enhance localization for meeting song titles and comments ([1510d48](https://github.com/berba-q/meeting_timer/commit/1510d4833f0c1c1035321846687ba31fb3870ae6))
 * enhance PyInstaller build commands to include additional dependencies ([55628b6](https://github.com/berba-q/meeting_timer/commit/55628b62f5716a01bb1e87d674281f7c658b80f3))
 * enhance settings signal handling for meeting and reminder updates ([e0f7ea4](https://github.com/berba-q/meeting_timer/commit/e0f7ea4aa0a604608c5e3d0bd439aa5c55ce26c5))
 * enhance timer state handling to reset reminders when stopped ([6a70b50](https://github.com/berba-q/meeting_timer/commit/6a70b5050a4a9921cf0fa033fa9fa8d50556ab58))
@@ -29,6 +30,7 @@
 * implement SSL context for secure URL requests in update checker ([8f3673a](https://github.com/berba-q/meeting_timer/commit/8f3673abc629b36f2e3c1bd53e0afaa36c57a547))
 * improve secondary display handling to update label and cleanup when disabled ([48b606b](https://github.com/berba-q/meeting_timer/commit/48b606b9fb9f072416bc62d04010d074f4e84a09))
 * improve text formatting stability and reduce flickering in secondary display ([32ae04d](https://github.com/berba-q/meeting_timer/commit/32ae04dce5ee191a44eaa59999890b7fde684150))
+* improve Watchtower issue retrieval logic for study periods ([50bbe59](https://github.com/berba-q/meeting_timer/commit/50bbe59020834ce25fd58c5746e52153c7f87b17))
 * modify transition completion behavior to allow overtime instead of auto-advancing ([bd3c2a3](https://github.com/berba-q/meeting_timer/commit/bd3c2a362b3899207396b9f63019e317ac6a3eef))
 * prevent recursion during secondary screen configuration updates ([4866b64](https://github.com/berba-q/meeting_timer/commit/4866b64bc179810589d116ce7197daa6c9a3df18))
 * prevent recursion in settings and network display updates ([7dc4bed](https://github.com/berba-q/meeting_timer/commit/7dc4bed5f0e0eb7b9989badad4aac8860c148663))
