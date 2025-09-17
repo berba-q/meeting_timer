@@ -628,11 +628,17 @@ class EPUBMeetingScraper:
         return list(dict.fromkeys(songs))  # Remove duplicates while preserving order
     
     def _extract_midweek_meetings(self, epub_content: Dict) -> Dict[str, List[Dict]]:
-        """Extract midweek meeting parts using structure-based approach, scanning only TOC files for date links."""
+        """
+        Extract midweek meeting parts using structure-based approach, scanning only TOC files for date links.
+        Improved: Accepts date ranges in headings, does not require ISO date in heading, uses fallback if needed.
+        Prevents cross-month fallback conflicts and ensures each XHTML file is uniquely assigned.
+        """
         meetings = {}
         import re
         from bs4 import BeautifulSoup
         # Only scan TOC files for date links
+        toc_links = []
+        toc_date_fallback = {}  # file_path -> parsed_date from TOC
         for file_name, html in epub_content.items():
             if 'toc' not in file_name.lower():
                 continue
@@ -647,44 +653,83 @@ class EPUBMeetingScraper:
                 match = re.search(r'(\d{1,2})\s*(?:[.–\-–]|bis)?\s*(\d{1,2})[.,]?\s*(\w+)?', date_text, re.IGNORECASE)
                 if match:
                     print(f"[{self.language}] TOC entry: '{date_text}'  {href}")
-        # (Original full-body soup scanning logic removed as requested)
+                    toc_links.append((date_text, href))
+                    parsed_date = self._parse_meeting_date_from_workbook(date_text)
+                    if parsed_date:
+                        target_file = href.split('#')[0]
+                        content_file = None
+                        if target_file in epub_content:
+                            content_file = target_file
+                        else:
+                            for f in epub_content:
+                                if f.endswith(target_file):
+                                    content_file = f
+                                    break
+                        if content_file:
+                            toc_date_fallback[content_file] = parsed_date
+
         # --- Begin: Populate meetings dict with parsed meeting parts
-        from bs4 import BeautifulSoup
-        for file_name, html in epub_content.items():
-            if 'toc' not in file_name.lower():
+        registered_meeting_dates = set()
+        for date_text, href in toc_links:
+            file_path = None
+            target_file = href.split('#')[0]
+            if target_file in epub_content:
+                file_path = target_file
+            else:
+                for f in epub_content:
+                    if f.endswith(target_file):
+                        file_path = f
+                        break
+            if not file_path:
                 continue
-            soup = BeautifulSoup(html, 'html.parser')
-            links = soup.find_all('a')
-            for link in links:
-                date_text = link.get_text(strip=True)
-                href = link.get('href')
-                if not date_text or not href:
-                    continue
-                match = re.search(r'(\d{1,2})\s*(?:[.–\-–]|bis)?\s*(\d{1,2})[.,]?\s*(\w+)?', date_text, re.IGNORECASE)
-                if match:
-                    # Already printed above
-                    normalized_date = self._parse_meeting_date_from_workbook(date_text)
-                    if not normalized_date:
-                        print(f"[{self.language}] Could not normalize date from: '{date_text}'")
-                        continue
-                    target_file = href.split('#')[0]
-                    content_file = None
-                    if target_file in epub_content:
-                        content_file = target_file
+            try:
+                body_html = epub_content[file_path]
+                soup_part = BeautifulSoup(body_html, 'html.parser')
+
+                # Extract all <h1> and <h2> headings
+                headings = []
+                for h in soup_part.find_all(['h1', 'h2']):
+                    headings.append(h.get_text().strip())
+
+                # Try to parse a date range from each heading. Use the same normalization logic.
+                date_found = None
+                for h_text in headings:
+                    parsed_date = self._parse_meeting_date_from_workbook(h_text)
+                    if parsed_date:
+                        date_found = parsed_date
+                        break
+
+                # Date fallback logic
+                parsed_date = date_found
+                if not parsed_date:
+                    # Try fallback using TOC date if available
+                    parsed_date = toc_date_fallback.get(file_path)
+                    if parsed_date:
+                        if parsed_date in registered_meeting_dates:
+                            print(f"[{self.language}] ⚠️ Skipping duplicate meeting date: {parsed_date} from {file_path}")
+                            continue  # Skip registering this meeting
+                        print(f"[{self.language}] ⏳ No heading date match, using TOC date {parsed_date} for {file_path}")
                     else:
-                        for f in epub_content:
-                            if f.endswith(target_file):
-                                content_file = f
-                                break
-                    if content_file:
-                        try:
-                            body_html = epub_content[content_file]
-                            soup_part = BeautifulSoup(body_html, 'html.parser')
-                            parts = self._extract_parts_by_structure(soup_part)
-                            meetings[normalized_date] = parts
-                            print(f"[{self.language}] Registered MIDWEEK meeting for {normalized_date} with {len(parts)} parts")
-                        except Exception as e:
-                            print(f"[{self.language}] Error extracting midweek from {content_file}: {e}")
+                        print(f"[{self.language}] ❌ Could not determine date for {file_path}, skipping")
+                        continue
+
+                # Instead of registering and checking for duplicates immediately, check for parts first
+                parts = self._extract_parts_by_structure(soup_part)
+                # Check if there are actual parts
+                if not parts or len(parts) == 0:
+                    print(f"[{self.language}] ⚠️ Skipping empty or invalid meeting for {parsed_date} from {file_path}")
+                    continue
+
+                # Now check for duplicates
+                if parsed_date in registered_meeting_dates:
+                    print(f"[{self.language}] ⚠️ Duplicate meeting for {parsed_date} detected from {file_path}, skipping")
+                    continue
+                registered_meeting_dates.add(parsed_date)
+
+                meetings[parsed_date] = parts
+                print(f"[{self.language}] Registered MIDWEEK meeting for {parsed_date} with {len(parts)} parts")
+            except Exception as e:
+                print(f"[{self.language}] Error extracting midweek from {file_path}: {e}")
         # --- End: Populate meetings dict
         return meetings
     
@@ -886,122 +931,14 @@ class EPUBMeetingScraper:
             h3_text = h3.get_text(" ", strip=True)
             print(f"[{self.language}] Found heading with potential date: '{h3_text}'")
             print(f"[{self.language}] Inspecting heading: '{h3_text}'")
-            
-            # Simplified regex patterns - just handle same-month vs cross-month
-            # Pattern 1: Cross-month ranges - more comprehensive patterns
-            cross_month_patterns = [
-                r'(\w+)\s+(\d{1,2}),?\s+(\d{4})[–\-–](\w+)\s+(\d{1,2}),?\s+(\d{4})',  # English: "June 30, 2025–July 6, 2025"
-                r'\((\d{1,2})\s+(\w+)\s+(\d{4})\s+[–\-–]\s+(\d{1,2})\s+(\w+)\s+(\d{4})\)',  # Italian: "(30 giugno 2025 – 6 luglio 2025)"
-                r'(\d{1,2})\s+(\w+)\s+(\d{4})\s+[–\-–]\s+(\d{1,2})\s+(\w+)\s+(\d{4})',  # French: "30 juin 2025 – 6 juillet 2025"
-                r'del\s+(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})\s+al\s+(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})',  # Spanish: "del 30 de junio de 2025 al 6 de julio de 2025"
-                r'(\d{1,2})\.\s+(\w+)\s+(\d{4})\s+bis\s+(\d{1,2})\.\s+(\w+)\s+(\d{4})',  # German: "30. Juni 2025 bis 6. Juli 2025"
-            ]
-            
-            # Pattern 2: Same-month ranges - works for all languages with minor variations
-            same_month_patterns = [
-                r'(\w+)\s+(\d{1,2})\s*[–\-]\s*(\d{1,2}),?\s*(\d{4})',  # English: "June 9-15, 2025"
-                r'\((\d{1,2})\s*[–\-]\s*(\d{1,2})\s+(\w+)\s+(\d{4})\)',  # Italian: "(9-15 giugno 2025)"
-                r'(\d{1,2})\s*[–\-]\s*(\d{1,2})\s+(\w+)\s+(\d{4})',      # French: "9-15 juin 2025"
-                r'del\s+(\d{1,2})\s+al\s+(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})',  # Spanish: "del 9 al 15 de junio de 2025"
-                r'(\d{1,2})\.\s*bis\s*(\d{1,2})\.\s*(\w+)\s+(\d{4})',    # German: "9. bis 15. Juni 2025"
-            ]
-            
-            match = None
-            is_cross_month = False
-            
-            # Try cross-month patterns first
-            for pattern in cross_month_patterns:
-                match = re.search(pattern, h3_text, re.IGNORECASE)
-                if match:
-                    is_cross_month = True
-                    break
-            
-            if not match:
-                # Try same-month patterns
-                for pattern in same_month_patterns:
-                    match = re.search(pattern, h3_text, re.IGNORECASE)
-                    if match:
-                        break
-            
-            # Skip if no proper date range
-            if not match:
+
+            # --- New: try to extract the heading date using fallback logic for date ranges
+            meeting_date = self._extract_heading_date(h3_text)
+            if not meeting_date:
                 print(f"[{self.language}]  Skipping due to no date-like pattern in heading.")
                 continue
             else:
                 print(f"[{self.language}] Passed date pattern check for heading.")
-            
-            # Extract date components - much simpler now!
-            try:
-                if is_cross_month:
-                    # Cross-month: different patterns have different group orders
-                    groups = match.groups()
-                    if len(groups) == 6:
-                        # English: start_month start_day start_year end_month end_day end_year
-                        # OR other patterns: start_day start_month start_year end_day end_month end_year
-                        if groups[0].isdigit():  # starts with day
-                            start_day, start_month_text, start_year, end_day, end_month_text, end_year = groups
-                        else:  # starts with month
-                            start_month_text, start_day, start_year, end_month_text, end_day, end_year = groups
-                    elif len(groups) == 8:
-                        # Spanish pattern: del start_day de start_month de start_year al end_day de end_month de end_year
-                        start_day, start_month_text, start_year, end_day, end_month_text, end_year = groups[0], groups[1], groups[2], groups[3], groups[4], groups[5]
-                    else:
-                        print(f"[{self.language}]  Unexpected cross-month group count {len(groups)} for: {h3_text}")
-                        continue
-                    
-                    end_day, year = int(end_day), int(end_year)
-                    month_text = end_month_text  # Use end month for the meeting
-                    
-                    print(f"[{self.language}]  Cross-month range detected, using end date")
-                else:
-                    # Same-month: extract based on group order (handle different patterns)
-                    groups = match.groups()
-                    if len(groups) == 4:
-                        # Could be: (month, start_day, end_day, year) OR (start_day, end_day, month, year)
-                        if groups[0].isdigit():  # starts with number: (start_day, end_day, month, year)
-                            start_day, end_day, month_text, year = groups
-                        else:  # starts with month: (month, start_day, end_day, year)
-                            month_text, start_day, end_day, year = groups
-                    elif len(groups) == 5:
-                        # Spanish pattern: del start_day al end_day de month de year
-                        start_day, end_day, month_text, _, year = groups
-                    else:
-                        print(f"[{self.language}] Unexpected group count {len(groups)} for: {h3_text}")
-                        continue
-                    
-                    end_day, year = int(end_day), int(year)
-                
-                # Parse the month name to get month number using dateparser
-                test_date_str = f"1 {month_text} {year}"
-                from dateparser import parse
-                parsed_date = parse(test_date_str, languages=[self.language, 'en'])
-                
-                if not parsed_date:
-                    print(f"[{self.language}]  Could not parse month from: '{month_text}'")
-                    continue
-                    
-                month = parsed_date.month
-                print(f"[{self.language}]  Extracted date components: {year}-{month:02d}-{end_day}")
-                
-                # Create the target Sunday (end of the week range)
-                # For "June 23-29", we want Sunday June 29
-                target_sunday = datetime(year, month, end_day)
-                
-                # Verify it's actually a Sunday
-                if target_sunday.weekday() != 6:  # 6 = Sunday
-                    print(f"[{self.language}] Warning: {target_sunday.date()} is not a Sunday, adjusting...")
-                    # Find the nearest Sunday
-                    days_to_sunday = (6 - target_sunday.weekday()) % 7
-                    if days_to_sunday == 0:
-                        days_to_sunday = 7  # Move to next Sunday if it's not Sunday
-                    target_sunday += timedelta(days=days_to_sunday)
-                
-                meeting_date = target_sunday.strftime('%Y-%m-%d')
-                print(f"[{self.language}] Extracted valid date from heading: {meeting_date}")
-                
-            except Exception as e:
-                print(f"[{self.language}] Error extracting date components from '{h3_text}': {e}")
-                continue
             
             # Find the first <a> sibling after this <h3> (article link)
             a_tag = None
@@ -1012,7 +949,7 @@ class EPUBMeetingScraper:
                 # stop if we hit another h3
                 if sib.name == 'h3':
                     break
-            
+
             if a_tag and a_tag.get('href'):
                 href = a_tag['href'].split('#')[0]
                 content_file = None
@@ -1219,7 +1156,7 @@ class EPUBMeetingScraper:
                                 'section': part.get('section', 'christian_living')
                             },
                             {
-                                'title': f"CLOSING_SONG_PRAYER|{closing_song}r",
+                                'title': f"CLOSING_SONG_PRAYER|{closing_song}",
                                 'duration_minutes': 5,
                                 'type': 'song_prayer',
                                 'section': part.get('section', 'christian_living')
@@ -1521,3 +1458,40 @@ class EPUBMeetingScraper:
     def get_meeting_for_specific_date(self, date_str: str, meeting_type: MeetingType) -> Optional[Meeting]:
         """Get meeting for a specific date (e.g., '2025-06-24' should return '23-29 GIUGNO' meeting)"""
         return self.get_meeting_by_date_range(date_str, meeting_type)
+
+    def _extract_heading_date(self, heading_text: str) -> Optional[str]:
+        """
+        Extract the date from a heading string. Handles full dates and date ranges.
+        Returns the normalized date string (YYYY-MM-DD) for the *start* of the range.
+        """
+        import dateparser
+        from datetime import datetime
+        # Try to match a full date first, e.g. "September 15, 2025"
+        full_date_match = re.search(r"(?P<month>\w+)\s+(?P<day>\d{1,2}),?\s+(?P<year>\d{4})", heading_text)
+        if full_date_match:
+            try:
+                month = full_date_match.group("month")
+                day = full_date_match.group("day")
+                year = full_date_match.group("year")
+                dt = dateparser.parse(f"{month} {day} {year}", languages=[self.language, 'en'])
+                if dt:
+                    return dt.strftime("%Y-%m-%d")
+            except Exception:
+                pass
+        # Fallback: match date range, e.g. "September 15–21, 2025" or "September 15-21, 2025"
+        range_match = re.search(
+            r"(?P<start_month>\w+)\s(?P<start_day>\d{1,2})[\-–](?P<end_day>\d{1,2}),?\s(?P<year>\d{4})",
+            heading_text
+        )
+        if range_match:
+            try:
+                start_month = range_match.group("start_month")
+                start_day = range_match.group("start_day")
+                year = range_match.group("year")
+                dt = dateparser.parse(f"{start_month} {start_day} {year}", languages=[self.language, 'en'])
+                if dt:
+                    return dt.strftime("%Y-%m-%d")
+            except Exception:
+                pass
+        # No match
+        return None
