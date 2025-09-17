@@ -455,10 +455,18 @@ jobs:
           echo "Type=Application" >> ontime.desktop
           echo "Categories=Utility;" >> ontime.desktop
       
-      - name: Download AppImage tool
+      - name: Download AppImage tool (non-blocking)
         run: |
-          wget https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage -O appimagetool
-          chmod +x appimagetool
+          set +e
+          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          STATUS=$?
+          if [ $STATUS -ne 0 ]; then
+            echo "⚠️ Warning: Failed to download appimagetool (status=$STATUS). Skipping Linux build."
+            echo "skip_linux_build=true" >> $GITHUB_ENV
+          else
+            chmod +x appimagetool
+          fi
+          set -e
       
       - name: Prepare AppDir
         run: |
@@ -529,6 +537,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libfuse2
 
       - name: Build AppImage
+        if: env.skip_linux_build != 'true'
         run: |
           # Explicitly set architecture to x86_64 to fix the error
           ARCH=x86_64 VERSION=${{ needs.release-please.outputs.version }} ./appimagetool AppDir OnTimeMeetingTimer-${{ needs.release-please.outputs.version }}.AppImage
