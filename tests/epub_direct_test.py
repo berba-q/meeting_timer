@@ -447,6 +447,23 @@ class EPUBScraperTester:
         for language in languages:
             result = self.test_single_language(language)
             all_results.append(result)
+
+        # Additional check for EN midweek meeting for current week
+        from datetime import date
+        from src.utils.epub_scraper import EPUBMeetingScraper
+        from src.models.meeting import MeetingType
+
+        print("\n🔎 Checking current midweek meeting for EN on today's date...")
+        try:
+            en_scraper = EPUBMeetingScraper(language="en")
+            current_meeting = en_scraper.get_meeting_for_current_week(meeting_type=MeetingType.MIDWEEK)
+            print(f"📅 Current EN Midweek Meeting for week of {current_meeting.date.strftime('%Y-%m-%d')}: {current_meeting.title}")
+            for section in current_meeting.sections:
+                print(f" - Section: {section.title}")
+                for part in section.parts:
+                    print(f"    • {part.title} ({part.duration_minutes} min)")
+        except Exception as e:
+            print(f"❌ Could not fetch current EN midweek meeting: {e}")
         
         # Print final report
         self.print_final_report(all_results)
