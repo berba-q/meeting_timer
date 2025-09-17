@@ -1,6 +1,11 @@
 # Changelog
 
-# [](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v) (2025-07-03)
+# [](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v) (2025-09-17)
+
+
+### Bug Fixes
+
+* Fixed an issue with meeting parts parsing and a stray sting attached to meeting songs. ([89e0074](https://github.com/berba-q/meeting_timer/commit/89e0074a2cd8e426cd6784486ead5c6cf12ae12b))
 
 
 
