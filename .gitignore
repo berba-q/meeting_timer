@@ -181,3 +181,4 @@ cython_debug/
 *.secret
 *.key
 
+.vscode/settings.json
