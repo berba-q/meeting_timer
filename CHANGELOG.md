@@ -1,11 +1,20 @@
 # Changelog
 
-# [](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v) (2025-09-17)
+# [](https://github.com/berba-q/meeting_timer/compare/v1.0.6...v) (2026-01-27)
 
 
 ### Bug Fixes
 
+* Fixed an issue where the weekend song editor hides behind the main application window on launch ([c03c815](https://github.com/berba-q/meeting_timer/commit/c03c815acc5284cb952923812890cd6e64de04be))
+* Fixed an issue with light and dark mode themes not applying correctly on some devices ([edcd5f3](https://github.com/berba-q/meeting_timer/commit/edcd5f3e86fb136ca6e5122cc9ae665d98709c02))
 * Fixed an issue with meeting parts parsing and a stray sting attached to meeting songs. ([89e0074](https://github.com/berba-q/meeting_timer/commit/89e0074a2cd8e426cd6784486ead5c6cf12ae12b))
+* Fixed an issue with weekend meeting selection which was selecting watchtower in week + 1 instead of current week. ([ce440fa](https://github.com/berba-q/meeting_timer/commit/ce440fa6f0f9e03945945d0097d7d381ccf30b70))
+
+
+### Features
+
+* Add intellligent CO visit mode which adjust both midweek and weekend meetings with CO visit  meeting pattern ([190360b](https://github.com/berba-q/meeting_timer/commit/190360bc9f924857b61464d7994d43518db82f57))
+* Implemented toast notification messages instead of system notifications to improve user experience. ([eeb2d71](https://github.com/berba-q/meeting_timer/commit/eeb2d71c70a45b505981551550b5a179c5b82fc0))
 
 
 
