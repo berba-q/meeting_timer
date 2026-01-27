@@ -46,425 +46,452 @@
       <translation type="finished">Time Meeting Timer</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="216" />
-      <location filename="../src/views/main_window.py" line="188" />
+      <location filename="../src/views/main_window.py" line="227" />
+      <location filename="../src/views/main_window.py" line="199" />
       <source>Loading components...</source>
       <translation type="finished">Ladekomponenten ...</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="192" />
+      <location filename="../src/views/main_window.py" line="203" />
       <source>Network</source>
       <translation type="finished">Netzwerk</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="195" />
+      <location filename="../src/views/main_window.py" line="206" />
       <source>Tools</source>
       <translation type="finished">Werkzeuge</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="372" />
+      <location filename="../src/views/main_window.py" line="383" />
       <source>All components loaded</source>
       <translation type="finished">Alle Komponenten geladen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="634" />
+      <location filename="../src/views/main_window.py" line="648" />
       <source>Current Meeting: Public Talk and Watchtower Study</source>
       <translation type="finished">Aktuelles Treffen: öffentliches Gespräch und Wachtturmstudium</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="636" />
+      <location filename="../src/views/main_window.py" line="650" />
       <source>Current Meeting:</source>
       <translation type="finished">Aktuelles Treffen:</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1220" />
-      <location filename="../src/views/main_window.py" line="709" />
+      <location filename="../src/views/main_window.py" line="1247" />
+      <location filename="../src/views/main_window.py" line="723" />
       <source>No meetings available</source>
       <translation type="finished">Keine Besprechungen verfügbar</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="720" />
+      <location filename="../src/views/main_window.py" line="734" />
       <source>Public Talk and Watchtower Study</source>
       <translation type="finished">Öffentliches Gespräch und Wachtturmstudium</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1506" />
-      <location filename="../src/views/main_window.py" line="733" />
+      <location filename="../src/views/main_window.py" line="1551" />
+      <location filename="../src/views/main_window.py" line="747" />
       <source>Secondary Display: Active</source>
       <translation type="finished">Sekundäranzeige: aktiv</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="760" />
+      <location filename="../src/views/main_window.py" line="774" />
       <source>&amp;File</source>
       <translation type="finished">&amp;File</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="763" />
+      <location filename="../src/views/main_window.py" line="777" />
       <source>&amp;New Meeting</source>
       <translation type="finished">&amp; Neues Meeting</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="769" />
+      <location filename="../src/views/main_window.py" line="783" />
       <source>&amp;Open Meeting</source>
       <translation type="finished">&amp; Offenes Treffen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="775" />
+      <location filename="../src/views/main_window.py" line="789" />
       <source>&amp;Edit Current Meeting</source>
       <translation type="finished">&amp; Bearbeiten Sie die aktuelle Besprechung</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="779" />
+      <location filename="../src/views/main_window.py" line="793" />
       <source>Edit Weekend &amp;Songs</source>
       <translation type="finished">Wochenende und Songs bearbeiten</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="787" />
+      <location filename="../src/views/main_window.py" line="801" />
       <source>&amp;Update Meetings from Web</source>
       <translation type="finished">&amp; Aktualisieren Sie Meetings aus Web</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="795" />
+      <location filename="../src/views/main_window.py" line="809" />
       <source>&amp;View</source>
       <translation type="finished">&amp;View</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="798" />
+      <location filename="../src/views/main_window.py" line="812" />
       <source>&amp;Network Display</source>
       <translation type="finished">&amp; Netzwerkanzeige</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="801" />
+      <location filename="../src/views/main_window.py" line="815" />
       <source>Show Network Panel</source>
       <translation type="finished">Netzwerkpanel anzeigen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1198" />
-      <location filename="../src/views/main_window.py" line="977" />
-      <location filename="../src/views/main_window.py" line="808" />
+      <location filename="../src/views/main_window.py" line="1221" />
+      <location filename="../src/views/main_window.py" line="991" />
+      <location filename="../src/views/main_window.py" line="822" />
       <source>Start Network Display</source>
       <translation type="finished">Starten Sie das Netzwerkdisplay</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="813" />
+      <location filename="../src/views/main_window.py" line="827" />
       <source>Network Display Info...</source>
       <translation type="finished">Netzwerkanzeigeinformationen ...</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="818" />
+      <location filename="../src/views/main_window.py" line="832" />
       <source>&amp;Settings</source>
       <translation type="finished">&amp;Settings</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="826" />
+      <location filename="../src/views/main_window.py" line="840" />
       <source>E&amp;xit</source>
       <translation type="finished">Ausfahrt</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="833" />
+      <location filename="../src/views/main_window.py" line="847" />
       <source>Toggle &amp;Secondary Display</source>
       <translation type="finished">Schalt- und Sekundäranzeige</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="851" />
+      <location filename="../src/views/main_window.py" line="865" />
       <source>&amp;Theme</source>
       <translation type="finished">&amp;Theme</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="854" />
+      <location filename="../src/views/main_window.py" line="868" />
       <source>&amp;Light Theme</source>
       <translation type="finished">&amp; Lichtthema</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="860" />
+      <location filename="../src/views/main_window.py" line="874" />
       <source>&amp;Dark Theme</source>
       <translation type="finished">&amp; Dunkles Thema</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="873" />
+      <location filename="../src/views/main_window.py" line="887" />
       <source>&amp;Help</source>
       <translation type="finished">&amp;Help</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="876" />
+      <location filename="../src/views/main_window.py" line="890" />
       <source>&amp;About</source>
       <translation type="finished">&amp;About</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="883" />
+      <location filename="../src/views/main_window.py" line="897" />
       <source>&amp;Check for Updates</source>
       <translation type="finished">Überprüfen Sie nach Updates</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1381" />
-      <location filename="../src/views/main_window.py" line="896" />
+      <location filename="../src/views/main_window.py" line="1411" />
+      <location filename="../src/views/main_window.py" line="910" />
       <source>Start Meeting</source>
       <translation type="finished">Treffen beginnen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1681" />
-      <location filename="../src/views/main_window.py" line="1401" />
-      <location filename="../src/views/main_window.py" line="903" />
+      <location filename="../src/views/main_window.py" line="1731" />
+      <location filename="../src/views/main_window.py" line="1431" />
+      <location filename="../src/views/main_window.py" line="917" />
       <source>Pause</source>
       <translation type="finished">Pause</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="914" />
+      <location filename="../src/views/main_window.py" line="928" />
       <source>Previous</source>
       <translation type="finished">Vorherige</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="921" />
+      <location filename="../src/views/main_window.py" line="935" />
       <source>Next</source>
       <translation type="finished">Nächste</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="931" />
+      <location filename="../src/views/main_window.py" line="945" />
       <source>-1 Minute</source>
       <translation type="finished">-1 Minute</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="938" />
+      <location filename="../src/views/main_window.py" line="952" />
       <source>+1 Minute</source>
       <translation type="finished">+1 Minute</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="955" />
+      <location filename="../src/views/main_window.py" line="969" />
       <source>Settings</source>
       <translation type="finished">Einstellungen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1176" />
-      <location filename="../src/views/main_window.py" line="1042" />
-      <location filename="../src/views/main_window.py" line="991" />
+      <location filename="../src/views/main_window.py" line="2515" />
+      <location filename="../src/views/main_window.py" line="1190" />
+      <location filename="../src/views/main_window.py" line="1056" />
+      <location filename="../src/views/main_window.py" line="1005" />
       <source>Stop Network Display</source>
       <translation type="finished">Stop -Netzwerkanzeige</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="996" />
+      <location filename="../src/views/main_window.py" line="1010" />
       <source>Network Display Disabled</source>
       <translation type="finished">Netzwerkanzeige deaktiviert</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="997" />
+      <location filename="../src/views/main_window.py" line="1011" />
       <source>Network display is disabled in settings. Please enable it in Settings &gt; Network Display.</source>
       <translation type="finished">Die Netzwerkanzeige ist in Einstellungen deaktiviert.Bitte aktivieren Sie es in Einstellungen&gt; Netzwerkanzeige.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1010" />
+      <location filename="../src/views/main_window.py" line="1024" />
       <source>Network display component not available</source>
       <translation type="finished">Netzwerkanzeigekomponente nicht verfügbar</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1075" />
+      <location filename="../src/views/main_window.py" line="1089" />
       <source>Loading meeting information...</source>
       <translation type="finished">Besprechungsinformationen laden ...</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1100" />
+      <location filename="../src/views/main_window.py" line="1114" />
       <source>No meeting selected</source>
       <translation type="finished">Kein Meeting ausgewählt</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1201" />
+      <location filename="../src/views/main_window.py" line="1228" />
       <source>Network display stopped</source>
       <translation type="finished">Netzwerkanzeige gestoppt</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1206" />
+      <location filename="../src/views/main_window.py" line="1233" />
       <source>Start</source>
       <translation type="finished">Start</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1366" />
-      <location filename="../src/views/main_window.py" line="1347" />
+      <location filename="../src/views/main_window.py" line="1396" />
+      <location filename="../src/views/main_window.py" line="1377" />
+      <location filename="../src/views/main_window.py" line="1311" />
       <location filename="../src/views/main_window.py" line="1284" />
-      <location filename="../src/views/main_window.py" line="1257" />
       <source>Last Part</source>
       <translation type="finished">Letzter Teil</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1273" />
+      <location filename="../src/views/main_window.py" line="1300" />
       <source>Meeting End</source>
       <translation type="finished">Treffen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1306" />
+      <location filename="../src/views/main_window.py" line="1333" />
       <source>Stop Meeting</source>
       <translation type="finished">Hör auf zu treffen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1423" />
-      <location filename="../src/views/main_window.py" line="1413" />
+      <location filename="../src/views/main_window.py" line="1453" />
+      <location filename="../src/views/main_window.py" line="1443" />
       <source>Meeting Ended</source>
       <translation type="finished">Treffen endete</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1478" />
+      <location filename="../src/views/main_window.py" line="1474" />
+      <source>Chairman Counsel and Transition</source>
+      <translation type="finished">Beratung und Übergang des Vorsitzenden</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="1475" />
+      <source>Chairman Introduction</source>
+      <translation type="finished">Einführung des Vorsitzenden</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="1476" />
+      <source>Chairman Transition</source>
+      <translation type="finished">Übergang des Vorsitzenden</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="1523" />
       <source>Language Changed</source>
       <translation type="finished">Sprache änderte sich</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1478" />
+      <location filename="../src/views/main_window.py" line="1523" />
       <source>App will now restart to apply changes.</source>
       <translation type="finished">Die App startet nun neu, um Änderungen anzuwenden.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1508" />
+      <location filename="../src/views/main_window.py" line="1553" />
       <source>Secondary Display: Inactive</source>
       <translation type="finished">Sekundäranzeige: Inaktiv</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1989" />
-      <location filename="../src/views/main_window.py" line="1604" />
+      <location filename="../src/views/main_window.py" line="2066" />
+      <location filename="../src/views/main_window.py" line="1649" />
       <source>No Meeting Selected</source>
       <translation type="finished">Kein Meeting ausgewählt</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1605" />
+      <location filename="../src/views/main_window.py" line="1650" />
       <source>Please select a meeting to start.</source>
       <translation type="finished">Bitte wählen Sie ein Meeting aus, um zu beginnen.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1631" />
+      <location filename="../src/views/main_window.py" line="1676" />
       <source>End Meeting?</source>
       <translation type="finished">Ende Meeting?</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1632" />
+      <location filename="../src/views/main_window.py" line="1677" />
       <source>😅 Hold up! Are you sure you want to stop the meeting?
 This will end the timer and reset the session.</source>
       <translation type="finished">😅 Halt!Sind Sie sicher, dass Sie das Meeting einstellen möchten?
 Dadurch wird der Timer beendet und die Sitzung zurückgesetzt.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1661" />
+      <location filename="../src/views/main_window.py" line="2397" />
+      <location filename="../src/views/main_window.py" line="1711" />
       <source>Resume</source>
       <translation type="finished">Wieder aufnehmen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1770" />
-      <source>⌛ Did We Forget Something?</source>
-      <translation type="finished">⌛ Haben wir etwas vergessen?</translation>
+      <location filename="../src/views/main_window.py" line="1845" />
+      <source>Did We Forget Something?</source>
+      <translation type="finished">Haben wir etwas vergessen?</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1771" />
+      <location filename="../src/views/main_window.py" line="1846" />
       <source>Click Start Meeting to launch the meeting timer and stay on track.</source>
       <translation type="finished">Klicken Sie auf Start Meeting, um den Besprechungstimer zu starten und auf dem richtigen Weg zu bleiben.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1798" />
-      <source>😅 Time to move on!</source>
-      <translation type="finished">😅 Zeit zum weitermachen!</translation>
+      <location filename="../src/views/main_window.py" line="1863" />
+      <source>current part</source>
+      <translation type="finished">aktueller Teil</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="2233" />
-      <location filename="../src/views/main_window.py" line="1839" />
+      <location filename="../src/views/main_window.py" line="1874" />
+      <source>Time to move on!</source>
+      <translation type="finished">Zeit weiterzumachen!</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="1875" />
+      <source>'{part_title}' is over — advance to next part?</source>
+      <translation type="finished">„{part_title}“ ist vorbei – mit dem nächsten Teil fortfahren?</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2310" />
+      <location filename="../src/views/main_window.py" line="1916" />
       <source>Error</source>
       <translation type="finished">Fehler</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1848" />
+      <location filename="../src/views/main_window.py" line="1925" />
       <source>Updating meetings from wol.jw.org...</source>
       <translation type="finished">Aktualisieren von Treffen von Wol.jw.org ...</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1848" />
+      <location filename="../src/views/main_window.py" line="1925" />
       <source>Cancel</source>
       <translation type="finished">Cancel</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1849" />
+      <location filename="../src/views/main_window.py" line="1926" />
       <source>Updating Meetings</source>
       <translation type="finished">Besprechungen aktualisieren</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1868" />
+      <location filename="../src/views/main_window.py" line="1945" />
       <source>Update Complete</source>
       <translation type="finished">Aktualisieren Sie vollständig</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1869" />
+      <location filename="../src/views/main_window.py" line="1946" />
       <source>Meetings have been successfully updated.</source>
       <translation type="finished">Treffen wurden erfolgreich aktualisiert.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1872" />
+      <location filename="../src/views/main_window.py" line="1949" />
       <source>Update Failed</source>
       <translation type="finished">Update fehlgeschlagen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1879" />
+      <location filename="../src/views/main_window.py" line="1956" />
       <source>Update from Web</source>
       <translation type="finished">Update aus Web</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1882" />
+      <location filename="../src/views/main_window.py" line="1959" />
       <source>Edit Current Meeting</source>
       <translation type="finished">Aktuelle Besprechung bearbeiten</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1887" />
+      <location filename="../src/views/main_window.py" line="1964" />
       <source>Create New Meeting</source>
       <translation type="finished">Neue Besprechung erstellen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1920" />
+      <location filename="../src/views/main_window.py" line="1997" />
       <source>Song Entry Required</source>
       <translation type="finished">Songeintrag erforderlich</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1928" />
+      <location filename="../src/views/main_window.py" line="2005" />
       <source>You are about to modify a running meeting.</source>
       <translation type="finished">Sie sind kurz davor, ein laufendes Meeting zu ändern.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1929" />
+      <location filename="../src/views/main_window.py" line="2006" />
       <source>This may reset timing. Continue?</source>
       <translation type="finished">Dies kann das Timing zurücksetzen.Weitermachen?</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1935" />
+      <location filename="../src/views/main_window.py" line="2012" />
       <source>Edit Now</source>
       <translation type="finished">Jetzt bearbeiten</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1939" />
+      <location filename="../src/views/main_window.py" line="2016" />
       <source>Skip</source>
       <translation type="finished">Überspringen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="1990" />
+      <location filename="../src/views/main_window.py" line="2067" />
       <source>Please select a meeting to edit.</source>
       <translation type="finished">Bitte wählen Sie ein Meeting zum Bearbeiten.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="2019" />
+      <location filename="../src/views/main_window.py" line="2096" />
       <source>Not a Weekend Meeting</source>
       <translation type="finished">Kein Wochenendtreffen</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="2020" />
+      <location filename="../src/views/main_window.py" line="2097" />
       <source>Please select a weekend meeting first.</source>
       <translation type="finished">Bitte wählen Sie zuerst ein Wochenendtreffen.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="2038" />
+      <location filename="../src/views/main_window.py" line="2115" />
       <source>Songs Updated</source>
       <translation type="finished">Songs aktualisiert</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="2039" />
+      <location filename="../src/views/main_window.py" line="2116" />
       <source>Weekend meeting songs have been updated.</source>
       <translation type="finished">Wochenendtreffen -Songs wurden aktualisiert.</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="2225" />
+      <location filename="../src/views/main_window.py" line="2302" />
       <source>About OnTime Meeting Timer</source>
       <translation type="finished">Über Time Meeting Timer</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="2226" />
+      <location filename="../src/views/main_window.py" line="2303" />
       <source>OnTime Meeting Timer
 
 A cross-platform timer application for managing JW meeting schedules.
@@ -477,14 +504,96 @@ Eine plattformübergreifende Timer-Anwendung zur Verwaltung von JW-Besprechungsp
 © 2025 Open Source</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="2301" />
+      <location filename="../src/views/main_window.py" line="2374" />
+      <location filename="../src/views/main_window.py" line="2348" />
+      <source>Session Recovery</source>
+      <translation type="finished">Sitzungswiederherstellung</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2349" />
+      <source>A previous session was interrupted, but the meeting schedule has changed.</source>
+      <translation type="finished">Eine vorherige Sitzung wurde unterbrochen, aber der Besprechungsplan hat sich geändert.</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2350" />
+      <source>Would you like to attempt recovery anyway, start fresh, or discard?</source>
+      <translation type="finished">Möchten Sie trotzdem eine Wiederherstellung versuchen, neu beginnen oder verwerfen?</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2356" />
+      <source>Recover Anyway</source>
+      <translation type="finished">Erholen Sie sich trotzdem</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2398" />
+      <location filename="../src/views/main_window.py" line="2357" />
+      <source>Start Fresh</source>
+      <translation type="finished">Fangen Sie neu an</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2425" />
+      <location filename="../src/views/main_window.py" line="2358" />
+      <source>Discard</source>
+      <translation type="finished">Verwerfen</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2375" />
+      <source>A previous meeting session was interrupted.</source>
+      <translation type="finished">Eine frühere Besprechungssitzung wurde unterbrochen.</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2418" />
+      <source>Old Session Found</source>
+      <translation type="finished">Alte Sitzung gefunden</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2420" />
+      <source>This session is quite old. Would you like to discard it or attempt recovery?</source>
+      <translation type="finished">Diese Sitzung ist ziemlich alt.Möchten Sie es verwerfen oder eine Wiederherstellung versuchen?</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2426" />
+      <source>Attempt Recovery</source>
+      <translation type="finished">Versuchen Sie eine Wiederherstellung</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2452" />
+      <location filename="../src/views/main_window.py" line="2442" />
+      <source>Recovery Failed</source>
+      <translation type="finished">Wiederherstellung fehlgeschlagen</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2443" />
+      <source>Could not find the meeting file. Starting fresh.</source>
+      <translation type="finished">Die Besprechungsdatei konnte nicht gefunden werden.Neu anfangen.</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2453" />
+      <source>Could not load the meeting file. Starting fresh.</source>
+      <translation type="finished">Die Besprechungsdatei konnte nicht geladen werden.Neu anfangen.</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2480" />
+      <source>Session restored successfully</source>
+      <translation type="finished">Sitzung erfolgreich wiederhergestellt</translation>
+    </message>
+    <message>
+      <location filename="../src/views/main_window.py" line="2596" />
       <source>Same Screen Selected</source>
       <translation type="finished">Gleicher Bildschirm ausgewählt</translation>
     </message>
     <message>
-      <location filename="../src/views/main_window.py" line="2302" />
+      <location filename="../src/views/main_window.py" line="2597" />
       <source>The primary and secondary screens are the same. This may cause overlapping windows.</source>
       <translation type="finished">Die primären und sekundären Bildschirme sind gleich.Dies kann überlappende Fenster verursachen.</translation>
+    </message>
+    <message>
+      <source>⌛ Did We Forget Something?</source>
+      <translation type="vanished">⌛ Haben wir etwas vergessen?</translation>
+    </message>
+    <message>
+      <source>😅 Time to move on!</source>
+      <translation type="vanished">😅 Zeit zum weitermachen!</translation>
     </message>
     <message>
       <source>Meeting Completed</source>
@@ -1291,13 +1400,13 @@ If you have trouble connecting, check your network settings and firewall configu
   <context>
     <name>TimerController</name>
     <message>
-      <location filename="../src/controllers/timer_controller.py" line="173" />
-      <location filename="../src/controllers/timer_controller.py" line="171" />
+      <location filename="../src/controllers/timer_controller.py" line="182" />
+      <location filename="../src/controllers/timer_controller.py" line="180" />
       <source>Meeting starts in</source>
       <translation type="finished">Das Treffen beginnt in</translation>
     </message>
     <message>
-      <location filename="../src/controllers/timer_controller.py" line="176" />
+      <location filename="../src/controllers/timer_controller.py" line="185" />
       <source>Meeting starts now!</source>
       <translation type="finished">Treffen beginnt jetzt!</translation>
     </message>
