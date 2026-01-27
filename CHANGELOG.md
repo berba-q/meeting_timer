@@ -3,6 +3,10 @@
 # [](https://github.com/berba-q/meeting_timer/compare/v1.0.6...v) (2026-01-27)
 
 
+
+## [1.0.6](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v1.0.6) (2026-01-27)
+
+
 ### Bug Fixes
 
 * Fixed an issue where the weekend song editor hides behind the main application window on launch ([c03c815](https://github.com/berba-q/meeting_timer/commit/c03c815acc5284cb952923812890cd6e64de04be))
