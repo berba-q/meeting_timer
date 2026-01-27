@@ -34,6 +34,7 @@ class SettingsController(QObject):
     reminder_settings_changed = pyqtSignal()  # Notification reminder settings
     timing_settings_changed = pyqtSignal()  # Predicted end time, etc.
     general_settings_changed = pyqtSignal()  # Language, etc.
+    co_visit_changed = pyqtSignal(bool)  # CO visit mode changed
     
     def __init__(self, settings_manager: SettingsManager):
         super().__init__()
@@ -93,9 +94,9 @@ class SettingsController(QObject):
         #self.settings_changed.emit()
     
     def set_theme(self, theme: str):
-        """Set application theme (light or dark)"""
-        if theme not in ['light', 'dark']:
-            theme = 'light'  # Default to light theme if invalid
+        """Set application theme (light, dark, or system)"""
+        if theme not in ['light', 'dark', 'system']:
+            theme = 'system'  # Default to system theme if invalid
             
         self.settings_manager.settings.display.theme = theme
         self.settings_manager.save_settings()
@@ -309,3 +310,33 @@ class SettingsController(QObject):
         self.settings_manager.settings.display.force_secondary_cleanup = enabled
         self.settings_manager.save_settings()
         #self.settings_changed.emit()
+
+    def set_co_visit_enabled(self, enabled: bool):
+        """Enable/disable CO visit mode for current week"""
+        from datetime import datetime, timedelta
+        settings = self.settings_manager.settings
+
+        if enabled:
+            today = datetime.now().date()
+            week_start = today - timedelta(days=today.weekday())
+            settings.co_visit.enabled = True
+            settings.co_visit.week_start_date = week_start.isoformat()
+        else:
+            settings.co_visit.enabled = False
+            settings.co_visit.week_start_date = None
+
+        self.settings_manager.save_settings()
+        self.co_visit_changed.emit(enabled)
+
+    def is_co_visit_active(self) -> bool:
+        """Check if CO visit mode is currently active"""
+        return self.settings_manager.settings.co_visit.is_valid_for_current_week()
+
+    def check_and_reset_co_visit(self):
+        """Reset CO visit if week has expired"""
+        settings = self.settings_manager.settings
+        if settings.co_visit.enabled and not settings.co_visit.is_valid_for_current_week():
+            settings.co_visit.enabled = False
+            settings.co_visit.week_start_date = None
+            self.settings_manager.save_settings()
+            self.co_visit_changed.emit(False)

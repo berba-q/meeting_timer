@@ -462,6 +462,13 @@ class EPUBScraperTester:
                 print(f" - Section: {section.title}")
                 for part in section.parts:
                     print(f"    • {part.title} ({part.duration_minutes} min)")
+            # New test: weekend meeting for current week
+            weekend_meeting = en_scraper.get_meeting_for_current_week(meeting_type=MeetingType.WEEKEND)
+            print(f"📅 Current EN Weekend Meeting for week of {weekend_meeting.date.strftime('%Y-%m-%d')}: {weekend_meeting.title}")
+            for section in weekend_meeting.sections:
+                print(f" - Section: {section.title}")
+                for part in section.parts:
+                    print(f"    • {part.title} ({part.duration_minutes} min)")
         except Exception as e:
             print(f"❌ Could not fetch current EN midweek meeting: {e}")
         

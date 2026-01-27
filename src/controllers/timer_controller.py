@@ -10,6 +10,8 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from src.controllers.settings_controller import SettingsController
 from src.models.meeting import Meeting, MeetingPart, MeetingType
 from src.models.timer import Timer, TimerState
+from src.models.session import SessionManager, SessionState
+from src.config import USER_DATA_DIR
 
 class TransitionType(Enum):
     """Types of chairman transitions"""
@@ -54,6 +56,9 @@ class TimerController(QObject):
         # Transition state
         self._in_transition = False
         self._next_part_after_transition = -1
+
+        # Re-entrancy guard for part navigation (prevents crashes from rapid button clicks)
+        self._navigating_part = False
         
         # Meeting progress tracking
         self._total_overtime_seconds = 0
@@ -71,6 +76,10 @@ class TimerController(QObject):
         # Connect timer signals
         self.timer.state_changed.connect(self._handle_timer_state_change)
         self.timer.time_updated.connect(self._handle_time_update)
+
+        # Session manager for crash recovery
+        self.session_manager = SessionManager(USER_DATA_DIR, parent=self)
+        self.session_manager.set_timer_controller(self)
         
     def _initialize_current_time_display(self):
         """Initialize the timer to display current time"""
@@ -209,6 +218,10 @@ class TimerController(QObject):
         self.part_changed.emit(current_part, self.current_part_index)
         self.meeting_started.emit()
         self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time)
+
+        # Start session tracking for crash recovery
+        meeting_file = f"{self.current_meeting.meeting_type.value}_{self.current_meeting.date.strftime('%Y-%m-%d')}_{self.current_meeting.language}.json"
+        self.session_manager.start_session(self.current_meeting, meeting_file)
     
     def _calculate_original_end_time(self):
         """Calculate the original end time based on scheduled parts"""
@@ -345,44 +358,87 @@ class TimerController(QObject):
         """Get total number of transitions in the meeting"""
         if not self.current_meeting:
             return 0
-        
+
         if self.current_meeting.meeting_type == MeetingType.WEEKEND:
             return min(1, len(self.current_meeting.sections) - 1)  # Max 1 for weekend
-        else:
-            return max(0, len(self.current_meeting.sections) - 1)  # Between sections for midweek
+
+        # For midweek, count all parts except those that don't get transitions
+        count = 0
+        all_parts = [part for section in self.current_meeting.sections for part in section.parts]
+        total_parts = len(all_parts)
+
+        for i, part in enumerate(all_parts):
+            # Skip last part (no transition after it)
+            if i >= total_parts - 1:
+                continue
+
+            # Skip Opening Song/Prayer (first part)
+            if i == 0:
+                continue
+
+            # Skip CBS (3rd-to-last, typically 30 min)
+            if i == total_parts - 3 and part.duration_minutes >= 25:
+                continue
+
+            # Skip Concluding Comments / Review and Preview (2nd-to-last)
+            if i == total_parts - 2:
+                continue
+
+            count += 1
+
+        return count
     
     def _calculate_remaining_transitions(self) -> int:
         """Calculate how many chairman transitions are left"""
         if not self.current_meeting or self.current_part_index < 0:
             return 0
-        
-        remaining_transitions = 0
-        current_section_index = -1
-        
-        # Find which section we're currently in
-        part_count = 0
-        for section_index, section in enumerate(self.current_meeting.sections):
-            for part in section.parts:
-                if part_count == self.current_part_index:
-                    current_section_index = section_index
+
+        if self.current_meeting.meeting_type == MeetingType.WEEKEND:
+            # Weekend meetings: find current section and count remaining section transitions
+            current_section_index = -1
+            part_count = 0
+            for section_index, section in enumerate(self.current_meeting.sections):
+                for part in section.parts:
+                    if part_count == self.current_part_index:
+                        current_section_index = section_index
+                        break
+                    part_count += 1
+                if current_section_index != -1:
                     break
-                part_count += 1
+
             if current_section_index != -1:
-                break
-        
-        if current_section_index != -1:
-            # Count transitions from current section to end
-            if self.current_meeting.meeting_type == MeetingType.WEEKEND:
-                # Weekend meetings have fewer transitions
                 remaining_sections = len(self.current_meeting.sections) - current_section_index - 1
-                remaining_transitions = min(remaining_sections, 1)  # Max 1 transition for weekend
-            else:
-                # Midweek meetings have transitions between sections
-                remaining_sections = len(self.current_meeting.sections) - current_section_index - 1
-                remaining_transitions = remaining_sections
-        
-        return remaining_transitions
-    
+                return min(remaining_sections, 1)  # Max 1 transition for weekend
+            return 0
+
+        # For midweek, count remaining parts that get transitions
+        count = 0
+        all_parts = [part for section in self.current_meeting.sections for part in section.parts]
+        total_parts = len(all_parts)
+
+        for i in range(self.current_part_index, total_parts):
+            # Skip last part (no transition after it)
+            if i >= total_parts - 1:
+                continue
+
+            part = all_parts[i]
+
+            # Skip Opening Song/Prayer (first part)
+            if i == 0:
+                continue
+
+            # Skip CBS (3rd-to-last, typically 30 min)
+            if i == total_parts - 3 and part.duration_minutes >= 25:
+                continue
+
+            # Skip Concluding Comments / Review and Preview (2nd-to-last)
+            if i == total_parts - 2:
+                continue
+
+            count += 1
+
+        return count
+
     def _should_add_chairman_transition(self):
         """Check if we should add a chairman transition between parts"""
         if not self.current_meeting or not self.parts_list:
@@ -398,6 +454,26 @@ class TimerController(QObject):
             if next_index in [1, 2]:
                 return True
             return False
+
+        # Midweek meeting logic
+        if self.current_meeting.meeting_type == MeetingType.MIDWEEK:
+            current_part = self.parts_list[self.current_part_index]
+            total_parts = len(self.parts_list)
+
+            # NO transition after Opening Song/Prayer (first part)
+            if self.current_part_index == 0:
+                return False
+
+            # NO transition after Congregation Bible Study (3rd-to-last, typically 30 min)
+            if self.current_part_index == total_parts - 3 and current_part.duration_minutes >= 25:
+                return False
+
+            # NO transition after Concluding Comments / Review and Preview (2nd-to-last)
+            if self.current_part_index == total_parts - 2:
+                return False
+
+            # All other parts get transitions
+            return True
 
         # Default: allow transition
         return True
@@ -439,7 +515,18 @@ class TimerController(QObject):
         """Move to the next part, allowing transitions to be skipped"""
         if not self.current_meeting or not self.parts_list:
             return
-        
+
+        # Re-entrancy guard to prevent crashes from rapid button clicks
+        if self._navigating_part:
+            return
+        self._navigating_part = True
+        try:
+            self._next_part_impl()
+        finally:
+            self._navigating_part = False
+
+    def _next_part_impl(self):
+        """Internal implementation of next_part (called with re-entrancy guard)"""
         # If we're in a transition, cancel it and move immediately to the next part
         if self._in_transition:
             if hasattr(self, '_transition_timer') and self._transition_timer.isActive():
@@ -492,36 +579,46 @@ class TimerController(QObject):
         """Move to the previous part"""
         if not self.current_meeting or not self.parts_list:
             return
-        
-        # Move to previous part
-        self.current_part_index -= 1
-        
-        # Check if we're at the beginning
-        if self.current_part_index < 0:
-            self.current_part_index = 0
-        
-        # Get current part
-        current_part = self.parts_list[self.current_part_index]
-        
-        # Start timer for this part
-        self.timer.start(current_part.duration_seconds)
-        
-        # Emit signal
-        self.part_changed.emit(current_part, self.current_part_index)
-        
-        # Update predicted end time
-        self._update_predicted_end_time()
+
+        # Re-entrancy guard to prevent crashes from rapid button clicks
+        if self._navigating_part:
+            return
+        self._navigating_part = True
+        try:
+            # Move to previous part
+            self.current_part_index -= 1
+
+            # Check if we're at the beginning
+            if self.current_part_index < 0:
+                self.current_part_index = 0
+
+            # Get current part
+            current_part = self.parts_list[self.current_part_index]
+
+            # Start timer for this part
+            self.timer.start(current_part.duration_seconds)
+
+            # Emit signal
+            self.part_changed.emit(current_part, self.current_part_index)
+
+            # Update predicted end time
+            self._update_predicted_end_time()
+        finally:
+            self._navigating_part = False
     
     def stop_meeting(self):
         """Stop the current meeting"""
         # Cancel any active transition timer
         if hasattr(self, '_transition_timer') and self._transition_timer.isActive():
             self._transition_timer.stop()
-        
+
         self._in_transition = False
         self.timer.stop()
         self.current_part_index = -1
         self.meeting_ended.emit()
+
+        # End session tracking (clean exit)
+        self.session_manager.end_session(clean=True)
     
     def pause_timer(self):
         """Pause the current timer"""
@@ -615,3 +712,85 @@ class TimerController(QObject):
         if self.current_meeting:
             # Update the meeting time in the timer
             self._initialize_meeting_countdown()
+
+    def restore_session(self, session: SessionState, adjusted_state: dict):
+        """Restore timer state from a saved session after crash recovery"""
+        if not self.current_meeting or not self.parts_list:
+            return
+
+        # Restore part index
+        self.current_part_index = session.current_part_index
+
+        # Validate part index
+        if self.current_part_index < 0 or self.current_part_index >= len(self.parts_list):
+            print(f"[TimerController] Invalid part index {self.current_part_index}, resetting to 0")
+            self.current_part_index = 0
+
+        # Mark previous parts as completed
+        for i in range(self.current_part_index):
+            self.parts_list[i].is_completed = True
+
+        # Get current part
+        current_part = self.parts_list[self.current_part_index]
+
+        # Restore meeting start time
+        if session.meeting_start_time:
+            try:
+                self._meeting_start_time = datetime.fromisoformat(session.meeting_start_time)
+            except ValueError:
+                self._meeting_start_time = datetime.now()
+        else:
+            self._meeting_start_time = datetime.now()
+
+        # Calculate original end time
+        self._calculate_original_end_time()
+
+        # Restore transition state
+        self._in_transition = session.in_transition
+        self._next_part_after_transition = session.next_part_after_transition
+        self._total_overtime_seconds = session.total_overtime_seconds
+
+        # Stop the countdown timer if running
+        if self._countdown_timer.isActive():
+            self._countdown_timer.stop()
+
+        # Restore timer state based on adjusted values
+        if adjusted_state.get('was_paused', False):
+            # Resume in paused state
+            self.timer.start(session.total_seconds)
+            # Calculate elapsed time from remaining
+            elapsed = session.total_seconds - session.remaining_seconds
+            self.timer._elapsed_time = elapsed
+            self.timer._remaining_seconds = session.remaining_seconds
+            self.timer.pause()
+        elif adjusted_state.get('overtime_seconds', 0) > 0:
+            # Part should be in overtime
+            self.timer.start(session.total_seconds)
+            # Force into overtime state
+            self.timer._elapsed_time = session.total_seconds + adjusted_state['overtime_seconds']
+            self.timer._remaining_seconds = -adjusted_state['overtime_seconds']
+            self.timer._state = TimerState.OVERTIME
+            self.timer.state_changed.emit(TimerState.OVERTIME)
+        else:
+            # Normal running state with adjusted remaining time
+            remaining = adjusted_state.get('remaining_seconds', session.remaining_seconds)
+            self.timer.start(session.total_seconds)
+            # Adjust to correct remaining time
+            elapsed = session.total_seconds - remaining
+            self.timer._elapsed_time = elapsed
+            self.timer._remaining_seconds = remaining
+
+        # Emit signals to update UI
+        self.part_changed.emit(current_part, self.current_part_index)
+        self.timer.state_changed.emit(self.timer.state)
+        self.timer.time_updated.emit(self.timer.remaining_seconds)
+        self.meeting_started.emit()
+
+        # Update predicted end time
+        self._update_predicted_end_time()
+        if self._original_end_time and self._predicted_end_time:
+            self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time)
+
+        # Restart session tracking
+        meeting_file = f"{self.current_meeting.meeting_type.value}_{self.current_meeting.date.strftime('%Y-%m-%d')}_{self.current_meeting.language}.json"
+        self.session_manager.start_session(self.current_meeting, meeting_file)

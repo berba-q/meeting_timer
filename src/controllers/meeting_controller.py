@@ -120,7 +120,9 @@ class MeetingController(QObject):
                 "opening_comments": "Opening Comments",
                 "concluding_comments": "Concluding Comments",
                 "opening_song_prayer": "Opening Song and Prayer",
-                "closing_song_prayer": "Closing Song and Prayer"
+                "closing_song_prayer": "Closing Song and Prayer",
+                "service_talk": "Service Talk",
+                "co_talk": "Circuit Overseer Talk"
             },
             "it": {
                 "song": "Cantico",
@@ -128,7 +130,9 @@ class MeetingController(QObject):
                 "opening_comments": "Commenti introduttivi",
                 "concluding_comments": "Commenti conclusivi",
                 "opening_song_prayer": "Cantico iniziale e preghiera",
-                "closing_song_prayer": "Cantico finale e preghiera"
+                "closing_song_prayer": "Cantico finale e preghiera",
+                "service_talk": "Discorso di servizio",
+                "co_talk": "Discorso del sorvegliante di circoscrizione"
             },
             "fr": {
                 "song": "Cantique",
@@ -136,7 +140,9 @@ class MeetingController(QObject):
                 "opening_comments": "Paroles d'introduction",
                 "concluding_comments": "Commentaires de conclusion",
                 "opening_song_prayer": "Cantique d'ouverture et prière",
-                "closing_song_prayer": "Cantique de clôture et prière"
+                "closing_song_prayer": "Cantique de clôture et prière",
+                "service_talk": "Discours de service",
+                "co_talk": "Discours du surveillant de circonscription"
             },
             "es": {
                 "song": "Canción",
@@ -144,7 +150,9 @@ class MeetingController(QObject):
                 "opening_comments": "Palabras de introducción",
                 "concluding_comments": "Comentarios finales",
                 "opening_song_prayer": "Canción inicial y oración",
-                "closing_song_prayer": "Canción final y oración"
+                "closing_song_prayer": "Canción final y oración",
+                "service_talk": "Discurso de servicio",
+                "co_talk": "Discurso del superintendente de circuito"
             },
             "de": {
                 "song": "Lied",
@@ -152,7 +160,9 @@ class MeetingController(QObject):
                 "opening_comments": "Einleitende Worte",
                 "concluding_comments": "Schlussworte",
                 "opening_song_prayer": "Eingangslied und Gebet",
-                "closing_song_prayer": "Schlusslied und Gebet"
+                "closing_song_prayer": "Schlusslied und Gebet",
+                "service_talk": "Dienstgespräch",
+                "co_talk": "Ansprache des Kreisaufsehers"
             },
             "pt": {
                 "song": "Cântico",
@@ -160,7 +170,9 @@ class MeetingController(QObject):
                 "opening_comments": "Comentários introdutórios",
                 "concluding_comments": "Comentários finais",
                 "opening_song_prayer": "Cântico inicial e oração",
-                "closing_song_prayer": "Cântico final e oração"
+                "closing_song_prayer": "Cântico final e oração",
+                "service_talk": "Discurso de serviço",
+                "co_talk": "Discurso do superintendente de circuito"
             },
             "ja": {
                 "song": "歌",
@@ -168,7 +180,9 @@ class MeetingController(QObject):
                 "opening_comments": "開会の言葉",
                 "concluding_comments": "結びの言葉",
                 "opening_song_prayer": "開会の歌と祈り",
-                "closing_song_prayer": "閉会の歌と祈り"
+                "closing_song_prayer": "閉会の歌と祈り",
+                "service_talk": "奉仕の話",
+                "co_talk": "巡回監督の話"
             },
             "ko": {
                 "song": "노래",
@@ -176,7 +190,9 @@ class MeetingController(QObject):
                 "opening_comments": "개회사",
                 "concluding_comments": "폐회사",
                 "opening_song_prayer": "개회 노래 및 기도",
-                "closing_song_prayer": "폐회 노래 및 기도"
+                "closing_song_prayer": "폐회 노래 및 기도",
+                "service_talk": "봉사 연설",
+                "co_talk": "순회 감독자 연설"
             },
             "zh": {
                 "song": "歌曲",
@@ -184,7 +200,9 @@ class MeetingController(QObject):
                 "opening_comments": "开场白",
                 "concluding_comments": "结束语",
                 "opening_song_prayer": "开场歌曲和祈祷",
-                "closing_song_prayer": "结束歌曲和祈祷"
+                "closing_song_prayer": "结束歌曲和祈祷",
+                "service_talk": "服务讲话",
+                "co_talk": "巡回监督讲话"
             }
             # Add more languages as needed
         }
@@ -682,12 +700,86 @@ class MeetingController(QObject):
         """Handle a meeting being updated from the editor"""
         # Save the meeting
         self.save_meeting(meeting)
-        
+
         # Update current meetings dictionary
         self.current_meetings[meeting.meeting_type] = meeting
-        
+
         # Set as current meeting
         self.set_current_meeting(meeting)
-        
+
         # Emit signal to notify all components
         self.meetings_loaded.emit(self.current_meetings)
+
+    def apply_co_visit_modifications(self, meeting: Meeting) -> Meeting:
+        """Apply CO visit schedule modifications to a meeting"""
+        import copy
+        modified = copy.deepcopy(meeting)
+
+        if meeting.meeting_type == MeetingType.MIDWEEK:
+            return self._apply_midweek_co_visit(modified)
+        elif meeting.meeting_type == MeetingType.WEEKEND:
+            return self._apply_weekend_co_visit(modified)
+        return modified
+
+    def _apply_midweek_co_visit(self, meeting: Meeting) -> Meeting:
+        """
+        Apply midweek CO visit modifications using indices relative to END:
+        - Section 2 (Living as Christians): [..., CBS(-3), Review(-2), Closing(-1)]
+        - Move Review before CBS
+        - Replace CBS with Service Talk (30 min)
+        """
+        translations = self._get_translations(meeting.language)
+
+        # Living as Christians is section index 2
+        if len(meeting.sections) > 2:
+            section = meeting.sections[2]
+            parts = section.parts
+
+            # Use indices from the end (works regardless of how many parts there are)
+            # Structure ends with: [..., CBS, Review/Concluding Comments, Closing Song]
+            if len(parts) >= 3:
+                # Calculate indices from end
+                cbs_idx = len(parts) - 3      # CBS is third from end
+                review_idx = len(parts) - 2   # Review is second from end
+
+                # Move Review before CBS
+                review_part = parts.pop(review_idx)
+                parts.insert(cbs_idx, review_part)
+                # After insert, CBS shifted to cbs_idx + 1
+
+                # Replace CBS (now at cbs_idx + 1) with Service Talk
+                parts[cbs_idx + 1].title = translations.get('service_talk', 'Service Talk')
+                parts[cbs_idx + 1].duration_minutes = 30
+
+        return meeting
+
+    def _apply_weekend_co_visit(self, meeting: Meeting) -> Meeting:
+        """
+        Apply weekend CO visit modifications using section/part indices:
+        - Section 1 (Watchtower Study): [Song(0), WT Study(1), Closing(2)]
+        - Reduce WT Study (index 1) to 30 mins
+        - Insert CO Talk (30 min) at index 2 (before closing song)
+        """
+        translations = self._get_translations(meeting.language)
+
+        # Watchtower Study is section index 1
+        if len(meeting.sections) > 1:
+            section = meeting.sections[1]
+            parts = section.parts
+
+            # Expected structure: [Song(0), WT Study(1), Closing(2)]
+            # We need at least 3 parts
+            if len(parts) >= 3:
+                # Reduce Watchtower Study (index 1) to 30 minutes
+                parts[1].duration_minutes = 30
+
+                # Insert CO Talk at index 2 (before closing song)
+                co_talk = MeetingPart(
+                    title=translations.get('co_talk', 'Circuit Overseer Talk'),
+                    duration_minutes=30,
+                    presenter=""
+                )
+                parts.insert(2, co_talk)
+                # Now structure is: [Song(0), WT Study(1), CO Talk(2), Closing(3)]
+
+        return meeting

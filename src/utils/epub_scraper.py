@@ -963,9 +963,11 @@ class EPUBMeetingScraper:
                 if content_file:
                     date_to_file[meeting_date] = (content_file, h3_text)
                     print(f"[{self.language}] Matched TOC entry '{h3_text}' to file '{content_file}'")
-        
+
         # Step 3: Parse the corresponding file and extract <h1> article title and songs.
-        for meeting_date, (content_file, link_text) in date_to_file.items():
+        # Sort the meeting dates before processing, in chronological order
+        for meeting_date in sorted(date_to_file):
+            content_file, link_text = date_to_file[meeting_date]
             print(f"[{self.language}]  Processing Watchtower content from: {content_file} for date: {meeting_date}")
             html_content = epub_content[content_file]
             try:
@@ -1128,7 +1130,7 @@ class EPUBMeetingScraper:
                         new_parts.extend([
                             {
                                 'title': f"OPENING_SONG_PRAYER|{opening_song}",
-                                'duration_minutes': 5,
+                                'duration_minutes': 4,
                                 'type': 'song_prayer',
                                 'section': part.get('section', 'treasures')
                             },
@@ -1157,7 +1159,7 @@ class EPUBMeetingScraper:
                             },
                             {
                                 'title': f"CLOSING_SONG_PRAYER|{closing_song}",
-                                'duration_minutes': 5,
+                                'duration_minutes': 4,
                                 'type': 'song_prayer',
                                 'section': part.get('section', 'christian_living')
                             }
@@ -1173,7 +1175,7 @@ class EPUBMeetingScraper:
                         
                         new_parts.append({
                             'title': f"MIDDLE_SONG|{song_num}",
-                            'duration_minutes': 3,
+                            'duration_minutes': 2,
                             'type': 'song',
                             'section': part.get('section', 'christian_living')
                         })
@@ -1277,10 +1279,10 @@ class EPUBMeetingScraper:
                 contains_current_studies = False
                 for meeting_date_str in weekend_meetings.keys():
                     meeting_date = datetime.strptime(meeting_date_str, '%Y-%m-%d')
-                    week_start = meeting_date - timedelta(days=6)  # Sunday is end of week
-                    week_end = meeting_date
-                    
-                    if week_start <= today <= week_end:
+                    study_week_start = meeting_date - timedelta(days=6)
+                    # Find the most recent past Saturday (or today if Saturday)
+                    last_saturday = today - timedelta(days=(today.weekday() + 2) % 7)
+                    if study_week_start <= last_saturday <= meeting_date:
                         contains_current_studies = True
                         break
                 
@@ -1333,11 +1335,11 @@ class EPUBMeetingScraper:
                     week_start = meeting_date  # Monday
                     week_end = meeting_date + timedelta(days=6)  # Sunday
                 else:
-                    # For weekend meetings: cached date is Sunday at the END of the week
-                    # For example: cached "2025-06-29" (Sunday) represents the week "June 23-29"
-                    # So the week range ends on the cached Sunday and starts 6 days before
-                    week_end = meeting_date    # The cached Sunday
-                    week_start = meeting_date - timedelta(days=6)  # Monday of that same week
+                    # For weekend meetings: cached date is the START of the week (same as midweek)
+                    # _extract_heading_date() returns the start date of the range
+                    # For example: heading "June 23-29" returns "2025-06-23" (the start)
+                    week_start = meeting_date  # Start of week
+                    week_end = meeting_date + timedelta(days=6)  # End of week (Sunday)
                 
                 print(f"[{self.language}] Checking week from {week_start.date()} to {week_end.date()} against {target_date.date()}")
                 

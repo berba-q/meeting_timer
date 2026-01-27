@@ -242,7 +242,7 @@ def create_default_templates():
             {
                 "title": "TREASURES FROM GOD'S WORD",
                 "parts": [
-                    {"title": "Opening Song and Prayer", "duration_minutes": 5, "presenter": ""},
+                    {"title": "Opening Song and Prayer", "duration_minutes": 4, "presenter": ""},
                     {"title": "Treasures from God's Word", "duration_minutes": 10, "presenter": ""},
                     {"title": "Digging for Spiritual Gems", "duration_minutes": 10, "presenter": ""},
                     {"title": "Bible Reading", "duration_minutes": 4, "presenter": ""}
@@ -259,11 +259,11 @@ def create_default_templates():
             {
                 "title": "LIVING AS CHRISTIANS",
                 "parts": [
-                    {"title": "Song", "duration_minutes": 5, "presenter": ""},
+                    {"title": "Song", "duration_minutes": 2, "presenter": ""},
                     {"title": "Local Needs", "duration_minutes": 15, "presenter": ""},
                     {"title": "Congregation Bible Study", "duration_minutes": 30, "presenter": ""},
                     {"title": "Review and Preview", "duration_minutes": 3, "presenter": ""},
-                    {"title": "Concluding Song and Prayer", "duration_minutes": 5, "presenter": ""}
+                    {"title": "Concluding Song and Prayer", "duration_minutes": 4, "presenter": ""}
                 ]
             }
         ]

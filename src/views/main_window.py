@@ -23,6 +23,7 @@ from src.controllers.settings_controller import SettingsController
 from src.models.settings import SettingsManager, TimerDisplayMode, MeetingSourceMode
 from src.models.meeting import Meeting, MeetingType
 from src.models.timer import TimerState
+from src.models.session import SessionState
 from src.views.timer_view import TimerView
 from src.views.meeting_view import MeetingView
 from src.views.settings_view import SettingsDialog
@@ -31,6 +32,7 @@ from src.views.weekend_song_editor import WeekendSongEditorDialog
 from src.utils.network_display_manager import NetworkDisplayManager
 from src.utils.network_broadcaster import NetworkBroadcaster
 from src.views.network_status_widget import NetworkStatusWidget, NetworkInfoDialog
+from src.views.toast_notification import ToastManager
 from src.models.settings import NetworkDisplayMode
 from src.utils.update_checker import check_for_updates
 
@@ -89,7 +91,13 @@ class MainWindow(QMainWindow):
         self.network_status_widget = None
         # Secondary display window placeholder
         self.secondary_display = None
-        
+
+        # Button debouncing to prevent rapid click crashes on Windows
+        self._button_cooldown = False
+        self._cooldown_timer = QTimer()
+        self._cooldown_timer.setSingleShot(True)
+        self._cooldown_timer.timeout.connect(self._reset_button_cooldown)
+
         # Setup UI
         self.setWindowTitle("OnTime Meeting Timer")
         self.setMinimumSize(600, 400)
@@ -123,10 +131,16 @@ class MainWindow(QMainWindow):
         self.tray_icon.show()
         self._create_central_widget()
         self._create_status_bar()
+
+        # Initialize toast notification manager for in-app notifications
+        self.toast_manager = ToastManager(self.centralWidget())
         
         # Connect signals
         self._connect_signals()
-        
+
+        # Check if CO visit has expired (new week started)
+        self.settings_controller.check_and_reset_co_visit()
+
         # Initialize timer to show current time
         self._initialize_timer_display()
         
@@ -376,7 +390,10 @@ class MainWindow(QMainWindow):
             mode = self.settings_controller.get_settings().network_display.mode
             if mode != NetworkDisplayMode.DISABLED and self.network_display_manager:
                 QTimer.singleShot(500, self._auto_start_network_display)
-                
+
+        # Check for session recovery (crash recovery)
+        QTimer.singleShot(1000, self._check_session_recovery)
+
         # silently check for updates after a short delay
         QTimer.singleShot(3000, lambda: self._check_for_updates(silent=True))
     
@@ -850,25 +867,38 @@ class MainWindow(QMainWindow):
         # Switch theme
         self.theme_menu = view_menu.addMenu(self.tr("&Theme"))
 
+        # System theme action (follow OS)
+        self.system_theme_action = QAction(self.tr("&System (follow OS)"), self)
+        self.system_theme_action.setCheckable(True)
+        self.system_theme_action.triggered.connect(lambda: self._set_theme("system"))
+        self.theme_menu.addAction(self.system_theme_action)
+
         # Light theme action
         self.light_theme_action = QAction(self.tr("&Light Theme"), self)
         self.light_theme_action.setCheckable(True)
         self.light_theme_action.triggered.connect(lambda: self._set_theme("light"))
         self.theme_menu.addAction(self.light_theme_action)
-        
+
         # Dark theme action
         self.dark_theme_action = QAction(self.tr("&Dark Theme"), self)
         self.dark_theme_action.setCheckable(True)
         self.dark_theme_action.triggered.connect(lambda: self._set_theme("dark"))
         self.theme_menu.addAction(self.dark_theme_action)
-        
+
         # Set initial theme selection
         current_theme = self.settings_controller.get_settings().display.theme
-        if current_theme == "dark":
-            self.dark_theme_action.setChecked(True)
-        else:
-            self.light_theme_action.setChecked(True)
-        
+        self.system_theme_action.setChecked(current_theme == "system")
+        self.light_theme_action.setChecked(current_theme == "light")
+        self.dark_theme_action.setChecked(current_theme == "dark")
+
+        # CO Visit toggle
+        view_menu.addSeparator()
+        self.co_visit_action = QAction(self.tr("CO Visit Mode"), self)
+        self.co_visit_action.setCheckable(True)
+        self.co_visit_action.setChecked(self.settings_controller.is_co_visit_active())
+        self.co_visit_action.triggered.connect(self._toggle_co_visit)
+        view_menu.addAction(self.co_visit_action)
+
         # Help menu
         help_menu = menu_bar.addMenu(self.tr("&Help"))
 
@@ -1149,13 +1179,14 @@ class MainWindow(QMainWindow):
         self.timer_controller.meeting_countdown_updated.connect(self._update_countdown)
         
         # Settings controller signals
-        
+
         self.settings_controller.language_changed.connect(self._on_language_changed) # Language change signal
         self.settings_controller.secondary_screen_changed.connect(self._on_secondary_screen_changed)
         self.settings_controller.tools_dock_state_changed.connect(self._on_tools_dock_state_changed)
         self.settings_controller.theme_changed.connect(self._theme_changed)
         self.settings_controller.meeting_settings_changed.connect(self._on_meeting_settings_changed)
         self.settings_controller.reminder_settings_changed.connect(self._on_reminder_settings_changed)
+        self.settings_controller.co_visit_changed.connect(self._on_co_visit_changed)
         # General settings changed signal for all other settings
         self.settings_controller.settings_changed.connect(self._settings_changed)
         
@@ -1174,6 +1205,15 @@ class MainWindow(QMainWindow):
         self._last_network_url = url # Store the URL for later use
         # Update menu action text
         self.toggle_network_action.setText(self.tr("Stop Network Display"))
+
+        # Update session state for crash recovery
+        print(f"[MainWindow] _network_display_started called with url: {url}")
+        has_timer = hasattr(self, 'timer_controller')
+        has_session = has_timer and self.timer_controller.session_manager.has_active_session()
+        print(f"[MainWindow] has_timer_controller: {has_timer}, has_active_session: {has_session}")
+        if has_timer and has_session:
+            self.timer_controller.session_manager.set_network_broadcast_state(True)
+            print("[MainWindow] Set network_broadcast_active to True")
 
         # Update status bar
         self.statusBar().showMessage(self.tr(f"Network display started at {url}"), 5000)
@@ -1196,6 +1236,10 @@ class MainWindow(QMainWindow):
         self._last_network_url = None # Clear the URL
         # Update menu action text
         self.toggle_network_action.setText(self.tr("Start Network Display"))
+
+        # Update session state for crash recovery
+        if hasattr(self, 'timer_controller') and self.timer_controller.session_manager.has_active_session():
+            self.timer_controller.session_manager.set_network_broadcast_state(False)
 
         # Update status bar
         self.statusBar().showMessage(self.tr("Network display stopped"), 5000)
@@ -1232,9 +1276,12 @@ class MainWindow(QMainWindow):
         """Handle meeting selection from the dropdown"""
         if index < 0 or self.meeting_selector.count() == 0:
             return
-        
+
         meeting = self.meeting_selector.itemData(index)
         if meeting:
+            # Apply CO visit modifications if active
+            if self.settings_controller.is_co_visit_active():
+                meeting = self.meeting_controller.apply_co_visit_modifications(meeting)
             self._set_current_meeting(meeting)
 
     
@@ -1328,10 +1375,13 @@ class MainWindow(QMainWindow):
 
         # stop start reminder animation
         if hasattr(self, 'start_button') and hasattr(self.start_button, '_pulse_animations'):
-            for anim in self.start_button._pulse_animations:
-                anim.stop()
+            for anim in list(self.start_button._pulse_animations):  # Copy list to avoid modification during iteration
+                if anim is not None:
+                    anim.stop()
             self.start_button._pulse_animations.clear()
-            self.start_button.graphicsEffect().setOpacity(1.0)
+            effect = self.start_button.graphicsEffect()
+            if effect is not None:
+                effect.setOpacity(1.0)
 
         # If secondary display exists, update it to show meeting info
         self.timer_view.show_clock = False
@@ -1434,19 +1484,34 @@ class MainWindow(QMainWindow):
         if self.timer_controller.timer.state == TimerState.STOPPED:
             self.timer_controller.timer._update_current_time()
     
+    def _translate_transition_message(self, transition_msg):
+        """Translate chairman transition messages.
+
+        Uses literal strings so pylupdate6 can extract them for translation.
+        """
+        # Map enum values to translated strings using literal tr() calls
+        translations = {
+            "Chairman Counsel and Transition": self.tr("Chairman Counsel and Transition"),
+            "Chairman Introduction": self.tr("Chairman Introduction"),
+            "Chairman Transition": self.tr("Chairman Transition"),
+        }
+        return translations.get(transition_msg, transition_msg)
+
     def _transition_started(self, transition_msg):
         """Handle chairman transition period"""
-        # Update the current part label
+        # Translate the transition message
+        translated_msg = self._translate_transition_message(transition_msg)
 
-        self.current_part_label.setText(self.tr(f"⏳ {transition_msg} (1:00)"))
+        # Update the current part label
+        self.current_part_label.setText(f"⏳ {translated_msg} (1:00)")
 
         # Also update the part_label in the timer view
-        self.timer_view.part_label.setText(self.tr(transition_msg))
+        self.timer_view.part_label.setText(translated_msg)
 
         # Update secondary display if available
         if self.secondary_display:
             # Use info_label1 instead of next_part_label in the new design
-            self.secondary_display.info_label1.setText(self.tr(transition_msg))
+            self.secondary_display.info_label1.setText(translated_msg)
             self.secondary_display.info_label1.setStyleSheet("""
                 color: #bb86fc; /* Purple for transitions */
                 font-size: 60px;
@@ -1510,29 +1575,34 @@ class MainWindow(QMainWindow):
     
     def _apply_current_theme(self):
         """Apply the current theme from settings"""
-        from src.utils.resources import apply_stylesheet
-        
+        from src.utils.resources import apply_stylesheet, get_system_theme
+
         theme = self.settings_controller.get_settings().display.theme
+        # Resolve "system" to actual theme
+        if theme == "system":
+            theme = get_system_theme()
         apply_stylesheet(QApplication.instance(), theme)
-    
+
     def _set_theme(self, theme: str):
         """Set the application theme"""
         # Update theme in settings
         self.settings_controller.set_theme(theme)
-        
+
         # Update menu checkboxes
+        self.system_theme_action.setChecked(theme == "system")
         self.light_theme_action.setChecked(theme == "light")
         self.dark_theme_action.setChecked(theme == "dark")
-        
+
         # Apply the theme
         self._apply_current_theme()
-    
+
     def _theme_changed(self, theme: str):
         """Handle theme change from settings"""
         # Update menu checkboxes
+        self.system_theme_action.setChecked(theme == "system")
         self.light_theme_action.setChecked(theme == "light")
         self.dark_theme_action.setChecked(theme == "dark")
-        
+
         # Apply the theme
         self._apply_current_theme()
         
@@ -1637,19 +1707,24 @@ class MainWindow(QMainWindow):
             # Stop visual animations (e.g., start/next button pulse)
             for btn in [self.start_button, self.next_button]:
                 if hasattr(btn, '_pulse_animations'):
-                    for anim in btn._pulse_animations:
-                        anim.stop()
+                    for anim in list(btn._pulse_animations):  # Copy list to avoid modification during iteration
+                        if anim is not None:
+                            anim.stop()
                     btn._pulse_animations.clear()
-                    if btn.graphicsEffect():
-                        btn.graphicsEffect().setOpacity(1.0)
+                    effect = btn.graphicsEffect()
+                    if effect is not None:
+                        effect.setOpacity(1.0)
                         btn.setGraphicsEffect(None)
 
             self.timer_controller.stop_meeting()
     
     def _toggle_pause_resume(self):
         """Toggle between pause and resume"""
+        # Debounce rapid clicks to prevent crashes on Windows
+        if self._is_button_debounced():
+            return
         from src.utils.resources import get_icon
-        
+
         if self.timer_controller.timer.state == TimerState.RUNNING:
             self.timer_controller.pause_timer()
             # Disable all other controls during pause
@@ -1689,23 +1764,47 @@ class MainWindow(QMainWindow):
                     widget.graphicsEffect().setOpacity(1.0)
                     widget.setGraphicsEffect(None)
     
+    def _reset_button_cooldown(self):
+        """Reset the button cooldown flag"""
+        self._button_cooldown = False
+
+    def _is_button_debounced(self) -> bool:
+        """Check if button action should be debounced (ignored due to rapid clicking)"""
+        if self._button_cooldown:
+            return True
+        self._button_cooldown = True
+        self._cooldown_timer.start(150)  # 150ms cooldown between button actions
+        return False
+
     def _next_part(self):
         """Move to the next part"""
+        # Debounce rapid clicks to prevent crashes on Windows
+        if self._is_button_debounced():
+            return
         # Stop next button pulse if active
         if hasattr(self, 'next_button') and hasattr(self.next_button, '_pulse_animations'):
-            for anim in self.next_button._pulse_animations:
-                anim.stop()
+            for anim in list(self.next_button._pulse_animations):  # Copy list to avoid modification during iteration
+                if anim is not None:
+                    anim.stop()
             self.next_button._pulse_animations.clear()
-            self.next_button.graphicsEffect().setOpacity(1.0)
+            effect = self.next_button.graphicsEffect()
+            if effect is not None:
+                effect.setOpacity(1.0)
         # Move to the next part
         self.timer_controller.next_part()
-    
+
     def _previous_part(self):
         """Move to the previous part"""
+        # Debounce rapid clicks to prevent crashes on Windows
+        if self._is_button_debounced():
+            return
         self.timer_controller.previous_part()
-    
+
     def _adjust_time(self, minutes_delta):
         """Adjust timer by adding/removing minutes"""
+        # Debounce rapid clicks to prevent crashes on Windows
+        if self._is_button_debounced():
+            return
         self.timer_controller.adjust_time(minutes_delta)
     
     # Notification for meeting start and advance    
@@ -1745,59 +1844,62 @@ class MainWindow(QMainWindow):
         widget._pulse_animations = [a for a in widget._pulse_animations if a.state() == QPropertyAnimation.State.Running]
         widget._pulse_animations.append(anim)
         
-    def _show_tray_notification(self, title, message):
-        """Show a tray notification with the given title and message."""
-        if hasattr(self, 'tray_icon') and self.tray_icon:
-            self.tray_icon.showMessage(
-                title,
-                message,
-                self.tray_icon.icon(),
-                5000  # 5 seconds
-            )
+    def _show_toast_notification(self, title, message, icon=""):
+        """Show an in-app toast notification with the given title and message.
+
+        Args:
+            title: The notification title (should be pre-translated via tr())
+            message: The notification message (should be pre-translated via tr())
+            icon: Optional emoji icon to display
+        """
+        if hasattr(self, 'toast_manager') and self.toast_manager:
+            self.toast_manager.show_toast(title, message, icon, duration=5000)
         else:
-            print("No tray_icon found")
+            print("No toast_manager found")
         
     def _nudge_start(self):
-        """Visual + tray nudge to remind the user to start the meeting."""
+        """Visual + toast nudge to remind the user to start the meeting."""
         if not getattr(self, 'start_button', None):
             return
 
         # Pulse the button
         self._pulse_widget(self.start_button)
-        
-        # Show tray message
-        self._show_tray_notification(
-        self.tr("⌛ Did We Forget Something?"),
-        self.tr("Click Start Meeting to launch the meeting timer and stay on track.")
-    )
+
+        # Show in-app toast message
+        self._show_toast_notification(
+            self.tr("Did We Forget Something?"),
+            self.tr("Click Start Meeting to launch the meeting timer and stay on track."),
+            icon="⌛"
+        )
 
 
             
     def _nudge_advance(self):
-        """Visual + tray nudge to remind the user to advance to the next part."""
+        """Visual + toast nudge to remind the user to advance to the next part."""
         print("_nudge_advance called")
         if not getattr(self, 'next_button', None):
             print("No next_button found")
             return
-        
+
         # Pulse the button
         self._pulse_widget(self.next_button)
-        
+
         # Get current part title
-        part_title = "current part"
-        if (hasattr(self.timer_controller, 'current_part_index') and 
+        part_title = self.tr("current part")
+        if (hasattr(self.timer_controller, 'current_part_index') and
             hasattr(self.timer_controller, 'parts_list') and
             0 <= self.timer_controller.current_part_index < len(self.timer_controller.parts_list)):
-            
+
             part = self.timer_controller.parts_list[self.timer_controller.current_part_index]
             if hasattr(part, 'title'):
                 part_title = part.title
-        
-        # Show tray message
-        self._show_tray_notification(
-        self.tr("😅 Time to move on!"),
-        self.tr(f"'{part_title}' is over — advance to next part?")
-    )
+
+        # Show in-app toast message
+        self._show_toast_notification(
+            self.tr("Time to move on!"),
+            self.tr("'{part_title}' is over — advance to next part?").replace("{part_title}", part_title),
+            icon="😅"
+        )
 
     
     def _create_new_meeting(self):
@@ -1920,7 +2022,14 @@ class MainWindow(QMainWindow):
                 dialog.setWindowTitle(self.tr("Song Entry Required"))
                 dialog.setMinimumWidth(450)
                 dialog.setModal(True)
-                dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
+                # Ensure dialog appears on top of the main window (especially on Windows)
+                dialog.setWindowFlags(
+                    dialog.windowFlags()
+                    & ~Qt.WindowType.WindowContextHelpButtonHint
+                    | Qt.WindowType.WindowStaysOnTopHint
+                )
+                dialog.raise_()
+                dialog.activateWindow()
 
                 layout = QVBoxLayout(dialog)
 
@@ -1966,7 +2075,8 @@ class MainWindow(QMainWindow):
                         self.showFullScreen()
                     else:
                         QTimer.singleShot(200, self._force_normal_window_state)
-            QTimer.singleShot(0, ask_and_edit)
+            # Delay slightly to ensure main window is fully shown (helps on Windows)
+            QTimer.singleShot(300, ask_and_edit)
 
     def _force_normal_window_state(self):
         self.showNormal()
@@ -2105,6 +2215,47 @@ class MainWindow(QMainWindow):
             self.secondary_display = None
 
         self._update_secondary_display()
+
+    def _toggle_co_visit(self, checked: bool):
+        """Toggle CO visit mode"""
+        if checked:
+            self._show_toast_notification(
+                self.tr("CO Visit Mode Enabled"),
+                self.tr("CO visit schedule will be applied to meetings this week."),
+                icon=""
+            )
+        else:
+            self._show_toast_notification(
+                self.tr("CO Visit Mode Disabled"),
+                self.tr("Normal meeting schedule restored."),
+                icon=""
+            )
+
+        self.settings_controller.set_co_visit_enabled(checked)
+        self._reload_current_meeting_with_co_visit()
+
+    def _reload_current_meeting_with_co_visit(self):
+        """Reload the current meeting with or without CO visit modifications"""
+        current_meeting = self.meeting_controller.current_meeting
+        if not current_meeting:
+            return
+
+        # Get the original meeting from the controller
+        meeting_type = current_meeting.meeting_type
+        original_meeting = self.meeting_controller.current_meetings.get(meeting_type)
+
+        if original_meeting:
+            if self.settings_controller.is_co_visit_active():
+                modified = self.meeting_controller.apply_co_visit_modifications(original_meeting)
+                self._set_current_meeting(modified)
+            else:
+                self._set_current_meeting(original_meeting)
+
+    def _on_co_visit_changed(self, enabled: bool):
+        """Handle CO visit mode changes from settings"""
+        if hasattr(self, 'co_visit_action'):
+            self.co_visit_action.setChecked(enabled)
+        self._reload_current_meeting_with_co_visit()
     
     def _update_secondary_display(self):
         """Update secondary display based on settings"""
@@ -2211,9 +2362,9 @@ class MainWindow(QMainWindow):
             self.predicted_end_time_label.setText(self.tr(f"End: {predicted_time_str} ({diff_minutes} min)"))
             self.predicted_end_time_label.setStyleSheet("color: green;")
         else:
-            # On time
+            # On time - use default theme text color
             self.predicted_end_time_label.setText(self.tr(f"End: {predicted_time_str} (on time)"))
-            self.predicted_end_time_label.setStyleSheet("color: black;")
+            self.predicted_end_time_label.setStyleSheet("")
         
         # Make the label visible
         self.predicted_end_time_label.setVisible(True)
@@ -2234,6 +2385,217 @@ class MainWindow(QMainWindow):
 
 
     # ------------------------------------------------------------------
+    # Session Recovery (Crash Recovery)
+    # ------------------------------------------------------------------
+    def _check_session_recovery(self):
+        """Check if there's a session to recover from a crash"""
+        session = self.timer_controller.session_manager.check_for_recovery()
+
+        if not session:
+            return
+
+        # Check if session is stale (older than 24 hours)
+        is_stale = self.timer_controller.session_manager.is_session_stale(session)
+
+        if is_stale:
+            self._show_stale_session_dialog(session)
+        else:
+            self._show_recovery_dialog(session)
+
+    def _show_recovery_dialog(self, session: SessionState):
+        """Show dialog offering to recover the session"""
+        from src.config import MEETINGS_DIR
+
+        # Try to load the meeting to check for changes
+        meeting_path = MEETINGS_DIR / session.meeting_file
+        meeting = None
+        if meeting_path.exists():
+            meeting = self.meeting_controller._load_meeting_file(str(meeting_path))
+
+        # Check if meeting has changed
+        meeting_changed = False
+        if meeting:
+            meeting_changed = self.timer_controller.session_manager.is_meeting_changed(session, meeting)
+
+        if meeting_changed:
+            msg = QMessageBox(self)
+            msg.setWindowTitle(self.tr("Session Recovery"))
+            msg.setText(self.tr("A previous session was interrupted, but the meeting schedule has changed."))
+            msg.setInformativeText(self.tr("Would you like to attempt recovery anyway, start fresh, or discard?"))
+            msg.setStandardButtons(
+                QMessageBox.StandardButton.Yes |
+                QMessageBox.StandardButton.No |
+                QMessageBox.StandardButton.Discard
+            )
+            msg.button(QMessageBox.StandardButton.Yes).setText(self.tr("Recover Anyway"))
+            msg.button(QMessageBox.StandardButton.No).setText(self.tr("Start Fresh"))
+            msg.button(QMessageBox.StandardButton.Discard).setText(self.tr("Discard"))
+
+            result = msg.exec()
+
+            if result == QMessageBox.StandardButton.Discard:
+                self.timer_controller.session_manager.clear_session()
+                return
+            elif result == QMessageBox.StandardButton.No:
+                self.timer_controller.session_manager.clear_session()
+                return
+            # Yes = continue to restore
+        else:
+            # Calculate adjusted state to show in dialog
+            adjusted = self.timer_controller.session_manager.calculate_adjusted_state(session)
+
+            msg = QMessageBox(self)
+            msg.setWindowTitle(self.tr("Session Recovery"))
+            msg.setText(self.tr("A previous meeting session was interrupted."))
+
+            # Build informative text
+            part_num = session.current_part_index + 1
+            if adjusted.get('was_paused', False):
+                mins = session.remaining_seconds // 60
+                secs = session.remaining_seconds % 60
+                info = self.tr(f"Resume at part {part_num} with {mins}:{secs:02d} remaining? (paused)")
+            elif adjusted.get('overtime_seconds', 0) > 0:
+                overtime_mins = adjusted['overtime_seconds'] // 60
+                overtime_secs = adjusted['overtime_seconds'] % 60
+                info = self.tr(f"Part {part_num} is now {overtime_mins}:{overtime_secs:02d} into overtime.")
+            else:
+                mins = adjusted['remaining_seconds'] // 60
+                secs = adjusted['remaining_seconds'] % 60
+                info = self.tr(f"Resume at part {part_num} with {mins}:{secs:02d} remaining?")
+
+            msg.setInformativeText(info)
+            msg.setStandardButtons(
+                QMessageBox.StandardButton.Yes |
+                QMessageBox.StandardButton.No
+            )
+            msg.button(QMessageBox.StandardButton.Yes).setText(self.tr("Resume"))
+            msg.button(QMessageBox.StandardButton.No).setText(self.tr("Start Fresh"))
+
+            result = msg.exec()
+
+            if result != QMessageBox.StandardButton.Yes:
+                self.timer_controller.session_manager.clear_session()
+                return
+
+        # Restore the session
+        self._restore_session(session)
+
+    def _show_stale_session_dialog(self, session: SessionState):
+        """Show dialog for stale session (crashed long ago)"""
+        try:
+            last_save = datetime.fromisoformat(session.last_save_time)
+            date_str = last_save.strftime("%Y-%m-%d %H:%M")
+        except (ValueError, TypeError):
+            date_str = "unknown time"
+
+        msg = QMessageBox(self)
+        msg.setWindowTitle(self.tr("Old Session Found"))
+        msg.setText(self.tr(f"A session from {date_str} was found."))
+        msg.setInformativeText(self.tr("This session is quite old. Would you like to discard it or attempt recovery?"))
+        msg.setStandardButtons(
+            QMessageBox.StandardButton.Yes |
+            QMessageBox.StandardButton.No
+        )
+        msg.button(QMessageBox.StandardButton.Yes).setText(self.tr("Discard"))
+        msg.button(QMessageBox.StandardButton.No).setText(self.tr("Attempt Recovery"))
+
+        if msg.exec() == QMessageBox.StandardButton.Yes:
+            self.timer_controller.session_manager.clear_session()
+        else:
+            self._show_recovery_dialog(session)
+
+    def _restore_session(self, session: SessionState):
+        """Restore a meeting session from crash recovery"""
+        from src.config import MEETINGS_DIR
+
+        # Load the meeting
+        meeting_path = MEETINGS_DIR / session.meeting_file
+        if not meeting_path.exists():
+            QMessageBox.warning(
+                self,
+                self.tr("Recovery Failed"),
+                self.tr("Could not find the meeting file. Starting fresh.")
+            )
+            self.timer_controller.session_manager.clear_session()
+            return
+
+        meeting = self.meeting_controller._load_meeting_file(str(meeting_path))
+        if not meeting:
+            QMessageBox.warning(
+                self,
+                self.tr("Recovery Failed"),
+                self.tr("Could not load the meeting file. Starting fresh.")
+            )
+            self.timer_controller.session_manager.clear_session()
+            return
+
+        # Set up the meeting in the controller
+        self.timer_controller.set_meeting(meeting)
+
+        # Update the meeting view if available
+        if self.meeting_view:
+            self.meeting_view.set_meeting(meeting)
+
+        # Calculate adjusted state
+        adjusted = self.timer_controller.session_manager.calculate_adjusted_state(session)
+
+        # Restore the session state
+        self.timer_controller.restore_session(session, adjusted)
+
+        # Update UI
+        self._update_ui_for_running_meeting()
+
+        # Restore network broadcast if it was active
+        print(f"[MainWindow] Session network_broadcast_active: {session.network_broadcast_active}")
+        if session.network_broadcast_active:
+            QTimer.singleShot(500, self._restore_network_broadcast)
+
+        # Show confirmation
+        self.statusBar().showMessage(self.tr("Session restored successfully"), 5000)
+
+    def _restore_network_broadcast(self):
+        """Restore network broadcast after session recovery"""
+        print("[MainWindow] Attempting to restore network broadcast...")
+
+        if not self._is_component_ready('network_display_manager'):
+            # Try to load the network manager
+            print("[MainWindow] Network display manager not ready, loading...")
+            if hasattr(self, 'component_loader') and self.component_loader:
+                self.component_loader.get_component('network_display_manager', blocking=True, timeout=5000)
+
+            if not self._is_component_ready('network_display_manager'):
+                print("[MainWindow] Could not restore network broadcast - component not available")
+                return
+
+        # Check if already broadcasting
+        if self.network_display_manager.broadcaster and self.network_display_manager.broadcaster.is_broadcasting:
+            print("[MainWindow] Network broadcast already active, skipping restore")
+            return
+
+        # Start network display with settings
+        from src.models.settings import NetworkDisplayMode
+        mode = self.settings_controller.get_settings().network_display.mode
+        http_port = self.settings_controller.get_settings().network_display.http_port
+        ws_port = self.settings_controller.get_settings().network_display.ws_port
+
+        print(f"[MainWindow] Network display mode from settings: {mode}")
+
+        # If mode is disabled but we know broadcast was active, use HTTP_ONLY as fallback
+        if mode == NetworkDisplayMode.DISABLED:
+            print("[MainWindow] Mode is DISABLED but broadcast was active, using HTTP_ONLY as fallback")
+            mode = NetworkDisplayMode.HTTP_ONLY
+
+        self.network_display_manager.start_network_display(mode, http_port, ws_port)
+        self.toggle_network_action.setText(self.tr("Stop Network Display"))
+        print("[MainWindow] Network broadcast restore initiated")
+
+    def _update_ui_for_running_meeting(self):
+        """Update UI elements to reflect a running meeting state"""
+        # The meeting_started signal should have already triggered _meeting_started()
+        # but call it explicitly to ensure UI is properly updated
+        self._meeting_started()
+
+    # ------------------------------------------------------------------
     # Ensure all child windows shut down cleanly when the main window
     # is closed (especially the secondary display, which otherwise keeps
     # running and may spawn duplicates next time).
@@ -2241,6 +2603,13 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Qt close handler – make sure secondary display and background
         tasks are cleaned up before the application quits."""
+        # End session tracking cleanly (this deletes the session file on clean exit)
+        try:
+            if hasattr(self, 'timer_controller') and self.timer_controller.session_manager.has_active_session():
+                self.timer_controller.session_manager.end_session(clean=True)
+        except Exception as e:
+            print(f"[MainWindow] Error ending session: {e}")
+
         try:
             # Shut down the secondary display if it exists
             if hasattr(self, "secondary_display") and self.secondary_display:

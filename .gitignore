@@ -181,3 +181,10 @@ cython_debug/
 *.secret
 *.key
 
+.vscode/settings.json
+.claude/settings.local.json
+epub_test_results_20260125_155837.json
+epub_test_results_20260125_171838.json
+epub_test_results_20260125_172640.json
+epub_test_results_20260126_220940.json
+epub_test_results_20260126_221035.json
