@@ -41,8 +41,8 @@ class NetworkDisplaySettings:
     ws_port: int = 8765
     auto_start: bool = False
     qr_code_enabled: bool = True  # Enable QR code for easy mobile connection
-    
-    
+
+
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
         return {
@@ -52,7 +52,7 @@ class NetworkDisplaySettings:
             'auto_start': self.auto_start,
             'qr_code_enabled': self.qr_code_enabled
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> 'NetworkDisplaySettings':
         """Create from dictionary"""
@@ -63,6 +63,42 @@ class NetworkDisplaySettings:
             auto_start=data.get('auto_start', False),
             qr_code_enabled=data.get('qr_code_enabled', True)
         )
+
+
+@dataclass
+class COVisitSettings:
+    """Settings for Circuit Overseer visit mode"""
+    enabled: bool = False
+    week_start_date: Optional[str] = None  # ISO format (Monday of week)
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage"""
+        return {
+            'enabled': self.enabled,
+            'week_start_date': self.week_start_date
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'COVisitSettings':
+        """Create from dictionary"""
+        return cls(
+            enabled=data.get('enabled', False),
+            week_start_date=data.get('week_start_date')
+        )
+
+    def is_valid_for_current_week(self) -> bool:
+        """Check if CO visit is still valid for current week"""
+        if not self.enabled or not self.week_start_date:
+            return False
+        from datetime import datetime, timedelta
+        try:
+            stored_week_start = datetime.fromisoformat(self.week_start_date).date()
+            today = datetime.now().date()
+            current_week_start = today - timedelta(days=today.weekday())
+            return stored_week_start == current_week_start
+        except (ValueError, TypeError):
+            return False
+
 
 @dataclass
 class MeetingSettings:
@@ -175,6 +211,7 @@ class AppSettings:
     meeting_source: MeetingSourceSettings = field(default_factory=MeetingSourceSettings)
     recent_meetings: List[str] = field(default_factory=list)  # List of meeting file paths
     network_display: NetworkDisplaySettings = field(default_factory=NetworkDisplaySettings)
+    co_visit: COVisitSettings = field(default_factory=COVisitSettings)
     # Global notification reminder settings
     start_reminder_enabled: bool = True
     start_reminder_delay:   int  = 2  # seconds
@@ -191,6 +228,7 @@ class AppSettings:
             'meeting_source': self.meeting_source.to_dict(),
             'recent_meetings': self.recent_meetings,
             'network_display': self.network_display.to_dict(),
+            'co_visit': self.co_visit.to_dict(),
             'start_reminder_enabled': self.start_reminder_enabled,
             'start_reminder_delay':   self.start_reminder_delay,
             'overrun_enabled':        self.overrun_enabled,
@@ -208,6 +246,7 @@ class AppSettings:
             meeting_source=MeetingSourceSettings.from_dict(data.get('meeting_source', {})),
             recent_meetings=data.get('recent_meetings', []),
             network_display=NetworkDisplaySettings.from_dict(data.get('network_display', {})),
+            co_visit=COVisitSettings.from_dict(data.get('co_visit', {})),
             start_reminder_enabled=data.get('start_reminder_enabled', True),
             start_reminder_delay=data.get('start_reminder_delay', 2),
             overrun_enabled=data.get('overrun_enabled', True),

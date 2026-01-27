@@ -137,7 +137,10 @@ class MainWindow(QMainWindow):
         
         # Connect signals
         self._connect_signals()
-        
+
+        # Check if CO visit has expired (new week started)
+        self.settings_controller.check_and_reset_co_visit()
+
         # Initialize timer to show current time
         self._initialize_timer_display()
         
@@ -887,7 +890,15 @@ class MainWindow(QMainWindow):
         self.system_theme_action.setChecked(current_theme == "system")
         self.light_theme_action.setChecked(current_theme == "light")
         self.dark_theme_action.setChecked(current_theme == "dark")
-        
+
+        # CO Visit toggle
+        view_menu.addSeparator()
+        self.co_visit_action = QAction(self.tr("CO Visit Mode"), self)
+        self.co_visit_action.setCheckable(True)
+        self.co_visit_action.setChecked(self.settings_controller.is_co_visit_active())
+        self.co_visit_action.triggered.connect(self._toggle_co_visit)
+        view_menu.addAction(self.co_visit_action)
+
         # Help menu
         help_menu = menu_bar.addMenu(self.tr("&Help"))
 
@@ -1168,13 +1179,14 @@ class MainWindow(QMainWindow):
         self.timer_controller.meeting_countdown_updated.connect(self._update_countdown)
         
         # Settings controller signals
-        
+
         self.settings_controller.language_changed.connect(self._on_language_changed) # Language change signal
         self.settings_controller.secondary_screen_changed.connect(self._on_secondary_screen_changed)
         self.settings_controller.tools_dock_state_changed.connect(self._on_tools_dock_state_changed)
         self.settings_controller.theme_changed.connect(self._theme_changed)
         self.settings_controller.meeting_settings_changed.connect(self._on_meeting_settings_changed)
         self.settings_controller.reminder_settings_changed.connect(self._on_reminder_settings_changed)
+        self.settings_controller.co_visit_changed.connect(self._on_co_visit_changed)
         # General settings changed signal for all other settings
         self.settings_controller.settings_changed.connect(self._settings_changed)
         
@@ -1264,9 +1276,12 @@ class MainWindow(QMainWindow):
         """Handle meeting selection from the dropdown"""
         if index < 0 or self.meeting_selector.count() == 0:
             return
-        
+
         meeting = self.meeting_selector.itemData(index)
         if meeting:
+            # Apply CO visit modifications if active
+            if self.settings_controller.is_co_visit_active():
+                meeting = self.meeting_controller.apply_co_visit_modifications(meeting)
             self._set_current_meeting(meeting)
 
     
@@ -2200,6 +2215,47 @@ class MainWindow(QMainWindow):
             self.secondary_display = None
 
         self._update_secondary_display()
+
+    def _toggle_co_visit(self, checked: bool):
+        """Toggle CO visit mode"""
+        if checked:
+            self._show_toast_notification(
+                self.tr("CO Visit Mode Enabled"),
+                self.tr("CO visit schedule will be applied to meetings this week."),
+                icon=""
+            )
+        else:
+            self._show_toast_notification(
+                self.tr("CO Visit Mode Disabled"),
+                self.tr("Normal meeting schedule restored."),
+                icon=""
+            )
+
+        self.settings_controller.set_co_visit_enabled(checked)
+        self._reload_current_meeting_with_co_visit()
+
+    def _reload_current_meeting_with_co_visit(self):
+        """Reload the current meeting with or without CO visit modifications"""
+        current_meeting = self.meeting_controller.current_meeting
+        if not current_meeting:
+            return
+
+        # Get the original meeting from the controller
+        meeting_type = current_meeting.meeting_type
+        original_meeting = self.meeting_controller.current_meetings.get(meeting_type)
+
+        if original_meeting:
+            if self.settings_controller.is_co_visit_active():
+                modified = self.meeting_controller.apply_co_visit_modifications(original_meeting)
+                self._set_current_meeting(modified)
+            else:
+                self._set_current_meeting(original_meeting)
+
+    def _on_co_visit_changed(self, enabled: bool):
+        """Handle CO visit mode changes from settings"""
+        if hasattr(self, 'co_visit_action'):
+            self.co_visit_action.setChecked(enabled)
+        self._reload_current_meeting_with_co_visit()
     
     def _update_secondary_display(self):
         """Update secondary display based on settings"""
