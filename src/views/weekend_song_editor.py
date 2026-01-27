@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFormLayout, QSpinBox, QDialogButtonBox, QMessageBox
 )
+from PyQt6.QtCore import Qt
 
 class WeekendSongEditorDialog(QDialog):
     """Dialog for editing weekend meeting songs"""
@@ -14,7 +15,16 @@ class WeekendSongEditorDialog(QDialog):
         self.setWindowTitle(self.tr("Edit Weekend Meeting Songs"))
         self.meeting = meeting
         self.song_fields = []
-        
+
+        # Ensure dialog appears on top of the main window (especially on Windows)
+        self.setWindowFlags(
+            self.windowFlags()
+            & ~Qt.WindowType.WindowContextHelpButtonHint
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.raise_()
+        self.activateWindow()
+
         # Setup UI
         self._setup_ui()
         

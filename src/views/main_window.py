@@ -1997,7 +1997,14 @@ class MainWindow(QMainWindow):
                 dialog.setWindowTitle(self.tr("Song Entry Required"))
                 dialog.setMinimumWidth(450)
                 dialog.setModal(True)
-                dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
+                # Ensure dialog appears on top of the main window (especially on Windows)
+                dialog.setWindowFlags(
+                    dialog.windowFlags()
+                    & ~Qt.WindowType.WindowContextHelpButtonHint
+                    | Qt.WindowType.WindowStaysOnTopHint
+                )
+                dialog.raise_()
+                dialog.activateWindow()
 
                 layout = QVBoxLayout(dialog)
 
@@ -2043,7 +2050,8 @@ class MainWindow(QMainWindow):
                         self.showFullScreen()
                     else:
                         QTimer.singleShot(200, self._force_normal_window_state)
-            QTimer.singleShot(0, ask_and_edit)
+            # Delay slightly to ensure main window is fully shown (helps on Windows)
+            QTimer.singleShot(300, ask_and_edit)
 
     def _force_normal_window_state(self):
         self.showNormal()
