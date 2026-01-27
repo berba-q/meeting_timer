@@ -9,8 +9,8 @@
   "releaseNotes": "See GitHub Release for complete notes at: https://github.com/berba-q/meeting_timer/releases/tag/v1.0.6",
   "releaseNotesUrl": "https://github.com/berba-q/meeting_timer/releases/tag/v1.0.6",
   "sha256": {
-    "windows": "c9ac42059fb5e859fef8fa5353a6f481db8a03095fde58159abb1677743ca932",
-    "macos": "b819f75066a76bc6bddc6df58f10cc4016664364fe98ebf0c01a51cd0d6b818f",
-    "linux": "701a2ad7931fe7909dd924cb4087fffd1174ab175ee0a717666982d79773227f"
+    "windows": "ad7a3a90016e829925e50e08e09c7a379704d9d54dc66ccee9a5d0b852ea1f59",
+    "macos": "b8843224fa41464e6c01af10dd2d994dfde515b1087af6b11c11144f7664d591",
+    "linux": "61518c00661e4bb3cb0ab264cefbc4d3c4caa2ec29020a32113ad2c3fc421f0b"
   }
 }
