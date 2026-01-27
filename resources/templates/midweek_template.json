@@ -7,7 +7,7 @@
       "parts": [
         {
           "title": "Opening Song and Prayer",
-          "duration_minutes": 5,
+          "duration_minutes": 4,
           "presenter": ""
         },
         {
@@ -52,7 +52,7 @@
       "parts": [
         {
           "title": "Song",
-          "duration_minutes": 5,
+          "duration_minutes": 2,
           "presenter": ""
         },
         {
@@ -72,7 +72,7 @@
         },
         {
           "title": "Concluding Song and Prayer",
-          "duration_minutes": 5,
+          "duration_minutes": 4,
           "presenter": ""
         }
       ]
