@@ -864,24 +864,29 @@ class MainWindow(QMainWindow):
         # Switch theme
         self.theme_menu = view_menu.addMenu(self.tr("&Theme"))
 
+        # System theme action (follow OS)
+        self.system_theme_action = QAction(self.tr("&System (follow OS)"), self)
+        self.system_theme_action.setCheckable(True)
+        self.system_theme_action.triggered.connect(lambda: self._set_theme("system"))
+        self.theme_menu.addAction(self.system_theme_action)
+
         # Light theme action
         self.light_theme_action = QAction(self.tr("&Light Theme"), self)
         self.light_theme_action.setCheckable(True)
         self.light_theme_action.triggered.connect(lambda: self._set_theme("light"))
         self.theme_menu.addAction(self.light_theme_action)
-        
+
         # Dark theme action
         self.dark_theme_action = QAction(self.tr("&Dark Theme"), self)
         self.dark_theme_action.setCheckable(True)
         self.dark_theme_action.triggered.connect(lambda: self._set_theme("dark"))
         self.theme_menu.addAction(self.dark_theme_action)
-        
+
         # Set initial theme selection
         current_theme = self.settings_controller.get_settings().display.theme
-        if current_theme == "dark":
-            self.dark_theme_action.setChecked(True)
-        else:
-            self.light_theme_action.setChecked(True)
+        self.system_theme_action.setChecked(current_theme == "system")
+        self.light_theme_action.setChecked(current_theme == "light")
+        self.dark_theme_action.setChecked(current_theme == "dark")
         
         # Help menu
         help_menu = menu_bar.addMenu(self.tr("&Help"))
@@ -1555,29 +1560,34 @@ class MainWindow(QMainWindow):
     
     def _apply_current_theme(self):
         """Apply the current theme from settings"""
-        from src.utils.resources import apply_stylesheet
-        
+        from src.utils.resources import apply_stylesheet, get_system_theme
+
         theme = self.settings_controller.get_settings().display.theme
+        # Resolve "system" to actual theme
+        if theme == "system":
+            theme = get_system_theme()
         apply_stylesheet(QApplication.instance(), theme)
-    
+
     def _set_theme(self, theme: str):
         """Set the application theme"""
         # Update theme in settings
         self.settings_controller.set_theme(theme)
-        
+
         # Update menu checkboxes
+        self.system_theme_action.setChecked(theme == "system")
         self.light_theme_action.setChecked(theme == "light")
         self.dark_theme_action.setChecked(theme == "dark")
-        
+
         # Apply the theme
         self._apply_current_theme()
-    
+
     def _theme_changed(self, theme: str):
         """Handle theme change from settings"""
         # Update menu checkboxes
+        self.system_theme_action.setChecked(theme == "system")
         self.light_theme_action.setChecked(theme == "light")
         self.dark_theme_action.setChecked(theme == "dark")
-        
+
         # Apply the theme
         self._apply_current_theme()
         
@@ -2296,9 +2306,9 @@ class MainWindow(QMainWindow):
             self.predicted_end_time_label.setText(self.tr(f"End: {predicted_time_str} ({diff_minutes} min)"))
             self.predicted_end_time_label.setStyleSheet("color: green;")
         else:
-            # On time
+            # On time - use default theme text color
             self.predicted_end_time_label.setText(self.tr(f"End: {predicted_time_str} (on time)"))
-            self.predicted_end_time_label.setStyleSheet("color: black;")
+            self.predicted_end_time_label.setStyleSheet("")
         
         # Make the label visible
         self.predicted_end_time_label.setVisible(True)

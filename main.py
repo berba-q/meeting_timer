@@ -99,7 +99,7 @@ from src.controllers.meeting_controller import MeetingController
 from src.controllers.timer_controller import TimerController
 from src.controllers.settings_controller import SettingsController
 from src.views.main_window import MainWindow
-from src.utils.resources import get_icon, apply_stylesheet
+from src.utils.resources import get_icon, apply_stylesheet, get_system_theme
 
 def _select_meeting_by_day(controller, main_window):
     """Select the appropriate meeting based on day of week"""
@@ -180,9 +180,18 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("OnTime")
     app.setOrganizationName("OnTime")
-
     app.setWindowIcon(get_icon("app_icon"))
-    apply_stylesheet(app, "light")
+
+    # Initialize controllers first so we can load saved theme
+    controller = MeetingController()
+    settings_controller = SettingsController(controller.settings_manager)
+    timer_controller = TimerController(settings_controller)
+
+    # Load saved theme preference (resolve "system" to actual theme)
+    saved_theme = settings_controller.get_settings().display.theme
+    if saved_theme == "system":
+        saved_theme = get_system_theme()
+    apply_stylesheet(app, saved_theme)
 
     splash = CustomSplashScreen()
     splash.show()
@@ -196,10 +205,7 @@ def main():
     splash.raise_()
     splash.activateWindow()
 
-    # Direct initialization
-    controller = MeetingController()
-    settings_controller = SettingsController(controller.settings_manager)
-    timer_controller = TimerController(settings_controller)
+    # Load meetings
     controller.load_meetings()
 
     # Load saved language

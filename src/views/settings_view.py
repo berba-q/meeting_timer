@@ -212,6 +212,7 @@ class SettingsDialog(QDialog):
         theme_layout.addWidget(QLabel(self.tr("Theme:")))
 
         self.theme_combo = QComboBox()
+        self.theme_combo.addItem(self.tr("System (follow OS)"), "system")
         self.theme_combo.addItem(self.tr("Light Theme"), "light")
         self.theme_combo.addItem(self.tr("Dark Theme"), "dark")
 

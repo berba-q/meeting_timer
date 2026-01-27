@@ -93,9 +93,9 @@ class SettingsController(QObject):
         #self.settings_changed.emit()
     
     def set_theme(self, theme: str):
-        """Set application theme (light or dark)"""
-        if theme not in ['light', 'dark']:
-            theme = 'light'  # Default to light theme if invalid
+        """Set application theme (light, dark, or system)"""
+        if theme not in ['light', 'dark', 'system']:
+            theme = 'system'  # Default to system theme if invalid
             
         self.settings_manager.settings.display.theme = theme
         self.settings_manager.save_settings()

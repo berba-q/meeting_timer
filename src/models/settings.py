@@ -96,7 +96,7 @@ class DisplaySettings:
     secondary_screen_name: str = ""
     use_secondary_screen: bool = False
     show_predicted_end_time: bool = True
-    theme: str = "light"  # 'light' or 'dark'
+    theme: str = "system"  # 'light', 'dark', or 'system' (follows OS theme)
     show_tools_dock: bool = False
     remember_tools_dock_state: bool = False  # Remember the state of the tools dock
     force_secondary_cleanup: bool = False  # Force cleanup of secondary screen on exit
@@ -128,7 +128,7 @@ class DisplaySettings:
             secondary_screen_name=data.get('secondary_screen_name', ""),
             use_secondary_screen=use_secondary_screen,
             show_predicted_end_time=data.get('show_predicted_end_time', True),
-            theme=data.get('theme', 'light'),
+            theme=data.get('theme', 'system'),
             show_tools_dock=data.get('show_tools_dock', False),
             remember_tools_dock_state=data.get('remember_tools_dock_state', False)
         )

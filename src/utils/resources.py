@@ -4,6 +4,7 @@ Resources utility for loading assets in the OnTime Meeting Timer application.
 import os
 import sys
 from pathlib import Path
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QApplication
 
@@ -71,6 +72,21 @@ def get_pixmap(icon_name: str) -> QPixmap:
         return QPixmap()
     
     return QPixmap(str(icon_path))
+
+
+def get_system_theme() -> str:
+    """
+    Detect the operating system's theme preference using Qt's QStyleHints.
+
+    Returns:
+        "dark" if the system is using dark mode, "light" otherwise
+    """
+    app = QApplication.instance()
+    if app:
+        hints = app.styleHints()
+        if hints.colorScheme() == Qt.ColorScheme.Dark:
+            return "dark"
+    return "light"
 
 
 def get_stylesheet(theme: str = "light") -> str:
