@@ -622,6 +622,10 @@ class MainWindow(QMainWindow):
                 self.meeting_selector.setCurrentIndex(found_index)
                 self.meeting_selector.blockSignals(False)
                 
+                # Apply CO visit modifications if active
+                if self.settings_controller.is_co_visit_active():
+                    meeting_to_select = self.meeting_controller.apply_co_visit_modifications(meeting_to_select)
+
                 # Update controllers and views
                 self._set_current_meeting(meeting_to_select)
             else:
@@ -1295,6 +1299,11 @@ class MainWindow(QMainWindow):
     
     def _part_changed(self, part, index):
         """Handle part change with lazy-loaded components"""
+        # Guard: Only update display if meeting is actually running
+        if self.timer_controller.current_part_index < 0:
+            # Meeting hasn't started yet, don't update the display
+            return
+
         # Update status bar to show the next part instead of the current part
         parts = self.timer_controller.parts_list
         if index + 1 < len(parts):
@@ -2336,36 +2345,42 @@ class MainWindow(QMainWindow):
             self.meeting_overtime_label.setStyleSheet(f"color: {color}; font-weight: bold;")
             self.meeting_overtime_label.setVisible(True)
     
-    def _update_predicted_end_time(self, original_end_time, predicted_end_time):
+    def _update_predicted_end_time(self, original_end_time, predicted_end_time, target_end_time):
         """Update the predicted end time display"""
         # Only show if the setting is enabled
         settings = self.settings_controller.get_settings()
         if not settings.display.show_predicted_end_time:
             self.predicted_end_time_label.setVisible(False)
             return
-        
-        # Format the times
-        original_time_str = original_end_time.strftime("%H:%M")
-        predicted_time_str = predicted_end_time.strftime("%H:%M")
-        
-        # Calculate the difference
-        time_diff = predicted_end_time - original_end_time
-        diff_minutes = int(time_diff.total_seconds() / 60)
-        
-        # Set the text and color based on whether we're running over or under
-        if diff_minutes > 0:
-            # Running over time
-            self.predicted_end_time_label.setText(self.tr(f"End: {predicted_time_str} (+{diff_minutes} min)"))
-            self.predicted_end_time_label.setStyleSheet("color: red;")
-        elif diff_minutes < 0:
-            # Running under time
-            self.predicted_end_time_label.setText(self.tr(f"End: {predicted_time_str} ({diff_minutes} min)"))
-            self.predicted_end_time_label.setStyleSheet("color: green;")
-        else:
-            # On time - use default theme text color
-            self.predicted_end_time_label.setText(self.tr(f"End: {predicted_time_str} (on time)"))
-            self.predicted_end_time_label.setStyleSheet("")
-        
+
+        # Format predicted time in 12-hour format
+        predicted_time_str = predicted_end_time.strftime("%I:%M %p").lstrip('0')
+        target_time_str = target_end_time.strftime("%I:%M %p").lstrip('0')
+
+        # Calculate difference from TARGET (not template)
+        time_diff = predicted_end_time - target_end_time
+        diff_seconds = int(time_diff.total_seconds())
+        diff_minutes = abs(diff_seconds) // 60
+
+        # Set the text and color based on target
+        if diff_seconds > 300:  # >5 min late
+            status_text = f"{diff_minutes} min{'s' if diff_minutes != 1 else ''} over ⚠️"
+            color = "red"
+        elif diff_seconds > 120:  # 2-5 min late
+            status_text = f"{diff_minutes} min{'s' if diff_minutes != 1 else ''} over"
+            color = "orange"
+        elif diff_seconds > -120:  # Within ±2 min
+            status_text = "On Time"
+            color = "green"
+        else:  # >2 min early
+            status_text = f"{diff_minutes} min{'s' if diff_minutes != 1 else ''} early"
+            color = "green"
+
+        # Format: "End: 8:50 PM | 5 mins over"
+        self.predicted_end_time_label.setText(self.tr(f"End: {predicted_time_str} | {status_text}"))
+        self.predicted_end_time_label.setStyleSheet(f"color: {color};")
+        self.predicted_end_time_label.setToolTip(f"Target finish: {target_time_str}")
+
         # Make the label visible
         self.predicted_end_time_label.setVisible(True)
     
