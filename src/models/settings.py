@@ -105,20 +105,23 @@ class MeetingSettings:
     """Settings for a specific meeting type"""
     day: DayOfWeek = DayOfWeek.WEDNESDAY  # Default midweek meeting day
     time: time = field(default_factory=lambda: time(19, 0))  # Default 7:00 PM
-    
+    target_duration_minutes: int = 105  # Expected total meeting duration in minutes
+
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
         return {
             'day': self.day.value,
-            'time': self.time.isoformat()
+            'time': self.time.isoformat(),
+            'target_duration_minutes': self.target_duration_minutes
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> 'MeetingSettings':
-        """Create from dictionary"""
+        """Create from dictionary with backwards compatibility"""
         return cls(
             day=DayOfWeek(data['day']),
-            time=time.fromisoformat(data['time'])
+            time=time.fromisoformat(data['time']),
+            target_duration_minutes=data.get('target_duration_minutes', 105)  # Default if missing
         )
 
 

@@ -228,7 +228,9 @@ class MeetingView(QWidget):
     
     def _part_changed(self, part, global_part_index):
         """Handle part change from timer controller"""
-        self.highlight_part(global_part_index)
+        # Only highlight if meeting is actually running
+        if self.timer_controller.current_part_index >= 0:
+            self.highlight_part(global_part_index)
     
     def _part_completed(self, global_part_index):
         """Handle part completion"""

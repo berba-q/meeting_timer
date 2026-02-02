@@ -31,7 +31,7 @@ class TimerController(QObject):
     countdown_started = pyqtSignal(datetime)  # target datetime
     transition_started = pyqtSignal(str)  # transition description
     meeting_overtime = pyqtSignal(int)  # total overtime in seconds
-    predicted_end_time_updated = pyqtSignal(datetime, datetime)  # original and predicted end times
+    predicted_end_time_updated = pyqtSignal(datetime, datetime, datetime)  # original, predicted, and target end times
     meeting_countdown_updated = pyqtSignal(int, str)  # seconds remaining, formatted message
     
     def __init__(self, settings_controller: SettingsController):
@@ -65,6 +65,7 @@ class TimerController(QObject):
         self._meeting_start_time = None
         self._original_end_time = None
         self._predicted_end_time = None
+        self._target_end_time = None  # Based on organizational standard or custom meeting target
         self._remaining_parts_duration = 0
         
         # Meeting countdown tracking
@@ -202,9 +203,10 @@ class TimerController(QObject):
         # Reset overtime tracking
         self._total_overtime_seconds = 0
         
-        # Record meeting start time and calculate original end time
+        # Record meeting start time and calculate original and target end times
         self._meeting_start_time = datetime.now()
-        self._calculate_original_end_time()
+        self._calculate_original_end_time()  # Template-based
+        self._calculate_target_end_time()    # Standard-based or custom
         self._predicted_end_time = self._original_end_time
         
         # Start timer for first part
@@ -217,7 +219,7 @@ class TimerController(QObject):
         # Emit signals
         self.part_changed.emit(current_part, self.current_part_index)
         self.meeting_started.emit()
-        self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time)
+        self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time, self._target_end_time)
 
         # Start session tracking for crash recovery
         meeting_file = f"{self.current_meeting.meeting_type.value}_{self.current_meeting.date.strftime('%Y-%m-%d')}_{self.current_meeting.language}.json"
@@ -239,7 +241,26 @@ class TimerController(QObject):
         
         # Set the original end time
         self._original_end_time = self._meeting_start_time + timedelta(seconds=total_seconds)
-    
+
+    def _calculate_target_end_time(self):
+        """Calculate the target end time based on organizational standards or meeting-specific target"""
+        if not self.current_meeting:
+            return
+
+        # Check if meeting has a custom target duration (for custom meetings)
+        if self.current_meeting.target_duration_minutes is not None:
+            target_minutes = self.current_meeting.target_duration_minutes
+        else:
+            # Use global settings for regular meetings
+            settings = self.settings_controller.get_settings()
+            if self.current_meeting.meeting_type == MeetingType.WEEKEND:
+                target_minutes = settings.weekend_meeting.target_duration_minutes
+            else:  # MIDWEEK or any other type defaults to midweek
+                target_minutes = settings.midweek_meeting.target_duration_minutes
+
+        # Calculate target end time
+        self._target_end_time = self._meeting_start_time + timedelta(minutes=target_minutes)
+
     def _update_predicted_end_time(self):
         """Update the predicted end time based on current progress and real-time data"""
         if not self._meeting_start_time or self.current_part_index < 0:
@@ -281,7 +302,7 @@ class TimerController(QObject):
             overtime_seconds = 0
         
         # Emit signal with updated prediction
-        self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time)
+        self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time, self._target_end_time)
         
         # Debug logging to catch issues
         print(f"[TIMER] Predicted end time update:")
@@ -707,11 +728,15 @@ class TimerController(QObject):
             current_part = self.parts_list[self.current_part_index]
             self.timer.set_duration(current_part.duration_minutes)
     def _on_settings_updated(self):
-        """Handle updates to settings such as meeting time"""
-        #settings = self.settings_controller.get_settings()
+        """Handle updates to settings such as meeting time and target duration"""
         if self.current_meeting:
             # Update the meeting time in the timer
             self._initialize_meeting_countdown()
+
+            # If a meeting is running, recalculate target end time
+            if self._meeting_start_time is not None:
+                self._calculate_target_end_time()
+                self._update_predicted_end_time()
 
     def restore_session(self, session: SessionState, adjusted_state: dict):
         """Restore timer state from a saved session after crash recovery"""
@@ -721,10 +746,16 @@ class TimerController(QObject):
         # Restore part index
         self.current_part_index = session.current_part_index
 
-        # Validate part index
-        if self.current_part_index < 0 or self.current_part_index >= len(self.parts_list):
+        # Validate part index (allow -1 for "not started" state)
+        if self.current_part_index >= len(self.parts_list):
             print(f"[TimerController] Invalid part index {self.current_part_index}, resetting to 0")
             self.current_part_index = 0
+
+        # Only proceed with session restoration if meeting was actually in progress
+        if self.current_part_index < 0:
+            # Meeting was never started, just restore the state without starting
+            print("[TimerController] Session shows meeting was not started, preserving pre-start state")
+            return
 
         # Mark previous parts as completed
         for i in range(self.current_part_index):

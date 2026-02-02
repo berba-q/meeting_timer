@@ -136,8 +136,27 @@ class SettingsDialog(QDialog):
         self.midweek_time_edit = QTimeEdit()
         self.midweek_time_edit.setDisplayFormat("hh:mm AP")
 
+        # Target duration setting for midweek
+        self.midweek_duration_spin = QSpinBox()
+        self.midweek_duration_spin.setRange(60, 180)  # 1-3 hours
+        self.midweek_duration_spin.setValue(105)  # Default
+        self.midweek_duration_spin.setSuffix(" min")
+        self.midweek_duration_spin.setToolTip(
+            self.tr("Organizational standard for total meeting duration (e.g., 105 minutes)")
+        )
+
+        # Preview label showing calculated end time
+        self.midweek_end_time_preview = QLabel()
+        self.midweek_end_time_preview.setStyleSheet("color: gray; font-size: 10pt;")
+
         midweek_layout.addRow(self.tr("Day:"), self.midweek_day_combo)
         midweek_layout.addRow(self.tr("Time:"), self.midweek_time_edit)
+        midweek_layout.addRow(self.tr("Target Duration:"), self.midweek_duration_spin)
+        midweek_layout.addRow("", self.midweek_end_time_preview)
+
+        # Connect signals to update preview when start time or duration changes
+        self.midweek_time_edit.timeChanged.connect(self._update_midweek_end_time_preview)
+        self.midweek_duration_spin.valueChanged.connect(self._update_midweek_end_time_preview)
 
         # Weekend meeting settings
         weekend_group = QGroupBox(self.tr("Weekend Meeting"))
@@ -150,12 +169,29 @@ class SettingsDialog(QDialog):
         self.weekend_time_edit = QTimeEdit()
         self.weekend_time_edit.setDisplayFormat("hh:mm AP")
 
+        # Target duration setting for weekend
+        self.weekend_duration_spin = QSpinBox()
+        self.weekend_duration_spin.setRange(60, 180)  # 1-3 hours
+        self.weekend_duration_spin.setValue(105)  # Default
+        self.weekend_duration_spin.setSuffix(" min")
+        self.weekend_duration_spin.setToolTip(
+            self.tr("Organizational standard for total meeting duration (e.g., 105 minutes)")
+        )
+
+        # Preview label showing calculated end time
+        self.weekend_end_time_preview = QLabel()
+        self.weekend_end_time_preview.setStyleSheet("color: gray; font-size: 10pt;")
+
         weekend_layout.addRow(self.tr("Day:"), self.weekend_day_combo)
         weekend_layout.addRow(self.tr("Time:"), self.weekend_time_edit)
+        weekend_layout.addRow(self.tr("Target Duration:"), self.weekend_duration_spin)
+        weekend_layout.addRow("", self.weekend_end_time_preview)
+
+        # Connect signals to update preview when start time or duration changes
+        self.weekend_time_edit.timeChanged.connect(self._update_weekend_end_time_preview)
+        self.weekend_duration_spin.valueChanged.connect(self._update_weekend_end_time_preview)
 
         # Initialize notification reminder controls
-        from PyQt6.QtWidgets import QCheckBox, QSpinBox  # ensure imports at top if missing
-
         self.start_reminder_check = QCheckBox(self.tr("Remind to start timer after delay"))
         self.start_delay_spin = QSpinBox()
         self.start_delay_spin.setRange(1, 300)
@@ -400,9 +436,7 @@ class SettingsDialog(QDialog):
     
     def _load_settings(self):
         """Load current settings into UI"""
-        # Optionally, use load_settings() instead of get_settings() for freshness.
-        # settings = self.settings_controller.get_settings()
-        settings = self.settings_controller.settings_manager._load_settings()
+        settings = self.settings_controller.get_settings()
         
         # General settings
         language_index = self.language_combo.findData(settings.language)
@@ -415,12 +449,17 @@ class SettingsDialog(QDialog):
             settings.midweek_meeting.time.hour,
             settings.midweek_meeting.time.minute
         ))
-        
+        self.midweek_duration_spin.setValue(settings.midweek_meeting.target_duration_minutes)
+        self._update_midweek_end_time_preview()  # Calculate initial preview
+
         self.weekend_day_combo.setCurrentIndex(settings.weekend_meeting.day.value)
         self.weekend_time_edit.setTime(QTime(
             settings.weekend_meeting.time.hour,
             settings.weekend_meeting.time.minute
         ))
+        self.weekend_duration_spin.setValue(settings.weekend_meeting.target_duration_minutes)
+        self._update_weekend_end_time_preview()  # Calculate initial preview
+
         # Notification reminder settings
         self.start_reminder_check.setChecked(settings.start_reminder_enabled)
         self.start_delay_spin.setValue(settings.start_reminder_delay)
@@ -506,14 +545,16 @@ class SettingsDialog(QDialog):
         midweek_day = DayOfWeek(self.midweek_day_combo.currentData())
         midweek_time_qtime = self.midweek_time_edit.time()
         midweek_time = time(midweek_time_qtime.hour(), midweek_time_qtime.minute())
-        
-        self.settings_controller.set_midweek_meeting(midweek_day, midweek_time)
-        
+        midweek_duration = self.midweek_duration_spin.value()
+
+        self.settings_controller.set_midweek_meeting(midweek_day, midweek_time, midweek_duration)
+
         weekend_day = DayOfWeek(self.weekend_day_combo.currentData())
         weekend_time_qtime = self.weekend_time_edit.time()
         weekend_time = time(weekend_time_qtime.hour(), weekend_time_qtime.minute())
-        
-        self.settings_controller.set_weekend_meeting(weekend_day, weekend_time)
+        weekend_duration = self.weekend_duration_spin.value()
+
+        self.settings_controller.set_weekend_meeting(weekend_day, weekend_time, weekend_duration)
         
         # Notification reminder settings
         self.settings_controller.set_start_reminder_enabled(self.start_reminder_check.isChecked())
@@ -719,6 +760,34 @@ class SettingsDialog(QDialog):
         """Toggle secondary screen combo box"""
         self.secondary_screen_combo.setEnabled(enabled)
     
+    def _update_midweek_end_time_preview(self):
+        """Update the preview label showing when midweek meeting will end"""
+        from datetime import datetime, timedelta
+
+        start_time = self.midweek_time_edit.time().toPyTime()
+        duration_minutes = self.midweek_duration_spin.value()
+
+        # Calculate end time
+        start_datetime = datetime.combine(datetime.today(), start_time)
+        end_datetime = start_datetime + timedelta(minutes=duration_minutes)
+        end_time_str = end_datetime.strftime("%I:%M %p").lstrip('0')
+
+        self.midweek_end_time_preview.setText(f"→ Meeting will end at: {end_time_str}")
+
+    def _update_weekend_end_time_preview(self):
+        """Update the preview label showing when weekend meeting will end"""
+        from datetime import datetime, timedelta
+
+        start_time = self.weekend_time_edit.time().toPyTime()
+        duration_minutes = self.weekend_duration_spin.value()
+
+        # Calculate end time
+        start_datetime = datetime.combine(datetime.today(), start_time)
+        end_datetime = start_datetime + timedelta(minutes=duration_minutes)
+        end_time_str = end_datetime.strftime("%I:%M %p").lstrip('0')
+
+        self.weekend_end_time_preview.setText(f"→ Meeting will end at: {end_time_str}")
+
     def accept(self):
         """Handle dialog acceptance"""
         self._apply_settings()

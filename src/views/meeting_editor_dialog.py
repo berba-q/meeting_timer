@@ -24,19 +24,24 @@ class MeetingEditorDialog(QDialog):
     # Signal emitted when a meeting is created/modified
     meeting_updated = pyqtSignal(Meeting)
     
-    def __init__(self, parent=None, meeting: Meeting = None):
+    def __init__(self, parent=None, meeting: Meeting = None, settings_manager=None):
         super().__init__(parent)
         self.meeting = meeting
         self.original_meeting = copy.deepcopy(meeting) if meeting else None
         self.template_manager = MeetingTemplate()
+        self.settings_manager = settings_manager
         self.is_new_meeting = meeting is None
-        
+        self._target_manually_set = False  # Track if user manually changed target
+
         # Setup UI
         self._setup_ui()
-        
+
         # Load meeting data if editing an existing meeting
         if meeting:
             self._load_meeting_data()
+        else:
+            # Initialize default target based on type
+            self._update_target_duration_default()
     
     def _setup_ui(self):
         """Setup the UI components"""
@@ -61,7 +66,10 @@ class MeetingEditorDialog(QDialog):
         
         # Connect type change to update template options
         self.type_combo.currentIndexChanged.connect(self._update_template_options)
-        
+
+        # Connect type change to update target duration default
+        self.type_combo.currentIndexChanged.connect(self._update_target_duration_default)
+
         # Date
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
@@ -73,6 +81,23 @@ class MeetingEditorDialog(QDialog):
         self.time_edit.setDisplayFormat("hh:mm AP")
         self.time_edit.setTime(QTime(19, 0))  # Default to 7:00 PM
         details_layout.addRow(self.tr("Time:"), self.time_edit)
+
+        # Target Duration
+        target_layout = QHBoxLayout()
+        self.target_duration_spin = QSpinBox()
+        self.target_duration_spin.setRange(30, 240)  # 30 min to 4 hours
+        self.target_duration_spin.setValue(105)  # Default
+        self.target_duration_spin.setSuffix(" min")
+        self.target_duration_spin.setToolTip(self.tr("Target duration for this meeting"))
+        self.target_duration_spin.valueChanged.connect(self._on_target_duration_changed)
+        target_layout.addWidget(self.target_duration_spin, 1)
+
+        # Comparison indicator label
+        self.target_comparison_label = QLabel()
+        self.target_comparison_label.setStyleSheet("font-size: 9pt;")
+        target_layout.addWidget(self.target_comparison_label, 1)
+
+        details_layout.addRow(self.tr("Target Duration:"), target_layout)
 
         # Templates
         template_layout = QHBoxLayout()
@@ -92,7 +117,15 @@ class MeetingEditorDialog(QDialog):
         # Meeting structure section
         structure_group = QGroupBox(self.tr("Meeting Structure"))
         structure_layout = QVBoxLayout(structure_group)
-        
+
+        # Total duration display at the top
+        duration_header = QHBoxLayout()
+        duration_header.addStretch()
+        self.total_duration_label = QLabel(self.tr("Total: 0 min"))
+        self.total_duration_label.setStyleSheet("font-size: 10pt; color: #666; font-weight: bold;")
+        duration_header.addWidget(self.total_duration_label)
+        structure_layout.addLayout(duration_header)
+
         # Split view with sections list on left, parts on right
         split_layout = QHBoxLayout()
         
@@ -228,10 +261,18 @@ class MeetingEditorDialog(QDialog):
         for section_data in template_data.get('sections', []):
             section_title = section_data.get('title', '')
             self._add_section_item(section_title, section_data.get('parts', []))
-        
+
         # Select first section if any
         if self.sections_list.count() > 0:
             self.sections_list.setCurrentRow(0)
+
+        # Auto-calculate target from template
+        if self.sections_list.count() > 0:
+            total = self._calculate_total_duration()
+            # Round up to nearest 5 minutes
+            suggested_target = ((total + 4) // 5) * 5
+            self.target_duration_spin.setValue(suggested_target)
+            self._update_duration_comparison()
     
     def _add_section_item(self, title: str, parts=None):
         """Add a section item to the sections list"""
@@ -287,9 +328,10 @@ class MeetingEditorDialog(QDialog):
         # Reconnect selection changed signal
         self.parts_table.itemSelectionChanged.connect(self._update_controls_state)
         self._selection_connected = True
-        
+
         self._update_controls_state()
-    
+        self._update_duration_comparison()
+
     def _add_section(self):
         """Add a new section"""
         section_title, ok = QInputDialog.getText(self, self.tr("Add Section"), self.tr("Section Title:"))
@@ -605,7 +647,73 @@ class MeetingEditorDialog(QDialog):
                 parts_data.append(part_data)
         
         item.setData(Qt.ItemDataRole.UserRole, parts_data)
-    
+        self._update_duration_comparison()
+
+    def _calculate_total_duration(self) -> int:
+        """Calculate total duration of all parts in all sections"""
+        total_minutes = 0
+        for i in range(self.sections_list.count()):
+            item = self.sections_list.item(i)
+            parts_data = item.data(Qt.ItemDataRole.UserRole)
+            if parts_data:
+                for part in parts_data:
+                    total_minutes += part.get('duration_minutes', 0)
+        return total_minutes
+
+    def _update_duration_comparison(self):
+        """Update total duration display and comparison indicator"""
+        total = self._calculate_total_duration()
+        target = self.target_duration_spin.value()
+
+        # Update total label
+        self.total_duration_label.setText(self.tr(f"Total: {total} min"))
+
+        if total == 0:
+            self.target_comparison_label.setText("")
+            return
+
+        diff = target - total
+
+        if diff > 5:
+            # Under target (good)
+            self.target_comparison_label.setText(f"✓ {diff} min under")
+            self.target_comparison_label.setStyleSheet("color: #4CAF50; font-size: 9pt;")
+        elif diff >= 0:
+            # Near target (acceptable)
+            self.target_comparison_label.setText(f"≈ Near target")
+            self.target_comparison_label.setStyleSheet("color: #FF9800; font-size: 9pt;")
+        else:
+            # Over target (warning)
+            self.target_comparison_label.setText(f"⚠ {abs(diff)} min over")
+            self.target_comparison_label.setStyleSheet("color: #F44336; font-size: 9pt;")
+
+    def _update_target_duration_default(self):
+        """Update target duration default when meeting type changes"""
+        if not hasattr(self, '_target_manually_set') or not self._target_manually_set:
+            meeting_type_str = self.type_combo.currentData()
+            settings = None
+            parent = self.parent()
+
+            if parent and hasattr(parent, 'settings_controller'):
+                settings = parent.settings_controller.get_settings()
+
+            if settings:
+                if meeting_type_str == MeetingType.MIDWEEK.value:
+                    self.target_duration_spin.setValue(settings.midweek_meeting.target_duration_minutes)
+                elif meeting_type_str == MeetingType.WEEKEND.value:
+                    self.target_duration_spin.setValue(settings.weekend_meeting.target_duration_minutes)
+                else:  # CUSTOM
+                    self.target_duration_spin.setValue(60)
+            else:
+                self.target_duration_spin.setValue(105)
+
+        self._update_duration_comparison()
+
+    def _on_target_duration_changed(self, value):
+        """Track manual edits to target duration"""
+        self._target_manually_set = True
+        self._update_duration_comparison()
+
     def _save_as_template(self):
         """Save current meeting as a template"""
         # Create template from current meeting structure
@@ -703,11 +811,19 @@ class MeetingEditorDialog(QDialog):
                 parts_data.append(part_data)
             
             self._add_section_item(section.title, parts_data)
-        
+
         # Select first section if any
         if self.sections_list.count() > 0:
             self.sections_list.setCurrentRow(0)
-    
+
+        # Load target duration if set
+        if self.meeting.target_duration_minutes is not None:
+            self.target_duration_spin.setValue(self.meeting.target_duration_minutes)
+        else:
+            self._update_target_duration_default()
+
+        self._update_duration_comparison()
+
     def create_meeting(self) -> Meeting:
         """Create a Meeting object from the editor data"""
         # Get meeting basics
@@ -767,9 +883,10 @@ class MeetingEditorDialog(QDialog):
             date=meeting_date,
             start_time=meeting_time,
             sections=sections,
-            language='en'  # Default
+            language='en',  # Default
+            target_duration_minutes=self.target_duration_spin.value()
         )
-        
+
         return meeting
     
     def accept(self):
