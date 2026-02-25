@@ -1,6 +1,25 @@
 # Changelog
 
-# [](https://github.com/berba-q/meeting_timer/compare/v1.0.6...v) (2026-01-27)
+# [](https://github.com/berba-q/meeting_timer/compare/v1.0.7...v) (2026-02-25)
+
+
+
+## [1.0.7](https://github.com/berba-q/meeting_timer/compare/v1.0.6...v1.0.7) (2026-02-25)
+
+
+### Bug Fixes
+
+* fixed an issue that caused app restarts ([87e4a2a](https://github.com/berba-q/meeting_timer/commit/87e4a2a595404fd403d65f874e710954275e408e))
+
+
+### Features
+
+* Added persistence and resume of timer when app crashes ([9f4bfd5](https://github.com/berba-q/meeting_timer/commit/9f4bfd55bbb5ca4fd5b474b58c511496abb58adf))
+* Enhance meeting duration management including defining specific meeting end time which forces time redestribution from current part. ([440f266](https://github.com/berba-q/meeting_timer/commit/440f266ed1d6af0bfb591d0ea4080e3b73f64c26))
+
+
+
+## [1.0.6](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v1.0.6) (2026-01-27)
 
 
 ### Bug Fixes
