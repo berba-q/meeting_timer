@@ -20,6 +20,7 @@ class MeetingPart:
     presenter: str = ""
     notes: str = ""
     is_completed: bool = False
+    original_duration_minutes: Optional[int] = None  # Pre-adjustment duration (None = not adjusted)
     
     @property
     def duration_seconds(self) -> int:
@@ -28,13 +29,16 @@ class MeetingPart:
     
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
-        return {
+        d = {
             'title': self.title,
             'duration_minutes': self.duration_minutes,
             'presenter': self.presenter,
             'notes': self.notes,
             'is_completed': self.is_completed
         }
+        if self.original_duration_minutes is not None:
+            d['original_duration_minutes'] = self.original_duration_minutes
+        return d
     
     @classmethod
     def from_dict(cls, data: dict) -> 'MeetingPart':
@@ -44,7 +48,8 @@ class MeetingPart:
             duration_minutes=data['duration_minutes'],
             presenter=data.get('presenter', ''),
             notes=data.get('notes', ''),
-            is_completed=data.get('is_completed', False)
+            is_completed=data.get('is_completed', False),
+            original_duration_minutes=data.get('original_duration_minutes')
         )
 
 @dataclass
@@ -82,7 +87,8 @@ class Meeting:
     start_time: time
     sections: List[MeetingSection]
     language: str = "en"
-    
+    target_duration_minutes: Optional[int] = None  # Custom target for specific meeting (e.g., custom meetings)
+
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
         return {
@@ -91,19 +97,21 @@ class Meeting:
             'date': self.date.isoformat(),
             'start_time': self.start_time.isoformat(),
             'sections': [section.to_dict() for section in self.sections],
-            'language': self.language
+            'language': self.language,
+            'target_duration_minutes': self.target_duration_minutes
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> 'Meeting':
-        """Create from dictionary"""
+        """Create from dictionary with backwards compatibility"""
         return cls(
             meeting_type=MeetingType(data['meeting_type']),
             title=data['title'],
             date=datetime.fromisoformat(data['date']),
             start_time=time.fromisoformat(data['start_time']),
             sections=[MeetingSection.from_dict(section) for section in data['sections']],
-            language=data.get('language', 'en')
+            language=data.get('language', 'en'),
+            target_duration_minutes=data.get('target_duration_minutes')  # None if not specified
         )
     
     @property

@@ -68,22 +68,26 @@ class SettingsController(QObject):
             self.language_changed.emit(language)
             self.general_settings_changed.emit()
     
-    def set_midweek_meeting(self, day: DayOfWeek, meeting_time: time):
-        """Set midweek meeting day and time"""
+    def set_midweek_meeting(self, day: DayOfWeek, meeting_time: time, target_duration_minutes: int = 105):
+        """Set midweek meeting day, time, and target duration"""
         self.settings_manager.settings.midweek_meeting = MeetingSettings(
             day=day,
-            time=meeting_time
+            time=meeting_time,
+            target_duration_minutes=target_duration_minutes
         )
         self.settings_manager.save_settings()
+        self.settings_changed.emit()  # Notify timer controller of changes
         self.meeting_settings_changed.emit()
 
-    def set_weekend_meeting(self, day: DayOfWeek, meeting_time: time):
-        """Set weekend meeting day and time"""
+    def set_weekend_meeting(self, day: DayOfWeek, meeting_time: time, target_duration_minutes: int = 105):
+        """Set weekend meeting day, time, and target duration"""
         self.settings_manager.settings.weekend_meeting = MeetingSettings(
             day=day,
-            time=meeting_time
+            time=meeting_time,
+            target_duration_minutes=target_duration_minutes
         )
         self.settings_manager.save_settings()
+        self.settings_changed.emit()  # Notify timer controller of changes
         self.meeting_settings_changed.emit()
     
     def set_display_mode(self, display_mode: TimerDisplayMode):

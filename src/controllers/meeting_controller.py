@@ -685,7 +685,7 @@ class MeetingController(QObject):
         """
         from src.views.meeting_editor_dialog import MeetingEditorDialog
 
-        dialog = MeetingEditorDialog(parent, meeting)
+        dialog = MeetingEditorDialog(parent, meeting, self.settings_manager)
 
         # Connect the signal from the dialog
         if on_meeting_updated:

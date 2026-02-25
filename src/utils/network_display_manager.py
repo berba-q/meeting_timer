@@ -583,8 +583,10 @@ class NetworkDisplayManager(QObject):
         # Force an update to reflect the new part
         self._on_time_updated(self.timer_controller.timer.remaining_seconds)
     
-    def _on_predicted_end_time_updated(self, original_end_time, predicted_end_time):
+    def _on_predicted_end_time_updated(self, original_end_time, predicted_end_time, target_end_time):
         """Handle predicted end time updates"""
+        # Store target end time for display formatting
+        self._target_end_time = target_end_time
         # Force an update to reflect the new predicted end time
         self._on_time_updated(self.timer_controller.timer.remaining_seconds)
     

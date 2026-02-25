@@ -1,13 +1,14 @@
 """
 Meeting view component for displaying and managing meeting parts.
 """
+from datetime import datetime
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QFrame, QTreeWidget, QTreeWidgetItem, QHeaderView,
     QSizePolicy, QSpacerItem, QMenu, QDialog, QFormLayout, QLineEdit,
-    QSpinBox, QDialogButtonBox, QMessageBox
+    QSpinBox, QDialogButtonBox, QMessageBox, QTimeEdit
 )
-from PyQt6.QtCore import Qt, pyqtSlot, QSize
+from PyQt6.QtCore import Qt, pyqtSlot, QSize, QTime
 from PyQt6.QtGui import QAction, QColor, QBrush, QIcon, QFont
 
 from src.controllers.meeting_controller import MeetingController
@@ -61,6 +62,114 @@ class PartEditDialog(QDialog):
             notes=self.part.notes,
             is_completed=self.part.is_completed
         )
+
+
+class EndMeetingAtDialog(QDialog):
+    """Dialog for setting a target end time and redistributing part durations"""
+
+    def __init__(self, predicted_end_time: datetime,
+                 remaining_parts_count: int,
+                 remaining_duration_minutes: int,
+                 parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("End Meeting At"))
+        self.setMinimumWidth(320)
+        self._remaining_parts_count = remaining_parts_count
+        self._remaining_duration_minutes = remaining_duration_minutes
+        self._setup_ui(predicted_end_time)
+
+    def _setup_ui(self, predicted_end_time: datetime):
+        layout = QFormLayout(self)
+
+        # Info: current predicted end
+        predicted_str = predicted_end_time.strftime("%I:%M %p")
+        info_label = QLabel(self.tr("Current predicted end: ") + predicted_str)
+        info_label.setStyleSheet("color: #666; font-size: 9pt;")
+        layout.addRow(info_label)
+
+        # Info: parts to be adjusted
+        parts_info = QLabel(
+            self.tr("%n part(s)", "", self._remaining_parts_count)
+            + f" ({self._remaining_duration_minutes} min) "
+            + self.tr("will be adjusted")
+        )
+        parts_info.setStyleSheet("color: #666; font-size: 9pt;")
+        layout.addRow(parts_info)
+
+        layout.addRow(QLabel(""))
+
+        # Time picker
+        self.time_edit = QTimeEdit()
+        self.time_edit.setDisplayFormat("hh:mm AP")
+        self.time_edit.setTime(QTime(predicted_end_time.hour, predicted_end_time.minute))
+        self.time_edit.timeChanged.connect(self._update_calculation)
+        layout.addRow(self.tr("End meeting at:"), self.time_edit)
+
+        # Live calculation label
+        self.calc_label = QLabel()
+        self.calc_label.setStyleSheet("font-size: 9pt;")
+        layout.addRow(self.calc_label)
+
+        self._update_calculation(self.time_edit.time())
+
+        # Buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.accepted.connect(self._validate_and_accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def _update_calculation(self, qtime):
+        now = datetime.now()
+        target = now.replace(hour=qtime.hour(), minute=qtime.minute(), second=0, microsecond=0)
+
+        if target <= now:
+            self.calc_label.setText(self.tr("Target time must be in the future"))
+            self.calc_label.setStyleSheet("color: #f44336; font-size: 9pt;")
+            return
+
+        diff_minutes = int((target - now).total_seconds() / 60)
+
+        if diff_minutes < self._remaining_parts_count:
+            self.calc_label.setText(
+                self.tr("Not enough time")
+                + f" ({diff_minutes} min "
+                + self.tr("for") + f" {self._remaining_parts_count} "
+                + self.tr("parts") + ")"
+            )
+            self.calc_label.setStyleSheet("color: #f44336; font-size: 9pt;")
+        else:
+            change = diff_minutes - self._remaining_duration_minutes
+            if change < 0:
+                self.calc_label.setText(
+                    self.tr("Saving") + f" {abs(change)} min " + self.tr("from remaining parts")
+                )
+                self.calc_label.setStyleSheet("color: #4caf50; font-size: 9pt;")
+            elif change > 0:
+                self.calc_label.setText(
+                    self.tr("Adding") + f" {change} min " + self.tr("to remaining parts")
+                )
+                self.calc_label.setStyleSheet("color: #ff9800; font-size: 9pt;")
+            else:
+                self.calc_label.setText(self.tr("No change needed"))
+                self.calc_label.setStyleSheet("color: #666; font-size: 9pt;")
+
+    def _validate_and_accept(self):
+        target = self.get_target_datetime()
+        if target <= datetime.now():
+            QMessageBox.warning(
+                self, self.tr("Invalid Time"),
+                self.tr("The target end time must be in the future.")
+            )
+            return
+        self.accept()
+
+    def get_target_datetime(self) -> datetime:
+        qtime = self.time_edit.time()
+        now = datetime.now()
+        return now.replace(hour=qtime.hour(), minute=qtime.minute(), second=0, microsecond=0)
 
 
 class MeetingView(QWidget):
@@ -171,8 +280,19 @@ class MeetingView(QWidget):
                 # check if songs are part of the meeting
                 is_song_part = "song" in part.title.lower()
                 part_item.setText(0, part.title)
-                part_item.setText(1, f"{part.duration_minutes} min")
-                
+                # Show adjusted duration with visual feedback
+                if (part.original_duration_minutes is not None and
+                        part.original_duration_minutes != part.duration_minutes):
+                    part_item.setText(1, f"{part.duration_minutes} min (was {part.original_duration_minutes})")
+                    part_item.setForeground(1, QBrush(QColor(255, 152, 0)))  # Orange
+                    diff = part.duration_minutes - part.original_duration_minutes
+                    direction = self.tr("added") if diff > 0 else self.tr("removed")
+                    part_item.setToolTip(1,
+                        self.tr("Adjusted:") + f" {abs(diff)} min {direction} "
+                        + self.tr("(original:") + f" {part.original_duration_minutes} min)")
+                else:
+                    part_item.setText(1, f"{part.duration_minutes} min")
+
                 # If it's a song part, make it visually distinct
                 if is_song_part:
                     part_item.setForeground(0, QBrush(QColor(74, 144, 226)))  # Blue color for songs
@@ -228,7 +348,9 @@ class MeetingView(QWidget):
     
     def _part_changed(self, part, global_part_index):
         """Handle part change from timer controller"""
-        self.highlight_part(global_part_index)
+        # Only highlight if meeting is actually running
+        if self.timer_controller.current_part_index >= 0:
+            self.highlight_part(global_part_index)
     
     def _part_completed(self, global_part_index):
         """Handle part completion"""
@@ -304,7 +426,29 @@ class MeetingView(QWidget):
                         move_down_action = QAction(self.tr("Move Down"), self)
                         move_down_action.triggered.connect(lambda: self._move_part_down(item))
                         menu.addAction(move_down_action)
-                
+
+                    # "End Meeting At..." — always visible, greyed out when not applicable
+                    menu.addSeparator()
+                    end_at_action = QAction(self.tr("End Meeting At..."), self)
+                    is_running = self.timer_controller.current_part_index >= 0
+                    is_current_or_future = is_running and item_index >= self.timer_controller.current_part_index
+                    end_at_action.setEnabled(is_current_or_future)
+                    if not is_running:
+                        end_at_action.setToolTip(self.tr("Start the meeting timer first"))
+                    elif not is_current_or_future:
+                        end_at_action.setToolTip(self.tr("Only available for current or upcoming parts"))
+                    end_at_action.triggered.connect(
+                        lambda checked=False, idx=item_index: self._show_end_meeting_at_dialog(idx))
+                    menu.addAction(end_at_action)
+
+                    # "Reset Adjusted Durations" — when any parts have adjustments
+                    if (self.timer_controller.parts_list and
+                            any(p.original_duration_minutes is not None
+                                for p in self.timer_controller.parts_list)):
+                        reset_action = QAction(self.tr("Reset Adjusted Durations"), self)
+                        reset_action.triggered.connect(self._reset_adjusted_durations)
+                        menu.addAction(reset_action)
+
                 elif item_type == "section":
                     # Section context menu
                     # Add section-specific actions here
@@ -440,9 +584,97 @@ class MeetingView(QWidget):
     def _get_global_part_index(self, section_index, part_index):
         """Convert section and part indices to global part index"""
         global_index = 0
-        
+
         for i in range(section_index):
             global_index += len(self.meeting.sections[i].parts)
-        
+
         global_index += part_index
         return global_index
+
+    def _show_end_meeting_at_dialog(self, clicked_part_index: int):
+        """Open the End Meeting At dialog and apply redistribution"""
+        if not self.meeting or not self.timer_controller.parts_list:
+            return
+
+        # Gather info for the dialog
+        parts = self.timer_controller.parts_list
+        remaining_parts = parts[clicked_part_index:]
+        remaining_count = len(remaining_parts)
+        remaining_minutes = sum(
+            (p.original_duration_minutes if p.original_duration_minutes is not None
+             else p.duration_minutes)
+            for p in remaining_parts
+        )
+
+        # Get predicted end time from controller
+        predicted = getattr(self.timer_controller, '_predicted_end_time', None)
+        if predicted is None:
+            predicted = datetime.now()
+
+        dialog = EndMeetingAtDialog(predicted, remaining_count, remaining_minutes, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        target = dialog.get_target_datetime()
+        result = self.timer_controller.redistribute_durations_for_end_time(target, clicked_part_index)
+
+        if not result.get('success'):
+            QMessageBox.warning(
+                self,
+                self.tr("Cannot Adjust"),
+                result.get('error', self.tr("Unknown error"))
+            )
+            return
+
+        # Refresh tree display to show adjustments
+        self._update_display()
+
+        # Re-highlight current part
+        if self.timer_controller.current_part_index >= 0:
+            self.highlight_part(self.timer_controller.current_part_index)
+
+    def _apply_duration_adjustment_visuals(self, adjusted_parts: list):
+        """Update tree items with visual feedback for adjusted durations.
+        adjusted_parts: [(global_idx, old_min, new_min), ...]
+        """
+        adjusted_map = {idx: (old, new) for idx, old, new in adjusted_parts}
+
+        for section_index in range(self.parts_tree.topLevelItemCount()):
+            section_item = self.parts_tree.topLevelItem(section_index)
+            for part_index in range(section_item.childCount()):
+                part_item = section_item.child(part_index)
+                item_data = part_item.data(0, Qt.ItemDataRole.UserRole)
+                if not item_data:
+                    continue
+                _, global_idx = item_data
+                if global_idx in adjusted_map:
+                    old_min, new_min = adjusted_map[global_idx]
+                    part_item.setText(1, f"{new_min} min (was {old_min})")
+                    part_item.setForeground(1, QBrush(QColor(255, 152, 0)))
+                    diff = new_min - old_min
+                    direction = self.tr("added") if diff > 0 else self.tr("removed")
+                    part_item.setToolTip(1,
+                        self.tr("Adjusted:") + f" {abs(diff)} min {direction} "
+                        + self.tr("(original:") + f" {old_min} min)")
+
+        self._update_section_totals()
+
+    def _update_section_totals(self):
+        """Recalculate and update section duration text in the tree"""
+        if not self.meeting:
+            return
+
+        for section_index in range(self.parts_tree.topLevelItemCount()):
+            section_item = self.parts_tree.topLevelItem(section_index)
+            if section_index < len(self.meeting.sections):
+                section = self.meeting.sections[section_index]
+                total = section.total_duration_minutes
+                section_item.setText(1, f"{total} min")
+
+    def _reset_adjusted_durations(self):
+        """Reset all adjusted durations back to their originals"""
+        count = self.timer_controller.reset_adjusted_durations()
+        if count > 0:
+            self._update_display()
+            if self.timer_controller.current_part_index >= 0:
+                self.highlight_part(self.timer_controller.current_part_index)

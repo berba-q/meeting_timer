@@ -1,6 +1,8 @@
 """
 Tests for the TimerController class in the JW Meeting Timer application.
 """
+import os
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
@@ -12,7 +14,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.timer import Timer, TimerState
 from src.models.meeting import Meeting, MeetingSection, MeetingPart, MeetingType
+from src.models.settings import SettingsManager
 from src.controllers.timer_controller import TimerController
+from src.controllers.settings_controller import SettingsController
 
 
 class TestTimerController(unittest.TestCase):
@@ -20,9 +24,17 @@ class TestTimerController(unittest.TestCase):
     
     def setUp(self):
         """Set up test environment"""
+        # Create temporary settings file
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.settings_file = os.path.join(self.test_dir.name, "test_settings.json")
+
+        # Create settings manager and controller
+        self.settings_manager = SettingsManager(self.settings_file)
+        self.settings_controller = SettingsController(self.settings_manager)
+
         # Create a timer controller with a mocked timer to avoid QTimer issues
-        self.timer_controller = TimerController()
-        
+        self.timer_controller = TimerController(self.settings_controller)
+
         # Mock the timer's QTimer to prevent "Timers can only be used with threads started with QThread" errors
         mock_qtimer = MagicMock()
         self.timer_controller.timer._timer = mock_qtimer
@@ -69,7 +81,7 @@ class TestTimerController(unittest.TestCase):
             lambda sec: self.signals_received['meeting_overtime'].append(sec)
         )
         self.timer_controller.predicted_end_time_updated.connect(
-            lambda orig, pred: self.signals_received['predicted_end_time_updated'].append((orig, pred))
+            lambda orig, pred, target: self.signals_received['predicted_end_time_updated'].append((orig, pred, target))
         )
     
     def tearDown(self):
@@ -77,6 +89,8 @@ class TestTimerController(unittest.TestCase):
         # Restore the original state change handler if you need it
         if hasattr(self, 'original_handle_state'):
             self.timer_controller._handle_timer_state_change = self.original_handle_state
+        # Clean up temp directory
+        self.test_dir.cleanup()
     
     def _increment_signal_count(self, signal_name):
         """Helper to increment signal counter"""
@@ -298,37 +312,40 @@ class TestTimerController(unittest.TestCase):
     def test_predicted_end_time(self):
         """Test predicted end time calculations"""
         # Instead of using a patch for datetime, we'll mock the method directly
-        
+
         # Set up meeting
         self.timer_controller.set_meeting(self.meeting)
-        
+
         # Mock the _update_predicted_end_time method
         self.timer_controller._update_predicted_end_time = MagicMock()
-        
+
         # Mock the private attributes that hold the datetime values
         self.timer_controller._original_end_time = datetime.now()
         self.timer_controller._predicted_end_time = datetime.now()
-        
+        self.timer_controller._target_end_time = datetime.now()  # NEW: Add target end time
+
         # Reset signals
         self._reset_signals()
-        
+
         # Create a mock for start_meeting to avoid date calculations
         original_start = self.timer_controller.start_meeting
         self.timer_controller.start_meeting = MagicMock()
-        
-        # Manually emit the signal
+
+        # Manually emit the signal with 3 parameters
         self.timer_controller.predicted_end_time_updated.emit(
             self.timer_controller._original_end_time,
-            self.timer_controller._predicted_end_time
+            self.timer_controller._predicted_end_time,
+            self.timer_controller._target_end_time  # NEW: Add target parameter
         )
-        
+
         # Check that the signal was received
         self.assertEqual(len(self.signals_received['predicted_end_time_updated']), 1)
-        original, predicted = self.signals_received['predicted_end_time_updated'][0]
-        
+        original, predicted, target = self.signals_received['predicted_end_time_updated'][0]  # NEW: Unpack 3 parameters
+
         # Verify the types
         self.assertIsInstance(original, datetime)
         self.assertIsInstance(predicted, datetime)
+        self.assertIsInstance(target, datetime)  # NEW: Verify target type
         
         # Restore original method
         self.timer_controller.start_meeting = original_start

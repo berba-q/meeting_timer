@@ -357,51 +357,49 @@ class SecondaryDisplay(QMainWindow):
             if self.info_label1.text() != formatted_text:
                 self.info_label1.setText(formatted_text)
 
-    def _update_predicted_end_time(self, original_end_time, predicted_end_time):
-        """Simply display the predicted end time calculated by timer controller"""
-        
+    def _update_predicted_end_time(self, original_end_time, predicted_end_time, target_end_time):
+        """Display predicted end time compared to organizational target"""
+
         # Don't show predicted end during countdown
         if self.show_countdown:
             self.info_label2.setText("")
             return
-        
-        # Just format and display the received values - NO calculations!
-        predicted_time_str = predicted_end_time.strftime("%H:%M")
-        original_time_str = original_end_time.strftime("%H:%M")
-        
-        # Calculate difference for display formatting only
-        time_diff = predicted_end_time - original_end_time
-        diff_seconds = int(time_diff.total_seconds())
-        
-        # Format the display text
-        if diff_seconds > 0:
-            # Running late
-            minutes = diff_seconds // 60
-            seconds = diff_seconds % 60
-            if seconds == 0:
-                time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (+{minutes}M)"
-            else:
-                time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (+{minutes}M)"
-            color = "#ffaa00" if diff_seconds <= 60 else "#ff4d4d"
-        elif diff_seconds < 0:
-            # Running early
-            abs_diff = abs(diff_seconds)
-            minutes = abs_diff // 60
-            seconds = abs_diff % 60
-            if seconds == 0:
-                time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (-{minutes}M)"
-            else:
-                time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (-{minutes}M)"
-            color = "#4caf50"
-        else:
-            # On time
-            time_text = f"{self.tr('PREDICTED END')}: {predicted_time_str} (ON TIME)"
-            color = "#4caf50"
 
-        # Display the formatted text
-        self.info_label2.setText(time_text)
+        # Format predicted time in 12-hour format (e.g., 8:50 PM)
+        predicted_time_str = predicted_end_time.strftime("%I:%M %p").lstrip('0')
+        target_time_str = target_end_time.strftime("%I:%M %p").lstrip('0')
+
+        # Calculate difference from TARGET (not template)
+        time_diff = predicted_end_time - target_end_time
+        diff_seconds = int(time_diff.total_seconds())
+        diff_minutes = abs(diff_seconds) // 60
+
+        # Color-coding based on target:
+        # GREEN: Within 2 min of target (acceptable variance)
+        # ORANGE: 3-5 min over target (caution)
+        # RED: >5 min over target (concerning)
+
+        if diff_seconds > 300:  # >5 min late
+            status_text = f"{diff_minutes} min{'s' if diff_minutes != 1 else ''} over ⚠️"
+            color = "#ff4d4d"  # Red
+        elif diff_seconds > 120:  # 2-5 min late
+            status_text = f"{diff_minutes} min{'s' if diff_minutes != 1 else ''} over"
+            color = "#ffaa00"  # Orange
+        elif diff_seconds > -120:  # Within ±2 min
+            status_text = "On Time"
+            color = "#4caf50"  # Green
+        else:  # >2 min early
+            status_text = f"{diff_minutes} min{'s' if diff_minutes != 1 else ''} early"
+            color = "#4caf50"  # Green
+
+        # Format: "Predicted End: 8:50 PM | 5 mins over"
+        time_text = f"Predicted End: {predicted_time_str} | {status_text}"
+
         self.info_label2.setText(time_text.upper())
         self.info_label2.setStyleSheet(f"color: {color}; font-weight: bold;")
+
+        # Tooltip shows target time for reference
+        self.info_label2.setToolTip(f"Target finish: {target_time_str}")
         
     def _meeting_started(self):
         """Handle meeting start event"""

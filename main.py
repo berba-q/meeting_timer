@@ -4,6 +4,7 @@ OnTime - A cross-platform timer application for managing meeting schedules
 import sys
 import os
 import time
+import logging
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -48,7 +49,7 @@ class CustomSplashScreen(QSplashScreen):
             self.icon_label.setPixmap(icon_pixmap)
             self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         except Exception as e:
-            print(f"[WARN] Could not load icon: {e}")
+            logging.getLogger("OnTime").warning("Could not load icon: %s", e)
             self.icon_label.setText("⏱️")
             self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.icon_label.setFont(QFont("Arial", 40))
@@ -174,13 +175,33 @@ def _select_meeting_by_day(controller, main_window):
         )
         
 
+def _log_system_info(logger):
+    """Log system information in the background after startup."""
+    from src.utils.helpers import get_system_info
+    for key, value in get_system_info().items():
+        logger.info("  %s: %s", key, value)
+
+
 def main():
     """Application entry point"""
     start_time = time.perf_counter()
+
+    from src.config import USER_DATA_DIR
+    from src.utils.helpers import setup_logging, setup_crash_handlers
+
+    # Initialize logging and crash handlers
+    log_dir = USER_DATA_DIR / "logs"
+    setup_logging(log_dir=log_dir)
+    setup_crash_handlers(log_dir=log_dir)
+    logger = logging.getLogger("OnTime")
+
     app = QApplication(sys.argv)
     app.setApplicationName("OnTime")
     app.setOrganizationName("OnTime")
     app.setWindowIcon(get_icon("app_icon"))
+
+    from src import __version__
+    logger.info("OnTime Meeting Timer v%s starting", __version__)
 
     # Initialize controllers first so we can load saved theme
     controller = MeetingController()
@@ -211,7 +232,7 @@ def main():
     # Load saved language
     saved_language = settings_controller.get_settings().language
     if saved_language == "en":
-        print("[LANG] Using default English interface.")
+        logger.info("Using default English interface")
     else:
         if not load_translation(app, saved_language):
             QMessageBox.information(
@@ -221,7 +242,7 @@ def main():
             )
             load_translation(app, "en")
         else:
-            print(f"[LANG] Loaded translation for {saved_language}")
+            logger.info("Loaded translation for %s", saved_language)
 
     splash.status_label.setText(splash.tr("Loading complete..."))
 
@@ -236,7 +257,10 @@ def main():
     main_window.show()
 
     elapsed = time.perf_counter() - start_time
-    print(f"[PERF] App ready in {elapsed:.2f} seconds")
+    logger.info("App ready in %.2f seconds", elapsed)
+
+    # Defer expensive system info logging until after the window is visible
+    QTimer.singleShot(0, lambda: _log_system_info(logger))
 
     sys.exit(app.exec())
     
