@@ -12,6 +12,9 @@ A cross-platform timer application designed specifically for managing meeting sc
 - **Manual Customization**: Edit all meeting parts, durations, and presenters on the fly
 - **Weekend Song Editor**: Specialized interface for managing weekend meeting songs
 - **Flexible Meeting Creation**: Create meetings from templates or from scratch
+- **CO Visit Mode**: Special schedule modifications for Circuit Overseer visits with automatic expiration
+- **Smart Meeting Selection**: Automatically selects the appropriate meeting based on the current day of week
+- **Session Recovery**: Persists timer state for recovery after unexpected shutdowns (Crashes and app crashes)
 
 ### Timer Functions
 - **Intuitive Timer Controls**: Start, pause, stop, next part, previous part
@@ -20,13 +23,17 @@ A cross-platform timer application designed specifically for managing meeting sc
 - **Overtime Tracking**: Automatic tracking of overtime for individual parts and the entire meeting
 - **Predicted End Time**: Real-time calculation of expected meeting end time based on current progress
 - **Chairman Transitions**: Special transition mode between parts with automatic timing
+- **Meeting Countdown**: Countdown display to scheduled meeting start time
+- **Notifications & Reminders**: Configurable alerts for meeting start delays and part overruns
 
 ### Display Options
 - **Multi-Screen Support**: Configure primary and secondary displays
 - **Secondary Display**: Full-screen display optimized for speakers/audience
 - **High-Contrast Display**: Ensures visibility from a distance
-- **Theme Options**: Light and dark themes available
+- **Theme Options**: Light, dark, and system-following themes
 - **Font Sizing**: Automatic adjustment for optimal visibility at any window size
+- **Analog Display Mode**: Clock-style analog timer view, switchable with F9
+- **System Tray**: Minimize to system tray for unobtrusive background operation
 
 ### Network Display
 - **Browser-Based Remote Display**: Share timer on any device with a web browser
@@ -37,10 +44,27 @@ A cross-platform timer application designed specifically for managing meeting sc
 - **Auto-Start Option**: Network display can start automatically with the application
 - **Multiple Connected Devices**: Support for multiple viewers on different devices
 
+### Internationalization
+- **Multi-Language Support**: English, Italian, French, and German
+- **Dynamic Language Switching**: Change language without restarting the application
+
 ### Cross-Platform
 - Works on Windows, macOS, and Linux
 - Consistent interface across platforms
 - No external dependencies required
+- **Automatic Update Checking**: Notifies you when a new version is available
+
+### Keyboard Shortcuts
+| Shortcut | Action |
+|---|---|
+| Ctrl+N | New Meeting |
+| Ctrl+O | Open Meeting |
+| Ctrl+E | Edit Current Meeting |
+| Ctrl+Shift+S | Edit Weekend Songs |
+| F5 | Update Meetings from Web |
+| F9 | Toggle Digital/Analog Display |
+| F10 | Toggle Secondary Display |
+| Ctrl+, | Open Settings |
 
 ## Screenshots
 
@@ -129,6 +153,10 @@ Download the latest release for your platform:
 - **Part Navigation**: Double-click any part to jump directly to it
 - **Contextual Controls**: Right-click menu for part-specific operations
 - **Time Adjustment**: Add or remove minutes with a click
+
+### CO Visit Mode
+- **Circuit Overseer Visit**: Activate CO visit mode to apply special schedule modifications
+- **Auto-Expiration**: Automatically deactivates when the visit week ends
 
 ## Troubleshooting
 
