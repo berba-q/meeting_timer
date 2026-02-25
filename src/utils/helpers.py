@@ -14,24 +14,87 @@ from pathlib import Path
 logger = logging.getLogger("OnTime")
 
 
-def setup_logging(log_file: Optional[str] = None, level: int = logging.INFO):
-    """Set up application logging"""
-    logger.setLevel(level)
-    
+def setup_logging(log_dir: Optional[Union[str, Path]] = None, level: int = logging.INFO) -> logging.Logger:
+    """Set up application logging with file rotation and console output.
+
+    Args:
+        log_dir: Directory for log files. If None, file logging is skipped.
+        level: Logging level (default: INFO).
+
+    Returns:
+        The configured 'OnTime' logger.
+    """
+    from logging.handlers import RotatingFileHandler
+
+    # Avoid adding duplicate handlers on repeated calls
+    if logger.handlers:
+        return logger
+
+    logger.setLevel(logging.DEBUG)
+
     # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
-    console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+    console_formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%H:%M:%S'
+    )
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
-    
-    # File handler (optional)
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(level)
-        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # File handler with rotation
+    if log_dir:
+        log_path = Path(log_dir)
+        log_path.mkdir(parents=True, exist_ok=True)
+        log_file = log_path / "ontime.log"
+
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=2 * 1024 * 1024,  # 2 MB per file
+            backupCount=3,
+            encoding='utf-8'
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_formatter = logging.Formatter(
+            '%(asctime)s [%(levelname)s] %(name)s (%(filename)s:%(lineno)d): %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
+
+    return logger
+
+
+def setup_crash_handlers(log_dir: Optional[Union[str, Path]] = None):
+    """Set up global crash handlers for uncaught exceptions and native crashes.
+
+    Args:
+        log_dir: Directory for crash dump files. If None, uses stderr only.
+    """
+    import faulthandler
+
+    # Enable faulthandler for native crashes (segfaults, SIGABRT, etc.)
+    if log_dir:
+        crash_path = Path(log_dir)
+        crash_path.mkdir(parents=True, exist_ok=True)
+        crash_file = crash_path / "crash_dump.txt"
+        # Kept open for process lifetime — faulthandler needs a live fd
+        _crash_fd = open(crash_file, 'a')
+        faulthandler.enable(file=_crash_fd)
+    else:
+        faulthandler.enable()
+
+    # Route uncaught Python exceptions through the logger
+    def _uncaught_exception_handler(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        logger.critical(
+            "Uncaught exception",
+            exc_info=(exc_type, exc_value, exc_traceback)
+        )
+
+    sys.excepthook = _uncaught_exception_handler
 
 
 def format_time(seconds: int) -> str:

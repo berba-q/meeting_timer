@@ -5,6 +5,7 @@ Main application window for the OnTime meeting timer app.
 # -*- coding: utf-8 -*-
 
 import os
+import logging
 from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -36,6 +37,8 @@ from src.views.toast_notification import ToastManager
 from src.models.settings import NetworkDisplayMode
 from src.utils.update_checker import check_for_updates
 
+logger = logging.getLogger("OnTime.MainWindow")
+
 
 class UpdateCheckWorker(QObject):
     """Worker class for running update checks in a separate thread"""
@@ -59,7 +62,7 @@ class UpdateCheckWorker(QObject):
             # Run check on this thread
             check_for_updates(main_window, self.silent)
         except Exception as e:
-            print(f"Error checking for updates: {e}")
+            logger.error("Error checking for updates: %s", e)
         finally:
             self.finished.emit()
 
@@ -420,7 +423,7 @@ class MainWindow(QMainWindow):
             
             
         else:
-            print("WARNING: Cannot connect network display manager signals - component not loaded yet")
+            logger.warning("Cannot connect network display manager signals - component not loaded yet")
     
     def _ensure_single_secondary_display(self):
         """Ensure only one secondary display exists with safe positioning"""
@@ -508,7 +511,7 @@ class MainWindow(QMainWindow):
             return self.update_thread
             
         except Exception as e:
-            print(f"[DEBUG] Error in _check_for_updates: {e}")
+            logger.error("Error in _check_for_updates: %s", e)
             import traceback
             traceback.print_exc()
             return None
@@ -692,9 +695,9 @@ class MainWindow(QMainWindow):
                         # Set flag to track that we're currently showing the countdown
                         secondary_display.show_countdown = True
                 except RuntimeError as e:
-                    print(f"Error updating secondary display: {e}")
+                    logger.error("Error updating secondary display: %s", e)
                 except Exception as e:
-                    print(f"Unexpected error updating secondary display: {e}")
+                    logger.error("Unexpected error updating secondary display: %s", e)
 
             # Disable countdown updates on secondary display (old logic, not needed with centralized management)
             # if self._is_component_ready('secondary_display_handler'):
@@ -1181,7 +1184,9 @@ class MainWindow(QMainWindow):
         self.timer_controller.meeting_overtime.connect(self._meeting_overtime)
         self.timer_controller.predicted_end_time_updated.connect(self._update_predicted_end_time)
         self.timer_controller.meeting_countdown_updated.connect(self._update_countdown)
-        
+        self.timer_controller.durations_redistributed.connect(self._on_durations_redistributed)
+        self.timer_controller.durations_reset.connect(self._on_durations_reset)
+
         # Settings controller signals
 
         self.settings_controller.language_changed.connect(self._on_language_changed) # Language change signal
@@ -1211,13 +1216,13 @@ class MainWindow(QMainWindow):
         self.toggle_network_action.setText(self.tr("Stop Network Display"))
 
         # Update session state for crash recovery
-        print(f"[MainWindow] _network_display_started called with url: {url}")
+        logger.info("Network display started with url: %s", url)
         has_timer = hasattr(self, 'timer_controller')
         has_session = has_timer and self.timer_controller.session_manager.has_active_session()
-        print(f"[MainWindow] has_timer_controller: {has_timer}, has_active_session: {has_session}")
+        logger.debug("has_timer_controller: %s, has_active_session: %s", has_timer, has_session)
         if has_timer and has_session:
             self.timer_controller.session_manager.set_network_broadcast_state(True)
-            print("[MainWindow] Set network_broadcast_active to True")
+            logger.debug("Set network_broadcast_active to True")
 
         # Update status bar
         self.statusBar().showMessage(self.tr(f"Network display started at {url}"), 5000)
@@ -1675,7 +1680,7 @@ class MainWindow(QMainWindow):
                 except (RuntimeError, AttributeError):
                     pass
         except Exception as e:
-            print(f"Error applying secondary display theme: {e}")
+            logger.error("Error applying secondary display theme: %s", e)
     
     def _start_meeting(self):
         """Start the current meeting"""
@@ -1853,6 +1858,26 @@ class MainWindow(QMainWindow):
         widget._pulse_animations = [a for a in widget._pulse_animations if a.state() == QPropertyAnimation.State.Running]
         widget._pulse_animations.append(anim)
         
+    def _on_durations_redistributed(self, adjusted_parts: list):
+        """Handle duration redistribution — show toast notification"""
+        count = len(adjusted_parts)
+        target = getattr(self.timer_controller, '_predicted_end_time', None)
+        time_str = target.strftime("%I:%M %p") if target else "?"
+        self._show_toast_notification(
+            self.tr("Schedule Updated"),
+            self.tr("%n part(s) redistributed — meeting now ends at", "", count)
+            + f" {time_str}",
+            icon="toast-adjust"
+        )
+
+    def _on_durations_reset(self):
+        """Handle duration reset — show toast notification"""
+        self._show_toast_notification(
+            self.tr("Durations Reset"),
+            self.tr("All part durations restored to their original values."),
+            icon="toast-reset"
+        )
+
     def _show_toast_notification(self, title, message, icon=""):
         """Show an in-app toast notification with the given title and message.
 
@@ -1876,9 +1901,9 @@ class MainWindow(QMainWindow):
 
         # Show in-app toast message
         self._show_toast_notification(
-            self.tr("Did We Forget Something?"),
-            self.tr("Click Start Meeting to launch the meeting timer and stay on track."),
-            icon="⌛"
+            self.tr("Ready to Begin?"),
+            self.tr("Press Start Meeting to begin the timer and stay on schedule."),
+            icon="toast-reminder"
         )
 
 
@@ -1905,9 +1930,9 @@ class MainWindow(QMainWindow):
 
         # Show in-app toast message
         self._show_toast_notification(
-            self.tr("Time to move on!"),
-            self.tr("'{part_title}' is over — advance to next part?").replace("{part_title}", part_title),
-            icon="😅"
+            self.tr("Over Time"),
+            self.tr("'{part_title}' has exceeded its allotted time.").replace("{part_title}", part_title),
+            icon="toast-overtime"
         )
 
     
@@ -2231,13 +2256,13 @@ class MainWindow(QMainWindow):
             self._show_toast_notification(
                 self.tr("CO Visit Mode Enabled"),
                 self.tr("CO visit schedule will be applied to meetings this week."),
-                icon=""
+                icon="toast-info"
             )
         else:
             self._show_toast_notification(
                 self.tr("CO Visit Mode Disabled"),
                 self.tr("Normal meeting schedule restored."),
-                icon=""
+                icon="toast-info"
             )
 
         self.settings_controller.set_co_visit_enabled(checked)
@@ -2283,20 +2308,20 @@ class MainWindow(QMainWindow):
                         self.toggle_secondary_action.setChecked(False)
                         self._cleanup_secondary_display()
                     except Exception as e:
-                        print(f"Error hiding secondary display: {e}")
+                        logger.error("Error hiding secondary display: %s", e)
 
             # Update toggle action (ensure it's in sync)
             if hasattr(self, 'toggle_secondary_action'):
                 self.toggle_secondary_action.setChecked(settings.display.use_secondary_screen)
 
         except Exception as e:
-            print(f"Error updating secondary display: {e}")
-    
+            logger.error("Error updating secondary display: %s", e)
+
     def _cleanup_secondary_display(self):
         """Clean up secondary display with monitoring stop"""
         try:
             if hasattr(self, 'secondary_display') and self.secondary_display:
-                print("[CLEANUP] Cleaning up secondary display")
+                logger.debug("Cleaning up secondary display")
                 
                 # Stop monitoring
                 self._stop_screen_monitoring()
@@ -2315,7 +2340,7 @@ class MainWindow(QMainWindow):
                 self.secondary_display = None
                 
         except Exception as e:
-            print(f"Error cleaning up secondary display: {e}")
+            logger.error("Error cleaning up secondary display: %s", e)
             self.secondary_display = None
     
     """  
@@ -2561,7 +2586,7 @@ class MainWindow(QMainWindow):
         self._update_ui_for_running_meeting()
 
         # Restore network broadcast if it was active
-        print(f"[MainWindow] Session network_broadcast_active: {session.network_broadcast_active}")
+        logger.info("Session network_broadcast_active: %s", session.network_broadcast_active)
         if session.network_broadcast_active:
             QTimer.singleShot(500, self._restore_network_broadcast)
 
@@ -2570,21 +2595,20 @@ class MainWindow(QMainWindow):
 
     def _restore_network_broadcast(self):
         """Restore network broadcast after session recovery"""
-        print("[MainWindow] Attempting to restore network broadcast...")
+        logger.info("Attempting to restore network broadcast...")
 
         if not self._is_component_ready('network_display_manager'):
-            # Try to load the network manager
-            print("[MainWindow] Network display manager not ready, loading...")
+            logger.info("Network display manager not ready, loading...")
             if hasattr(self, 'component_loader') and self.component_loader:
                 self.component_loader.get_component('network_display_manager', blocking=True, timeout=5000)
 
             if not self._is_component_ready('network_display_manager'):
-                print("[MainWindow] Could not restore network broadcast - component not available")
+                logger.warning("Could not restore network broadcast - component not available")
                 return
 
         # Check if already broadcasting
         if self.network_display_manager.broadcaster and self.network_display_manager.broadcaster.is_broadcasting:
-            print("[MainWindow] Network broadcast already active, skipping restore")
+            logger.info("Network broadcast already active, skipping restore")
             return
 
         # Start network display with settings
@@ -2593,16 +2617,16 @@ class MainWindow(QMainWindow):
         http_port = self.settings_controller.get_settings().network_display.http_port
         ws_port = self.settings_controller.get_settings().network_display.ws_port
 
-        print(f"[MainWindow] Network display mode from settings: {mode}")
+        logger.info("Network display mode from settings: %s", mode)
 
         # If mode is disabled but we know broadcast was active, use HTTP_ONLY as fallback
         if mode == NetworkDisplayMode.DISABLED:
-            print("[MainWindow] Mode is DISABLED but broadcast was active, using HTTP_ONLY as fallback")
+            logger.info("Mode is DISABLED but broadcast was active, using HTTP_ONLY as fallback")
             mode = NetworkDisplayMode.HTTP_ONLY
 
         self.network_display_manager.start_network_display(mode, http_port, ws_port)
         self.toggle_network_action.setText(self.tr("Stop Network Display"))
-        print("[MainWindow] Network broadcast restore initiated")
+        logger.info("Network broadcast restore initiated")
 
     def _update_ui_for_running_meeting(self):
         """Update UI elements to reflect a running meeting state"""
@@ -2623,7 +2647,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'timer_controller') and self.timer_controller.session_manager.has_active_session():
                 self.timer_controller.session_manager.end_session(clean=True)
         except Exception as e:
-            print(f"[MainWindow] Error ending session: {e}")
+            logger.error("Error ending session: %s", e)
 
         try:
             # Shut down the secondary display if it exists
@@ -2639,14 +2663,14 @@ class MainWindow(QMainWindow):
                 self.secondary_display.deleteLater()
                 self.secondary_display = None
         except Exception as e:
-            print(f"[MainWindow] Error while closing secondary display: {e}")
+            logger.error("Error closing secondary display: %s", e)
 
         # Also make sure the network display stops broadcasting
         if getattr(self, "network_display_manager", None):
             try:
                 self.network_display_manager.stop_network_display()
             except Exception as e:
-                print(f"[MainWindow] Error stopping network display: {e}")
+                logger.error("Error stopping network display: %s", e)
 
         # Finally proceed with the default close behavior
         super().closeEvent(event)
@@ -2668,7 +2692,7 @@ class MainWindow(QMainWindow):
         if screen:
             QTimer.singleShot(500, lambda: self._move_secondary_display(screen))
         else:
-            print("[WARNING] Could not resolve a valid screen for secondary display.")
+            logger.warning("Could not resolve a valid screen for secondary display")
 
         self._update_secondary_display_label()
 

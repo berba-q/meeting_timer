@@ -1,6 +1,7 @@
 """
 Controller for managing timer functionality in the OnTime Meeting Timer application.
 """
+import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 from enum import Enum
@@ -12,6 +13,8 @@ from src.models.meeting import Meeting, MeetingPart, MeetingType
 from src.models.timer import Timer, TimerState
 from src.models.session import SessionManager, SessionState
 from src.config import USER_DATA_DIR
+
+logger = logging.getLogger("OnTime.TimerController")
 
 class TransitionType(Enum):
     """Types of chairman transitions"""
@@ -33,6 +36,8 @@ class TimerController(QObject):
     meeting_overtime = pyqtSignal(int)  # total overtime in seconds
     predicted_end_time_updated = pyqtSignal(datetime, datetime, datetime)  # original, predicted, and target end times
     meeting_countdown_updated = pyqtSignal(int, str)  # seconds remaining, formatted message
+    durations_redistributed = pyqtSignal(list)  # [(global_idx, old_min, new_min), ...]
+    durations_reset = pyqtSignal()
     
     def __init__(self, settings_controller: SettingsController):
         """Initialize the TimerController with a settings controller"""
@@ -304,23 +309,27 @@ class TimerController(QObject):
         # Emit signal with updated prediction
         self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time, self._target_end_time)
         
-        # Debug logging to catch issues
-        print(f"[TIMER] Predicted end time update:")
-        print(f"  Current time: {now.strftime('%H:%M:%S')}")
-        print(f"  Current part: {self.current_part_index + 1}/{len(self.parts_list)}")
-        print(f"  Timer state: {self.timer.state}")
-        print(f"  Current part remaining: {max(0, self.timer.remaining_seconds) if self.timer.state != TimerState.OVERTIME else 0:.0f}s")
-        print(f"  Future parts time: {sum(self.parts_list[i].duration_seconds for i in range(self.current_part_index + 1, len(self.parts_list))):.0f}s")
-        print(f"  Transitions remaining: {remaining_transitions}")
-        print(f"  Total remaining: {remaining_time:.0f}s ({remaining_time/60:.1f}m)")
-        print(f"  Predicted end: {self._predicted_end_time.strftime('%H:%M:%S')}")
-        print(f"  Original end: {self._original_end_time.strftime('%H:%M:%S') if self._original_end_time else 'N/A'}")
-        
-        # SAFETY CHECK: This should never happen now
+        # Debug logging
+        logger.debug(
+            "Predicted end time: now=%s, part=%d/%d, state=%s, "
+            "part_remaining=%.0fs, future=%.0fs, transitions=%d, "
+            "total_remaining=%.0fs (%.1fm), predicted=%s, original=%s",
+            now.strftime('%H:%M:%S'),
+            self.current_part_index + 1, len(self.parts_list),
+            self.timer.state,
+            max(0, self.timer.remaining_seconds) if self.timer.state != TimerState.OVERTIME else 0,
+            sum(self.parts_list[i].duration_seconds for i in range(self.current_part_index + 1, len(self.parts_list))),
+            remaining_transitions,
+            remaining_time, remaining_time / 60,
+            self._predicted_end_time.strftime('%H:%M:%S'),
+            self._original_end_time.strftime('%H:%M:%S') if self._original_end_time else 'N/A'
+        )
+
         if self._predicted_end_time < now:
-            print(f"[ERROR] Predicted end time is in the past! This should not happen.")
-            print(f"  Predicted: {self._predicted_end_time}")
-            print(f"  Current: {now}")
+            logger.error(
+                "Predicted end time is in the past: predicted=%s, current=%s",
+                self._predicted_end_time, now
+            )
     
     def _calculate_planned_elapsed_time(self) -> float:
         """Calculate how much time should have elapsed based on current part position"""
@@ -658,10 +667,165 @@ class TimerController(QObject):
     def adjust_time(self, minutes_delta: int):
         """Adjust the current timer by adding/removing minutes"""
         self.timer.adjust_time(minutes_delta * 60)
-        
+
         # Update predicted end time since we've changed the duration
         self._update_predicted_end_time()
-    
+
+    def redistribute_durations_for_end_time(self, target_end_time: datetime, from_part_index: int) -> dict:
+        """Redistribute part durations from from_part_index onward to end meeting at target_end_time.
+
+        Returns dict with 'success', 'error' (if failed), 'adjusted_parts' list of
+        (global_index, old_minutes, new_minutes) tuples.
+        """
+        now = datetime.now()
+
+        # Validate preconditions
+        if self.current_part_index < 0 or not self.current_meeting:
+            return {'success': False, 'error': 'Meeting is not running'}
+        if target_end_time <= now:
+            return {'success': False, 'error': 'Target end time must be in the future'}
+        if from_part_index < self.current_part_index or from_part_index >= len(self.parts_list):
+            return {'success': False, 'error': 'Invalid part index'}
+
+        # Build section map: global_part_index -> section_index
+        section_map = []
+        for sec_idx, section in enumerate(self.current_meeting.sections):
+            for _ in section.parts:
+                section_map.append(sec_idx)
+
+        # Calculate available time from now to target
+        total_available = (target_end_time - now).total_seconds()
+
+        # Subtract locked time (parts before from_part_index that we're NOT adjusting)
+        locked_time = 0.0
+        if from_part_index > self.current_part_index:
+            # Current part's remaining time is locked
+            locked_time += max(0, self.timer.remaining_seconds)
+            # Parts between current+1 and from-1 are locked
+            for i in range(self.current_part_index + 1, from_part_index):
+                locked_time += self.parts_list[i].duration_seconds
+            # Transitions in locked range
+            for i in range(self.current_part_index, from_part_index - 1):
+                if i + 1 < len(section_map) and section_map[i] != section_map[i + 1]:
+                    locked_time += 60
+        elif from_part_index == self.current_part_index:
+            # Nothing locked — we're adjusting from the current part
+            pass
+
+        available_for_adjusted = total_available - locked_time
+
+        # Subtract transitions within the adjusted range
+        for i in range(from_part_index, len(self.parts_list) - 1):
+            if section_map[i] != section_map[i + 1]:
+                available_for_adjusted -= 60
+
+        # Parts to adjust
+        parts_to_adjust = self.parts_list[from_part_index:]
+        if not parts_to_adjust:
+            return {'success': False, 'error': 'No parts to adjust'}
+
+        # For the current part, only its remaining time is adjustable
+        is_current_included = (from_part_index == self.current_part_index)
+        current_elapsed = 0
+        if is_current_included:
+            current_elapsed = self.timer.elapsed_seconds
+
+        # Calculate original durations (use original_duration_minutes if previously adjusted)
+        originals_seconds = []
+        for i, part in enumerate(parts_to_adjust):
+            orig = (part.original_duration_minutes or part.duration_minutes) * 60
+            if i == 0 and is_current_included:
+                # For current part, only the remaining portion participates
+                orig = max(0, orig - current_elapsed)
+            originals_seconds.append(orig)
+
+        sum_originals = sum(originals_seconds)
+        if sum_originals <= 0:
+            return {'success': False, 'error': 'No adjustable time in selected parts'}
+
+        # Validate minimum time
+        min_time_needed = len(parts_to_adjust) * 60  # 1 min per part minimum
+        if is_current_included:
+            # Current part needs at least enough for its elapsed + 1 min
+            min_time_needed = (len(parts_to_adjust) - 1) * 60 + max(60, current_elapsed + 60)
+
+        if available_for_adjusted < min_time_needed:
+            mins_needed = int(min_time_needed / 60)
+            mins_available = int(available_for_adjusted / 60)
+            return {
+                'success': False,
+                'error': f'Not enough time: need at least {mins_needed} min, '
+                         f'but only {mins_available} min available'
+            }
+
+        # Distribute proportionally
+        ratio = available_for_adjusted / sum_originals
+        adjusted_parts = []
+        allocated_seconds = 0
+
+        for i, part in enumerate(parts_to_adjust):
+            global_idx = from_part_index + i
+
+            # Save original if first time adjusting
+            if part.original_duration_minutes is None:
+                part.original_duration_minutes = part.duration_minutes
+
+            old_minutes = part.duration_minutes
+
+            if i == len(parts_to_adjust) - 1:
+                # Last part gets remainder
+                remaining_available = available_for_adjusted - allocated_seconds
+                if i == 0 and is_current_included:
+                    new_minutes = max(1, round((remaining_available + current_elapsed) / 60))
+                else:
+                    new_minutes = max(1, round(remaining_available / 60))
+            else:
+                new_seconds = originals_seconds[i] * ratio
+                if i == 0 and is_current_included:
+                    # Add back elapsed time to get full duration
+                    new_minutes = max(1, round((new_seconds + current_elapsed) / 60))
+                    allocated_seconds += (new_minutes * 60) - current_elapsed
+                else:
+                    new_minutes = max(1, round(new_seconds / 60))
+                    allocated_seconds += new_minutes * 60
+
+            part.duration_minutes = new_minutes
+            adjusted_parts.append((global_idx, old_minutes, new_minutes))
+
+        # Update current part's timer if it was adjusted
+        if is_current_included:
+            new_total = parts_to_adjust[0].duration_seconds
+            new_remaining = max(0, new_total - current_elapsed)
+            self.timer._total_seconds = new_total
+            self.timer._remaining_seconds = new_remaining
+            self.timer.time_updated.emit(new_remaining)
+
+        self._update_predicted_end_time()
+        self.durations_redistributed.emit(adjusted_parts)
+
+        return {'success': True, 'adjusted_parts': adjusted_parts}
+
+    def reset_adjusted_durations(self) -> int:
+        """Reset all adjusted parts back to their original durations. Returns count of parts reset."""
+        count = 0
+        for i, part in enumerate(self.parts_list):
+            if part.original_duration_minutes is not None:
+                part.duration_minutes = part.original_duration_minutes
+                part.original_duration_minutes = None
+                count += 1
+                # Update running timer if this is the current part
+                if i == self.current_part_index:
+                    self.timer._total_seconds = part.duration_seconds
+                    new_remaining = max(0, part.duration_seconds - self.timer.elapsed_seconds)
+                    self.timer._remaining_seconds = new_remaining
+                    self.timer.time_updated.emit(new_remaining)
+
+        if count > 0:
+            self._update_predicted_end_time()
+            self.durations_reset.emit()
+
+        return count
+
     def jump_to_part(self, part_index: int):
         """Jump to a specific part"""
         if not self.current_meeting or not self.parts_list:
@@ -748,13 +912,13 @@ class TimerController(QObject):
 
         # Validate part index (allow -1 for "not started" state)
         if self.current_part_index >= len(self.parts_list):
-            print(f"[TimerController] Invalid part index {self.current_part_index}, resetting to 0")
+            logger.warning("Invalid part index %d, resetting to 0", self.current_part_index)
             self.current_part_index = 0
 
         # Only proceed with session restoration if meeting was actually in progress
         if self.current_part_index < 0:
             # Meeting was never started, just restore the state without starting
-            print("[TimerController] Session shows meeting was not started, preserving pre-start state")
+            logger.info("Session shows meeting was not started, preserving pre-start state")
             return
 
         # Mark previous parts as completed
@@ -773,8 +937,9 @@ class TimerController(QObject):
         else:
             self._meeting_start_time = datetime.now()
 
-        # Calculate original end time
+        # Calculate original and target end times
         self._calculate_original_end_time()
+        self._calculate_target_end_time()
 
         # Restore transition state
         self._in_transition = session.in_transition
@@ -817,10 +982,8 @@ class TimerController(QObject):
         self.timer.time_updated.emit(self.timer.remaining_seconds)
         self.meeting_started.emit()
 
-        # Update predicted end time
+        # Update predicted end time (this method emits predicted_end_time_updated internally)
         self._update_predicted_end_time()
-        if self._original_end_time and self._predicted_end_time:
-            self.predicted_end_time_updated.emit(self._original_end_time, self._predicted_end_time)
 
         # Restart session tracking
         meeting_file = f"{self.current_meeting.meeting_type.value}_{self.current_meeting.date.strftime('%Y-%m-%d')}_{self.current_meeting.language}.json"

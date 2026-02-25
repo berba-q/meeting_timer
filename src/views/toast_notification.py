@@ -3,19 +3,26 @@ In-app toast notification widget for displaying messages.
 Supports localization via Qt's tr() system - pass translated strings when calling show_toast().
 """
 
+import sys
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QHBoxLayout, QVBoxLayout,
     QGraphicsOpacityEffect, QPushButton
 )
 from PyQt6.QtCore import (
     Qt, QTimer, QPropertyAnimation, QEasingCurve,
-    pyqtSignal
+    pyqtSignal, QPoint
 )
-from PyQt6.QtGui import QFont, QPainter, QColor, QPainterPath
+from PyQt6.QtGui import QFont, QPainter, QColor, QPainterPath, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
+
+from src.utils.resources import get_resource_path
+
+# Margin from the edges of the parent window
+_MARGIN = 16
 
 
 class ToastNotification(QWidget):
-    """A toast notification widget that appears at the top of the parent window."""
+    """A toast notification widget that appears at the bottom-right of the parent window."""
 
     closed = pyqtSignal()
 
@@ -35,7 +42,13 @@ class ToastNotification(QWidget):
 
     def _setup_ui(self):
         """Setup the toast UI."""
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
+        flags = (Qt.WindowType.FramelessWindowHint
+                 | Qt.WindowType.Tool
+                 | Qt.WindowType.WindowStaysOnTopHint)
+        # On Windows, bypass the window manager to avoid taskbar flicker
+        if sys.platform == "win32":
+            flags |= Qt.WindowType.WindowDoesNotAcceptFocus
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
 
@@ -44,13 +57,10 @@ class ToastNotification(QWidget):
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(12)
 
-        # Icon label (emoji)
+        # Icon label (renders SVG/PNG via QPixmap)
         self.icon_label = QLabel()
-        self.icon_label.setFixedSize(24, 24)
+        self.icon_label.setFixedSize(28, 28)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_font = QFont()
-        icon_font.setPointSize(16)
-        self.icon_label.setFont(icon_font)
         layout.addWidget(self.icon_label)
 
         # Text container
@@ -77,7 +87,7 @@ class ToastNotification(QWidget):
         layout.addLayout(text_container, 1)
 
         # Close button
-        self.close_button = QPushButton("×")
+        self.close_button = QPushButton("\u00d7")
         self.close_button.setFixedSize(24, 24)
         self.close_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_button.clicked.connect(self.fade_out)
@@ -141,7 +151,8 @@ class ToastNotification(QWidget):
         Args:
             title: The toast title (should be pre-translated via tr())
             message: The toast message (should be pre-translated via tr())
-            icon: Optional emoji icon to display
+            icon: Icon name (without extension) from assets/icons/,
+                  e.g. "toast-adjust". Falls back to hiding the icon.
         """
         # Stop any existing animations/timers
         self.hide_timer.stop()
@@ -151,13 +162,12 @@ class ToastNotification(QWidget):
         # Set content
         self.title_label.setText(title)
         self.message_label.setText(message)
-        self.icon_label.setText(icon if icon else "")
-        self.icon_label.setVisible(bool(icon))
+        self._set_icon(icon)
 
         # Adjust size
         self.adjustSize()
 
-        # Position at top center of parent
+        # Position at bottom-right of parent
         self._position_toast()
 
         # Show and animate
@@ -168,17 +178,58 @@ class ToastNotification(QWidget):
         # Start auto-hide timer
         self.hide_timer.start(self.duration)
 
+    def _set_icon(self, icon_name: str):
+        """Load an SVG/PNG icon into the icon label."""
+        if not icon_name:
+            self.icon_label.setVisible(False)
+            return
+
+        pixmap = None
+        icon_size = 28
+
+        # Try SVG first (resolution-independent)
+        svg_path = get_resource_path(f"assets/icons/{icon_name}.svg")
+        if svg_path.exists():
+            renderer = QSvgRenderer(str(svg_path))
+            if renderer.isValid():
+                pixmap = QPixmap(icon_size, icon_size)
+                pixmap.fill(Qt.GlobalColor.transparent)
+                painter = QPainter(pixmap)
+                renderer.render(painter)
+                painter.end()
+
+        # Fallback to PNG
+        if pixmap is None:
+            png_path = get_resource_path(f"assets/icons/{icon_name}.png")
+            if png_path.exists():
+                pixmap = QPixmap(str(png_path)).scaled(
+                    icon_size, icon_size,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+
+        if pixmap and not pixmap.isNull():
+            self.icon_label.setPixmap(pixmap)
+            self.icon_label.setVisible(True)
+        else:
+            self.icon_label.setVisible(False)
+
     def _position_toast(self):
-        """Position the toast at the top center of the parent window."""
-        if self.parent():
-            parent = self.parent()
-            parent_rect = parent.rect()
+        """Position the toast at the bottom-right of the parent window."""
+        if not self.parent():
+            return
 
-            # Calculate position - top center with some margin
-            x = (parent_rect.width() - self.width()) // 2
-            y = 20  # Margin from top
+        parent = self.parent()
+        # Map the parent's bottom-right corner to global screen coordinates.
+        # This is required because Tool windows use screen-level positioning.
+        parent_bottom_right = parent.mapToGlobal(
+            QPoint(parent.rect().width(), parent.rect().height())
+        )
 
-            self.move(x, y)
+        x = parent_bottom_right.x() - self.width() - _MARGIN
+        y = parent_bottom_right.y() - self.height() - _MARGIN
+
+        self.move(x, y)
 
     def fade_out(self):
         """Start the fade out animation."""
@@ -218,7 +269,7 @@ class ToastManager(QWidget):
         Args:
             title: The toast title (should be pre-translated via tr())
             message: The toast message (should be pre-translated via tr())
-            icon: Optional emoji icon
+            icon: Icon name from assets/icons/ (e.g. "toast-adjust")
             duration: How long to show the toast (ms)
         """
         # Create toast if needed, or reuse existing

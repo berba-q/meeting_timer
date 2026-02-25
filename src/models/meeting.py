@@ -20,6 +20,7 @@ class MeetingPart:
     presenter: str = ""
     notes: str = ""
     is_completed: bool = False
+    original_duration_minutes: Optional[int] = None  # Pre-adjustment duration (None = not adjusted)
     
     @property
     def duration_seconds(self) -> int:
@@ -28,13 +29,16 @@ class MeetingPart:
     
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
-        return {
+        d = {
             'title': self.title,
             'duration_minutes': self.duration_minutes,
             'presenter': self.presenter,
             'notes': self.notes,
             'is_completed': self.is_completed
         }
+        if self.original_duration_minutes is not None:
+            d['original_duration_minutes'] = self.original_duration_minutes
+        return d
     
     @classmethod
     def from_dict(cls, data: dict) -> 'MeetingPart':
@@ -44,7 +48,8 @@ class MeetingPart:
             duration_minutes=data['duration_minutes'],
             presenter=data.get('presenter', ''),
             notes=data.get('notes', ''),
-            is_completed=data.get('is_completed', False)
+            is_completed=data.get('is_completed', False),
+            original_duration_minutes=data.get('original_duration_minutes')
         )
 
 @dataclass

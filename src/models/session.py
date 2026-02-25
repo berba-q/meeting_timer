@@ -3,12 +3,15 @@ Session persistence model for crash recovery in OnTime Meeting Timer.
 """
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+
+logger = logging.getLogger("OnTime.SessionManager")
 
 if TYPE_CHECKING:
     from src.models.meeting import Meeting
@@ -127,7 +130,7 @@ class SessionManager(QObject):
             with open(meeting_path, 'w', encoding='utf-8') as f:
                 json.dump(meeting.to_dict(), f, indent=2)
         except IOError as e:
-            print(f"[SessionManager] Error saving meeting for recovery: {e}")
+            logger.error("Error saving meeting for recovery: %s", e)
 
     def update_session_from_controller(self):
         """Update session state from timer controller"""
@@ -149,12 +152,12 @@ class SessionManager(QObject):
 
     def set_network_broadcast_state(self, is_active: bool):
         """Update the network broadcast state in the session"""
-        print(f"[SessionManager] set_network_broadcast_state called with: {is_active}")
+        logger.debug("set_network_broadcast_state called with: %s", is_active)
         if self._current_session:
             self._current_session.network_broadcast_active = is_active
-            print(f"[SessionManager] Session network_broadcast_active now: {self._current_session.network_broadcast_active}")
+            logger.debug("Session network_broadcast_active now: %s", self._current_session.network_broadcast_active)
         else:
-            print("[SessionManager] No current session to update")
+            logger.debug("No current session to update network broadcast state")
 
     def end_session(self, clean: bool = True):
         """End the current session"""
@@ -185,7 +188,7 @@ class SessionManager(QObject):
             return session
 
         except (json.JSONDecodeError, KeyError, IOError) as e:
-            print(f"[SessionManager] Error reading session file: {e}")
+            logger.error("Error reading session file: %s", e)
             return None
 
     def is_session_stale(self, session: SessionState) -> bool:
@@ -285,7 +288,7 @@ class SessionManager(QObject):
                 json.dump(self._current_session.to_dict(), f, indent=2)
             self.session_saved.emit()
         except IOError as e:
-            print(f"[SessionManager] Error saving session: {e}")
+            logger.error("Error saving session: %s", e)
 
     def _delete_session_file(self):
         """Delete the session file"""
@@ -293,7 +296,7 @@ class SessionManager(QObject):
             if self.session_file.exists():
                 self.session_file.unlink()
         except IOError as e:
-            print(f"[SessionManager] Error deleting session file: {e}")
+            logger.error("Error deleting session file: %s", e)
 
     def _compute_meeting_hash(self, meeting: 'Meeting') -> str:
         """Compute a hash of meeting parts for change detection"""
