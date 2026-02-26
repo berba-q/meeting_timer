@@ -1595,7 +1595,17 @@ class MainWindow(QMainWindow):
         # Resolve "system" to actual theme
         if theme == "system":
             theme = get_system_theme()
-        apply_stylesheet(QApplication.instance(), theme)
+        # Guard against invalid values reaching the stylesheet loader
+        if theme not in ("light", "dark"):
+            theme = "light"
+
+        app = QApplication.instance()
+        apply_stylesheet(app, theme)
+        # Force full widget repaint — needed on Windows where
+        # setStyleSheet alone may not propagate to all children
+        app.style().unpolish(app)
+        app.style().polish(app)
+        app.processEvents()
 
     def _set_theme(self, theme: str):
         """Set the application theme"""

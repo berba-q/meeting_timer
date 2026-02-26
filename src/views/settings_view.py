@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QLabel, QComboBox, QCheckBox, QTimeEdit, QPushButton,
     QGroupBox, QFormLayout, QSpinBox, QDialogButtonBox,
-    QRadioButton, QButtonGroup, QScrollArea, QLineEdit, QGridLayout
+    QRadioButton, QButtonGroup, QLineEdit, QGridLayout
 )
 from PyQt6.QtCore import Qt, QTime
 from PyQt6.QtGui import QPixmap, QImage
@@ -57,30 +57,28 @@ class SettingsDialog(QDialog):
         self.display_tab = QWidget()
         self.meeting_source_tab = QWidget()  # New tab for meeting source options
         self.network_display_tab = QWidget()  # Setup network display tab
-        
+        self.data_management_tab = QWidget()  # Data cleanup settings tab
+
         self._setup_general_tab()
         self._setup_meetings_tab()
         self._setup_display_tab()
         self._setup_meeting_source_tab()  # Setup new tab
         self._setup_network_display_tab()  # Setup network display tab
-        
+        self._setup_data_management_tab()  # Setup data management tab
+
         # Add tabs to tab widget
         self.tab_widget.addTab(self.general_tab, self.tr("General"))
         self.tab_widget.addTab(self.meetings_tab, self.tr("Meetings"))
         self.tab_widget.addTab(self.display_tab, self.tr("Display"))
         self.tab_widget.addTab(self.meeting_source_tab, self.tr("Meeting Source"))
         self.tab_widget.addTab(self.network_display_tab, self.tr("Network Display"))
+        self.tab_widget.addTab(self.data_management_tab, self.tr("Data Management"))
 
-        
-        # Add tab widget to layout with ScrollArea support
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setWidget(self.tab_widget)
-        
-        # Set scroll policy to make scrollbars appear only when needed
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        
+        # Make tab bar responsive: truncate labels before hiding tabs
+        self.tab_widget.setElideMode(Qt.TextElideMode.ElideRight)
+        self.tab_widget.tabBar().setExpanding(True)
+        self.tab_widget.setUsesScrollButtons(True)
+
         # Add tab widget to layout
         layout.addWidget(self.tab_widget)
         
@@ -534,6 +532,11 @@ class SettingsDialog(QDialog):
         # Update UI state based on current settings
         self._update_network_display_ui_state()
         self._update_qr_code_preview()
+
+        # Data cleanup settings
+        self.cleanup_enabled_check.setChecked(settings.data_cleanup.enabled)
+        self.retention_days_spin.setValue(settings.data_cleanup.retention_days)
+        self.retention_days_spin.setEnabled(settings.data_cleanup.enabled)
     
     def _apply_settings(self):
         """Apply settings changes"""
@@ -620,12 +623,54 @@ class SettingsDialog(QDialog):
             self.qr_code_check.isChecked()
         )
 
+        # Data cleanup settings
+        self.settings_controller.set_data_cleanup_enabled(self.cleanup_enabled_check.isChecked())
+        self.settings_controller.set_data_cleanup_retention_days(self.retention_days_spin.value())
+
         # Save the updated settings so get_settings() returns latest values
         self.settings_controller.save_settings()
         # Emit the signal to notify changes have occurred
         self.settings_controller.settings_changed.emit()
         
         
+    def _setup_data_management_tab(self):
+        """Setup data management settings tab for automatic cleanup"""
+        layout = QVBoxLayout(self.data_management_tab)
+
+        # Auto-cleanup group
+        cleanup_group = QGroupBox(self.tr("Automatic Data Cleanup"))
+        cleanup_layout = QFormLayout(cleanup_group)
+
+        self.cleanup_enabled_check = QCheckBox(self.tr("Enable automatic cleanup on startup"))
+        self.cleanup_enabled_check.setToolTip(
+            self.tr("Automatically remove old meeting files and cache data when the application starts")
+        )
+        cleanup_layout.addRow(self.cleanup_enabled_check)
+
+        self.retention_days_spin = QSpinBox()
+        self.retention_days_spin.setRange(7, 365)
+        self.retention_days_spin.setSuffix(self.tr(" days"))
+        self.retention_days_spin.setToolTip(
+            self.tr("Files older than this many days will be removed")
+        )
+        cleanup_layout.addRow(self.tr("Retention period:"), self.retention_days_spin)
+
+        # Toggle spin box enabled state based on checkbox
+        self.cleanup_enabled_check.toggled.connect(self.retention_days_spin.setEnabled)
+
+        # Informational label
+        info_label = QLabel(self.tr(
+            "Cleanup removes old meeting JSON files, EPUB downloads, "
+            "and web scraper cache files. Currently loaded meetings "
+            "are never removed."
+        ))
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: gray; font-size: 9pt;")
+        cleanup_layout.addRow(info_label)
+
+        layout.addWidget(cleanup_group)
+        layout.addStretch()
+
     def _setup_network_display_tab(self):
         """Setup network display tab in the settings dialog"""
         layout = QVBoxLayout(self.network_display_tab)

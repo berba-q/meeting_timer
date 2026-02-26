@@ -1,12 +1,15 @@
 """
 Resources utility for loading assets in the OnTime Meeting Timer application.
 """
+import logging
 import os
 import sys
 from pathlib import Path
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QApplication
+
+logger = logging.getLogger("OnTime.Resources")
 
 
 def get_resource_path(relative_path: str) -> Path:
@@ -114,7 +117,9 @@ def get_stylesheet(theme: str = "light") -> str:
     if theme_style_path.exists():
         with open(theme_style_path, 'r') as f:
             style_content += f"\n" + f.read()
-    
+    else:
+        logger.warning("Theme stylesheet not found: %s (theme=%r)", theme_style_path, theme)
+
     return style_content
 
 

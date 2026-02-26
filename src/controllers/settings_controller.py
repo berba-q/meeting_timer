@@ -344,3 +344,15 @@ class SettingsController(QObject):
             settings.co_visit.week_start_date = None
             self.settings_manager.save_settings()
             self.co_visit_changed.emit(False)
+
+    # --- Data Cleanup Settings ---
+
+    def set_data_cleanup_enabled(self, enabled: bool):
+        """Enable/disable automatic data cleanup"""
+        self.settings_manager.settings.data_cleanup.enabled = enabled
+        self.settings_manager.save_settings()
+
+    def set_data_cleanup_retention_days(self, days: int):
+        """Set data retention period in days"""
+        self.settings_manager.settings.data_cleanup.retention_days = max(7, min(365, days))
+        self.settings_manager.save_settings()

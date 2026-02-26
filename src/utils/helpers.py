@@ -182,6 +182,7 @@ def _get_screens_info() -> List[Dict]:
             app = QApplication([])
         
         screens = []
+        primary_screen = app.primaryScreen()
         for i, screen in enumerate(app.screens()):
             geometry = screen.geometry()
             screens.append({
@@ -189,7 +190,7 @@ def _get_screens_info() -> List[Dict]:
                 'name': screen.name(),
                 'width': geometry.width(),
                 'height': geometry.height(),
-                'primary': screen.isPrimary()
+                'primary': (screen == primary_screen)
             })
         
         return screens
