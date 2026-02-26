@@ -1,6 +1,11 @@
 # Changelog
 
-# [](https://github.com/berba-q/meeting_timer/compare/v1.0.7...v) (2026-02-25)
+# [](https://github.com/berba-q/meeting_timer/compare/v1.0.8...v) (2026-02-26)
+
+
+### Features
+
+* Implement automatic data cleanup feature ([b406dc9](https://github.com/berba-q/meeting_timer/commit/b406dc9e53cc2bd585378977e1dc2a0006cd1a97))
 
 
 
