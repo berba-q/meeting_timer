@@ -101,6 +101,26 @@ class COVisitSettings:
 
 
 @dataclass
+class DataCleanupSettings:
+    """Settings for automatic data cleanup / garbage collection"""
+    enabled: bool = True
+    retention_days: int = 90  # Default 90 days
+
+    def to_dict(self) -> dict:
+        return {
+            'enabled': self.enabled,
+            'retention_days': self.retention_days
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'DataCleanupSettings':
+        return cls(
+            enabled=data.get('enabled', True),
+            retention_days=data.get('retention_days', 90)
+        )
+
+
+@dataclass
 class MeetingSettings:
     """Settings for a specific meeting type"""
     day: DayOfWeek = DayOfWeek.WEDNESDAY  # Default midweek meeting day
@@ -167,7 +187,7 @@ class DisplaySettings:
             secondary_screen_name=data.get('secondary_screen_name', ""),
             use_secondary_screen=use_secondary_screen,
             show_predicted_end_time=data.get('show_predicted_end_time', True),
-            theme=data.get('theme', 'system'),
+            theme=data.get('theme', 'system') if data.get('theme') in ('light', 'dark', 'system') else 'system',
             show_tools_dock=data.get('show_tools_dock', False),
             remember_tools_dock_state=data.get('remember_tools_dock_state', False)
         )
@@ -215,15 +235,20 @@ class AppSettings:
     recent_meetings: List[str] = field(default_factory=list)  # List of meeting file paths
     network_display: NetworkDisplaySettings = field(default_factory=NetworkDisplaySettings)
     co_visit: COVisitSettings = field(default_factory=COVisitSettings)
+    data_cleanup: DataCleanupSettings = field(default_factory=DataCleanupSettings)
     # Global notification reminder settings
     start_reminder_enabled: bool = True
     start_reminder_delay:   int  = 2  # seconds
     overrun_enabled:        bool = True
     overrun_delay:          int  = 20  # seconds
 
+    # Bump this when settings structure changes so old files get migrated.
+    SETTINGS_VERSION = 2
+
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
         return {
+            '_settings_version': self.SETTINGS_VERSION,
             'language': self.language,
             'midweek_meeting': self.midweek_meeting.to_dict(),
             'weekend_meeting': self.weekend_meeting.to_dict(),
@@ -232,6 +257,7 @@ class AppSettings:
             'recent_meetings': self.recent_meetings,
             'network_display': self.network_display.to_dict(),
             'co_visit': self.co_visit.to_dict(),
+            'data_cleanup': self.data_cleanup.to_dict(),
             'start_reminder_enabled': self.start_reminder_enabled,
             'start_reminder_delay':   self.start_reminder_delay,
             'overrun_enabled':        self.overrun_enabled,
@@ -250,6 +276,7 @@ class AppSettings:
             recent_meetings=data.get('recent_meetings', []),
             network_display=NetworkDisplaySettings.from_dict(data.get('network_display', {})),
             co_visit=COVisitSettings.from_dict(data.get('co_visit', {})),
+            data_cleanup=DataCleanupSettings.from_dict(data.get('data_cleanup', {})),
             start_reminder_enabled=data.get('start_reminder_enabled', True),
             start_reminder_delay=data.get('start_reminder_delay', 2),
             overrun_enabled=data.get('overrun_enabled', True),
@@ -258,30 +285,59 @@ class AppSettings:
 
 class SettingsManager:
     """Manages loading and saving application settings"""
-    
+
     def __init__(self, settings_file: str = "settings.json"):
         self.settings_file = settings_file
         self.settings = self._load_settings()
-    
+
     def _load_settings(self) -> AppSettings:
         """Load settings from file or create default settings"""
         if os.path.exists(self.settings_file):
-           
             try:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings_dict = json.load(f)
-                
-                return AppSettings.from_dict(settings_dict)
+
+                migrated = self._migrate(settings_dict)
+                settings = AppSettings.from_dict(migrated)
+                # Auto-save if migration changed the version (upgrades old files in place)
+                if migrated.get('_settings_version') != settings_dict.get('_settings_version'):
+                    with open(self.settings_file, 'w', encoding='utf-8') as fw:
+                        json.dump(settings.to_dict(), fw, indent=2)
+                return settings
             except (json.JSONDecodeError, KeyError, ValueError) as e:
                 print(f"Error loading settings: {e}")
                 return AppSettings()
         return AppSettings()
-    
+
+    @staticmethod
+    def _migrate(data: dict) -> dict:
+        """Apply sequential migrations to bring old settings up to date.
+
+        Each migration handles one version bump.  When adding a new
+        migration, bump ``AppSettings.SETTINGS_VERSION`` and add a new
+        ``if version < N`` block at the end.
+        """
+        version = data.get('_settings_version', 1)
+
+        if version < 2:
+            # v1 → v2: validate theme value, add data_cleanup defaults
+            display = data.get('display', {})
+            if display.get('theme') not in ('light', 'dark', 'system'):
+                display['theme'] = 'system'
+            data['display'] = display
+            data.setdefault('data_cleanup', {})
+            version = 2
+
+        # Future: if version < 3: ...
+
+        data['_settings_version'] = version
+        return data
+
     def save_settings(self):
         """Save current settings to file"""
         with open(self.settings_file, 'w', encoding='utf-8') as f:
             json.dump(self.settings.to_dict(), f, indent=2)
-    
+
     def reset_settings(self):
         """Reset settings to defaults"""
         self.settings = AppSettings()

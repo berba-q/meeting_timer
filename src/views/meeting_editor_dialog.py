@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QDate, QTime, pyqtSignal
 from PyQt6.QtGui import QAction
 
-from src.models.meeting import Meeting, MeetingSection, MeetingPart, MeetingType
+from src.models.meeting import Meeting, MeetingSection, MeetingPart, MeetingType, MeetingSource
 from src.models.meeting_template import MeetingTemplate, TemplateType
 
 
@@ -876,7 +876,7 @@ class MeetingEditorDialog(QDialog):
             )
             sections.append(section)
         
-        # Create meeting
+        # Create meeting - tag as manually created so it doesn't override scraped data
         meeting = Meeting(
             meeting_type=meeting_type,
             title=title,
@@ -884,15 +884,24 @@ class MeetingEditorDialog(QDialog):
             start_time=meeting_time,
             sections=sections,
             language='en',  # Default
-            target_duration_minutes=self.target_duration_spin.value()
+            target_duration_minutes=self.target_duration_spin.value(),
+            source=MeetingSource.MANUAL
         )
 
         return meeting
     
     def accept(self):
         """Handle dialog acceptance"""
-        if not self.title_edit.text():
+        title = self.title_edit.text().strip()
+        if not title:
             QMessageBox.warning(self, self.tr("Missing Data"), self.tr("Please enter a meeting title."))
+            return
+
+        if len(title) < 3:
+            QMessageBox.warning(
+                self, self.tr("Invalid Title"),
+                self.tr("Meeting title must be at least 3 characters long.")
+            )
             return
         
         if self.sections_list.count() == 0:

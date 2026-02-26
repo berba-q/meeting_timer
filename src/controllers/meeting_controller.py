@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtWidgets import QDialog
 
-from src.models.meeting import Meeting, MeetingType, MeetingSection, MeetingPart
+from src.models.meeting import Meeting, MeetingType, MeetingSection, MeetingPart, MeetingSource
 from src.models.settings import SettingsManager, MeetingSourceMode
 from src.models.meeting_template import MeetingTemplate, TemplateType
 from src.utils.epub_scraper import EPUBMeetingScraper
@@ -406,31 +406,23 @@ class MeetingController(QObject):
         else:
             try:
                 # Get all meeting files
-                meeting_files = [f for f in os.listdir(self.meetings_dir) 
+                meeting_files = [f for f in os.listdir(self.meetings_dir)
                                if f.endswith('.json')]
-                
+
                 # Group by meeting type
                 midweek_files = [f for f in meeting_files if 'midweek' in f.lower()]
                 weekend_files = [f for f in meeting_files if 'weekend' in f.lower()]
-                
+
                 # Sort by date (assuming filename contains date)
                 midweek_files.sort(reverse=True)
                 weekend_files.sort(reverse=True)
-                
-                # Load most recent of each type
-                if midweek_files:
-                    midweek_meeting = self._load_meeting_file(
-                        os.path.join(self.meetings_dir, midweek_files[0])
-                    )
-                    if midweek_meeting:
-                        meetings[MeetingType.MIDWEEK] = midweek_meeting
-                
-                if weekend_files:
-                    weekend_meeting = self._load_meeting_file(
-                        os.path.join(self.meetings_dir, weekend_files[0])
-                    )
-                    if weekend_meeting:
-                        meetings[MeetingType.WEEKEND] = weekend_meeting
+
+                # Load most recent of each type, preferring scraped over manual
+                meetings[MeetingType.MIDWEEK] = self._load_best_meeting(midweek_files)
+                meetings[MeetingType.WEEKEND] = self._load_best_meeting(weekend_files)
+
+                # Remove None entries
+                meetings = {k: v for k, v in meetings.items() if v is not None}
             
             except Exception as e:
                 error_message = f"Failed to load meetings: {str(e)}"
@@ -521,6 +513,36 @@ class MeetingController(QObject):
             print(f"Error loading meeting file {file_path}: {e}")
             return None
     
+    def _load_best_meeting(self, files: List[str]) -> Optional[Meeting]:
+        """Load the best meeting from a list of files, preferring scraped over manual.
+
+        Files should already be sorted by date (most recent first).
+        Scraped meetings are preferred because manual (user-created) meetings
+        may have test/placeholder data that shouldn't override real meeting content.
+        """
+        if not files:
+            return None
+
+        # Try to find the most recent scraped meeting first
+        best_scraped = None
+        best_manual = None
+
+        for filename in files:
+            meeting = self._load_meeting_file(
+                os.path.join(self.meetings_dir, filename)
+            )
+            if not meeting:
+                continue
+
+            if meeting.source == MeetingSource.SCRAPED and best_scraped is None:
+                best_scraped = meeting
+                break  # Most recent scraped meeting found, no need to continue
+            elif meeting.source == MeetingSource.MANUAL and best_manual is None:
+                best_manual = meeting
+                # Don't break — keep looking for a scraped one
+
+        return best_scraped or best_manual
+
     def save_meeting(self, meeting: Meeting):
         """Save a meeting to a file"""
         # Create filename with date, meeting type, and language

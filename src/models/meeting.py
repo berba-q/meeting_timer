@@ -12,6 +12,11 @@ class MeetingType(Enum):
     WEEKEND = "weekend"
     CUSTOM = "custom"
 
+class MeetingSource(Enum):
+    """How the meeting data was created"""
+    SCRAPED = "scraped"    # Auto-fetched from web (EPUB scraper)
+    MANUAL = "manual"      # User-created via the meeting editor
+
 @dataclass
 class MeetingPart:
     """Represents a single part in a meeting"""
@@ -88,6 +93,7 @@ class Meeting:
     sections: List[MeetingSection]
     language: str = "en"
     target_duration_minutes: Optional[int] = None  # Custom target for specific meeting (e.g., custom meetings)
+    source: MeetingSource = MeetingSource.SCRAPED  # How the meeting was created
 
     def to_dict(self) -> dict:
         """Convert to dictionary for storage"""
@@ -98,12 +104,20 @@ class Meeting:
             'start_time': self.start_time.isoformat(),
             'sections': [section.to_dict() for section in self.sections],
             'language': self.language,
-            'target_duration_minutes': self.target_duration_minutes
+            'target_duration_minutes': self.target_duration_minutes,
+            'source': self.source.value
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> 'Meeting':
         """Create from dictionary with backwards compatibility"""
+        # Determine source - default to "scraped" for older files without the field
+        source_str = data.get('source', MeetingSource.SCRAPED.value)
+        try:
+            source = MeetingSource(source_str)
+        except ValueError:
+            source = MeetingSource.SCRAPED
+
         return cls(
             meeting_type=MeetingType(data['meeting_type']),
             title=data['title'],
@@ -111,7 +125,8 @@ class Meeting:
             start_time=time.fromisoformat(data['start_time']),
             sections=[MeetingSection.from_dict(section) for section in data['sections']],
             language=data.get('language', 'en'),
-            target_duration_minutes=data.get('target_duration_minutes')  # None if not specified
+            target_duration_minutes=data.get('target_duration_minutes'),  # None if not specified
+            source=source
         )
     
     @property

@@ -182,6 +182,59 @@ def _log_system_info(logger):
         logger.info("  %s: %s", key, value)
 
 
+def _run_startup_cleanup(controller, main_window):
+    """Run data cleanup in a background thread after startup."""
+    from pathlib import Path
+    from src.utils.data_cleanup import CleanupWorker
+
+    settings = controller.settings_manager.settings
+    if not settings.data_cleanup.enabled:
+        return
+
+    # Build set of active meeting filenames (never delete these)
+    active_files = set()
+    for meeting in controller.current_meetings.values():
+        date_str = meeting.date.strftime("%Y-%m-%d")
+        filename = f"{meeting.meeting_type.value}_{date_str}_{meeting.language}.json"
+        active_files.add(filename)
+
+    # Resolve cache dir (same path used by epub_scraper and scraper)
+    try:
+        from platformdirs import user_cache_dir
+    except ImportError:
+        def user_cache_dir(appname, appauthor=None):
+            return str(Path.home() / ".meeting_timer_cache")
+
+    meetings_dir = Path(controller.meetings_dir)
+    cache_dir = Path(user_cache_dir("MeetingTimer"))
+
+    worker = CleanupWorker(
+        meetings_dir=meetings_dir,
+        cache_dir=cache_dir,
+        retention_days=settings.data_cleanup.retention_days,
+        active_meeting_files=active_files,
+        parent=main_window
+    )
+
+    def on_cleanup_finished(result):
+        if result.has_removals:
+            main_window._show_toast_notification(
+                main_window.tr("Data Cleanup"),
+                result.summary(),
+                icon="toast-shredder"
+            )
+        if result.errors:
+            main_window._show_toast_notification(
+                main_window.tr("Cleanup Errors"),
+                main_window.tr(f"{len(result.errors)} file(s) could not be removed"),
+                icon="toast-info"
+            )
+        worker.deleteLater()
+
+    worker.finished.connect(on_cleanup_finished)
+    worker.start()
+
+
 def main():
     """Application entry point"""
     start_time = time.perf_counter()
@@ -261,6 +314,9 @@ def main():
 
     # Defer expensive system info logging until after the window is visible
     QTimer.singleShot(0, lambda: _log_system_info(logger))
+
+    # Run data cleanup in background (non-blocking, off main thread)
+    QTimer.singleShot(0, lambda: _run_startup_cleanup(controller, main_window))
 
     sys.exit(app.exec())
     
