@@ -4,6 +4,7 @@ Language-agnostic implementation using HTML structure and date arithmetic
 """
 import calendar
 import locale
+import logging
 import dateparser
 import json
 import re
@@ -15,6 +16,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from xml.etree import ElementTree as ET
 from dateutil.parser import parse as parse_date
+
+logger = logging.getLogger("OnTime.EPUBScraper")
 
 # Platformdirs support for cache directory
 try:
@@ -56,7 +59,7 @@ class EPUBMeetingScraper:
     
     def __init__(self, language: str = "en"):
         if language not in self.LANG_CODES:
-            print(f"[WARNING] Language '{language}' not supported, defaulting to English.")
+            logger.warning(f"Language '{language}' not supported, defaulting to English.")
             language = "en"
         
         self.language = language
@@ -205,7 +208,7 @@ class EPUBMeetingScraper:
             candidates.remove(primary_issue)
             candidates.insert(0, primary_issue)
         
-        print(f"[{self.language}] For {today.strftime('%B %d')}, trying Watchtower issues: {candidates}")
+        logger.debug(f"For {today.strftime('%B %d')}, trying Watchtower issues: {candidates}")
         return candidates
     
     def _download_epub(self, publication: str, issue: str) -> Optional[Path]:
@@ -229,14 +232,14 @@ class EPUBMeetingScraper:
         }
 
         try:
-            print(f"[{self.language}] Downloading {publication} {issue}...")
+            logger.info(f"Downloading {publication} {issue}...")
             # Print the final constructed API URL for debugging
             full_url = self.session.prepare_request(requests.Request('GET', self.API_BASE_URL, params=params)).url
-            print(f"[{self.language}] API request URL: {full_url}")
+            logger.debug(f"API request URL: {full_url}")
             response = self.session.get(self.API_BASE_URL, params=params, timeout=30)
 
             if response.status_code != 200:
-                print(f"[{self.language}] API request failed: {response.status_code}")
+                logger.error(f"API request failed: {response.status_code}")
                 return None
 
             # Parse API response to get download URL
@@ -248,23 +251,23 @@ class EPUBMeetingScraper:
                 epub_url = files[0].get("file", {}).get("url")
 
             if not epub_url:
-                print(f"[{self.language}] No EPUB URL found in API response")
+                logger.error(f"No EPUB URL found in API response")
                 return None
             # Print the EPUB download URL for debugging
-            print(f"[{self.language}] EPUB download URL: {epub_url}")
+            logger.debug(f"EPUB download URL: {epub_url}")
 
             # Download the EPUB file
             epub_response = self.session.get(epub_url, timeout=60)
             if epub_response.status_code == 200:
                 cache_file.write_bytes(epub_response.content)
-                print(f"[{self.language}] Downloaded {cache_file.name}")
+                logger.info(f"Downloaded {cache_file.name}")
                 return cache_file
             else:
-                print(f"[{self.language}] EPUB download failed: {epub_response.status_code}")
+                logger.error(f"EPUB download failed: {epub_response.status_code}")
                 return None
 
         except Exception as e:
-            print(f"[{self.language}] Error downloading {publication} {issue}: {e}")
+            logger.error(f"Error downloading {publication} {issue}: {e}")
             return None
     
     def _parse_epub_content(self, epub_path: Path) -> Dict:
@@ -273,27 +276,27 @@ class EPUBMeetingScraper:
             with zipfile.ZipFile(epub_path, 'r') as epub_zip:
                 # Find all HTML/XHTML files
                 html_files = [f for f in epub_zip.namelist() if f.endswith(('.html', '.xhtml'))]
-                print(f"[{self.language}] EPUB contains {len(html_files)} HTML files: {html_files[:5]}")
+                logger.debug(f"EPUB contains {len(html_files)} HTML files: {html_files[:5]}")
                 content = {}
                 for html_file in html_files:
                     try:
                         html_content = epub_zip.read(html_file).decode('utf-8')
                         content[html_file] = html_content
                     except Exception as e:
-                        print(f"[{self.language}] Error reading {html_file}: {e}")
+                        logger.error(f"Error reading {html_file}: {e}")
                         continue
                 
                 return content
                 
         except Exception as e:
-            print(f"[{self.language}] Error parsing EPUB {epub_path}: {e}")
+            logger.error(f"Error parsing EPUB {epub_path}: {e}")
             return {}
     
     def _parse_meeting_date_from_workbook(self, date_text: str) -> Optional[str]:
         """Language-agnostic date parsing using locale and dateparser"""
         try:
             date_text = date_text.strip()
-            print(f"[{self.language}] Parsing date text: '{date_text}'")
+            logger.debug(f"Parsing date text: '{date_text}'")
             
             # Method 1: Try with dateparser library (handles most languages automatically)
             try:
@@ -327,7 +330,7 @@ class EPUBMeetingScraper:
                         # Ensure we get the Monday of that week
                         monday_date = self._get_monday_of_week(parsed_date)
                         result = monday_date.strftime('%Y-%m-%d')
-                        print(f"[{self.language}] Dateparser same-month: {date_text} → {result}")
+                        logger.debug(f"Dateparser same-month: {date_text} -> {result}")
                         return result
                 
                 # Pattern 2: Cross-month range (e.g., "JUNE 30--JULY 6", "GIUGNO 30--LUGLIO 6")
@@ -358,17 +361,17 @@ class EPUBMeetingScraper:
                         # Ensure we get the Monday of that week
                         monday_date = self._get_monday_of_week(parsed_date)
                         result = monday_date.strftime('%Y-%m-%d')
-                        print(f"[{self.language}] Dateparser cross-month: {date_text} → {result}")
+                        logger.debug(f"Dateparser cross-month: {date_text} -> {result}")
                         return result
                         
             except ImportError:
-                print(f"[{self.language}] dateparser not available, falling back to locale method")
+                logger.warning(f"dateparser not available, falling back to locale method")
             
             # Method 2: Use locale-based parsing (fallback)
             return self._parse_with_locale(date_text)
             
         except Exception as e:
-            print(f"[{self.language}] Error parsing date '{date_text}': {e}")
+            logger.error(f"Error parsing date '{date_text}': {e}")
             return None
     
     def _parse_with_locale(self, date_text: str) -> Optional[str]:
@@ -422,7 +425,7 @@ class EPUBMeetingScraper:
             return self._parse_by_position(date_text)
             
         except Exception as e:
-            print(f"[{self.language}] Locale parsing failed: {e}")
+            logger.error(f"Locale parsing failed: {e}")
             return self._parse_by_position(date_text)
         
     def _parse_with_month_names(self, date_text: str, month_names: dict) -> Optional[str]:
@@ -449,7 +452,7 @@ class EPUBMeetingScraper:
                     
                     monday_date = self._get_monday_of_week(parsed_date)
                     result = monday_date.strftime('%Y-%m-%d')
-                    print(f"[{self.language}] Locale parsing: {date_text} → {result}")
+                    logger.debug(f"Locale parsing: {date_text} -> {result}")
                     return result
                     
                 except ValueError:
@@ -492,7 +495,7 @@ class EPUBMeetingScraper:
                     days_diff = abs((monday_date - now).days)
                     if days_diff <= 120:  # Within 4 months
                         result = monday_date.strftime('%Y-%m-%d')
-                        print(f"[{self.language}] Position fallback: {date_text} → {result}")
+                        logger.debug(f"Position fallback: {date_text} -> {result}")
                         return result
                         
                 except ValueError:
@@ -501,7 +504,7 @@ class EPUBMeetingScraper:
             return None
             
         except Exception as e:
-            print(f"[{self.language}]  Position parsing failed: {e}")
+            logger.error(f"Position parsing failed: {e}")
             return None
         
     def _get_monday_of_week(self, date_obj: datetime) -> datetime:
@@ -642,7 +645,7 @@ class EPUBMeetingScraper:
         for file_name, html in epub_content.items():
             if 'toc' not in file_name.lower():
                 continue
-            print(f"[{self.language}] Scanning TOC file: {file_name}")
+            logger.debug(f"Scanning TOC file: {file_name}")
             soup = BeautifulSoup(html, 'html.parser')
             links = soup.find_all('a')
             for link in links:
@@ -652,7 +655,7 @@ class EPUBMeetingScraper:
                     continue
                 match = re.search(r'(\d{1,2})\s*(?:[.–\-–]|bis)?\s*(\d{1,2})[.,]?\s*(\w+)?', date_text, re.IGNORECASE)
                 if match:
-                    print(f"[{self.language}] TOC entry: '{date_text}'  {href}")
+                    logger.debug(f"TOC entry: '{date_text}'  {href}")
                     toc_links.append((date_text, href))
                     parsed_date = self._parse_meeting_date_from_workbook(date_text)
                     if parsed_date:
@@ -706,30 +709,30 @@ class EPUBMeetingScraper:
                     parsed_date = toc_date_fallback.get(file_path)
                     if parsed_date:
                         if parsed_date in registered_meeting_dates:
-                            print(f"[{self.language}] ⚠️ Skipping duplicate meeting date: {parsed_date} from {file_path}")
+                            logger.warning(f"Skipping duplicate meeting date: {parsed_date} from {file_path}")
                             continue  # Skip registering this meeting
-                        print(f"[{self.language}] ⏳ No heading date match, using TOC date {parsed_date} for {file_path}")
+                        logger.debug(f"No heading date match, using TOC date {parsed_date} for {file_path}")
                     else:
-                        print(f"[{self.language}] ❌ Could not determine date for {file_path}, skipping")
+                        logger.warning(f"Could not determine date for {file_path}, skipping")
                         continue
 
                 # Instead of registering and checking for duplicates immediately, check for parts first
                 parts = self._extract_parts_by_structure(soup_part)
                 # Check if there are actual parts
                 if not parts or len(parts) == 0:
-                    print(f"[{self.language}] ⚠️ Skipping empty or invalid meeting for {parsed_date} from {file_path}")
+                    logger.warning(f"Skipping empty or invalid meeting for {parsed_date} from {file_path}")
                     continue
 
                 # Now check for duplicates
                 if parsed_date in registered_meeting_dates:
-                    print(f"[{self.language}] ⚠️ Duplicate meeting for {parsed_date} detected from {file_path}, skipping")
+                    logger.warning(f"Duplicate meeting for {parsed_date} detected from {file_path}, skipping")
                     continue
                 registered_meeting_dates.add(parsed_date)
 
                 meetings[parsed_date] = parts
-                print(f"[{self.language}] Registered MIDWEEK meeting for {parsed_date} with {len(parts)} parts")
+                logger.info(f"Registered MIDWEEK meeting for {parsed_date} with {len(parts)} parts")
             except Exception as e:
-                print(f"[{self.language}] Error extracting midweek from {file_path}: {e}")
+                logger.error(f"Error extracting midweek from {file_path}: {e}")
         # --- End: Populate meetings dict
         return meetings
     
@@ -773,7 +776,7 @@ class EPUBMeetingScraper:
         duration_match = re.search(r'\((\d+)\s*min', header_text, re.IGNORECASE)
         if duration_match:
             duration = int(duration_match.group(1))
-            print(f"[{self.language}] Found duration in header: {duration} min for '{header_text[:50]}...'")
+            logger.debug(f"Found duration in header: {duration} min for '{header_text[:50]}...'")
             return duration
         
         # Method 2: Look in the next few siblings for duration info
@@ -784,7 +787,7 @@ class EPUBMeetingScraper:
                 duration_match = re.search(r'\((\d+)\s*min', sibling_text, re.IGNORECASE)
                 if duration_match:
                     duration = int(duration_match.group(1))
-                    print(f"[{self.language}] Found duration in sibling: {duration} min for '{header_text[:50]}...'")
+                    logger.debug(f"Found duration in sibling: {duration} min for '{header_text[:50]}...'")
                     return duration
             
             # Stop looking if we hit another header or major section
@@ -798,7 +801,7 @@ class EPUBMeetingScraper:
                     duration_match = re.search(r'\((\d+)\s*min', elem_text, re.IGNORECASE)
                     if duration_match:
                         duration = int(duration_match.group(1))
-                        print(f"[{self.language}] Found duration in nested element: {duration} min for '{header_text[:50]}...'")
+                        logger.debug(f"Found duration in nested element: {duration} min for '{header_text[:50]}...'")
                         return duration
         
         # Method 3: Look in the parent container for duration info
@@ -808,12 +811,12 @@ class EPUBMeetingScraper:
             duration_match = re.search(r'\((\d+)\s*min', parent_text, re.IGNORECASE)
             if duration_match:
                 duration = int(duration_match.group(1))
-                print(f"[{self.language}] Found duration in parent: {duration} min for '{header_text[:50]}...'")
+                logger.debug(f"Found duration in parent: {duration} min for '{header_text[:50]}...'")
                 return duration
         
         # Method 4: Use improved default durations based on content analysis
         default_duration = self._get_intelligent_default_duration(header_text, position)
-        print(f"[{self.language}] Using intelligent default duration: {default_duration} min for '{header_text[:50]}...'")
+        logger.debug(f"Using intelligent default duration: {default_duration} min for '{header_text[:50]}...'")
         return default_duration
     
     def _get_intelligent_default_duration(self, text: str, position: int) -> int:
@@ -899,12 +902,12 @@ class EPUBMeetingScraper:
                 toc_file = file_name
                 break
         if not toc_file:
-            print(f"[{self.language}] No TOC file found in Watchtower EPUB.")
+            logger.warning(f"No TOC file found in Watchtower EPUB.")
             return meetings
         
         toc_html = epub_content[toc_file]
         soup = BeautifulSoup(toc_html, 'html.parser')
-        print(f"[{self.language}] Scanning TOC file: {toc_file}")
+        logger.debug(f"Scanning TOC file: {toc_file}")
         
         # --- Begin: Find the 'chapter2' li to locate the detailed groupTOC
         chapter2 = soup.find('li', id='chapter2')
@@ -919,7 +922,7 @@ class EPUBMeetingScraper:
                         group_toc_file = f
                         break
                 if group_toc_file:
-                    print(f"[{self.language}] Found group TOC file: {group_toc_file}")
+                    logger.debug(f"Found group TOC file: {group_toc_file}")
                     toc_html = epub_content[group_toc_file]
                     soup = BeautifulSoup(toc_html, 'html.parser')
         # --- End: groupTOC logic
@@ -929,16 +932,16 @@ class EPUBMeetingScraper:
         # Scan for <h3> elements containing date range and article titles, then extract article file from sibling <a>
         for h3 in soup.find_all('h3'):
             h3_text = h3.get_text(" ", strip=True)
-            print(f"[{self.language}] Found heading with potential date: '{h3_text}'")
-            print(f"[{self.language}] Inspecting heading: '{h3_text}'")
+            logger.debug(f"Found heading with potential date: '{h3_text}'")
+            logger.debug(f"Inspecting heading: '{h3_text}'")
 
             # --- New: try to extract the heading date using fallback logic for date ranges
             meeting_date = self._extract_heading_date(h3_text)
             if not meeting_date:
-                print(f"[{self.language}]  Skipping due to no date-like pattern in heading.")
+                logger.debug(f"Skipping due to no date-like pattern in heading.")
                 continue
             else:
-                print(f"[{self.language}] Passed date pattern check for heading.")
+                logger.debug(f"Passed date pattern check for heading.")
             
             # Find the first <a> sibling after this <h3> (article link)
             a_tag = None
@@ -962,20 +965,20 @@ class EPUBMeetingScraper:
                             break
                 if content_file:
                     date_to_file[meeting_date] = (content_file, h3_text)
-                    print(f"[{self.language}] Matched TOC entry '{h3_text}' to file '{content_file}'")
+                    logger.debug(f"Matched TOC entry '{h3_text}' to file '{content_file}'")
 
         # Step 3: Parse the corresponding file and extract <h1> article title and songs.
         # Sort the meeting dates before processing, in chronological order
         for meeting_date in sorted(date_to_file):
             content_file, link_text = date_to_file[meeting_date]
-            print(f"[{self.language}]  Processing Watchtower content from: {content_file} for date: {meeting_date}")
+            logger.debug(f"Processing Watchtower content from: {content_file} for date: {meeting_date}")
             html_content = epub_content[content_file]
             try:
                 article_soup = BeautifulSoup(html_content, 'html.parser')
                 # Find article title
                 title_elem = article_soup.find("h1")
                 if not title_elem:
-                    print(f"[{self.language}] No <h1> found in {content_file}")
+                    logger.warning(f"No <h1> found in {content_file}")
                     continue
                 title_text = title_elem.get_text().strip()
                 if len(title_text) < 10:
@@ -983,12 +986,12 @@ class EPUBMeetingScraper:
                 
                 # Extract songs
                 songs = self._extract_songs(article_soup)
-                print(f"[{self.language}] Normalized meeting date: {meeting_date}")
+                logger.debug(f"Normalized meeting date: {meeting_date}")
                 meeting_parts = self._build_weekend_meeting(title_text, songs)
                 meetings[meeting_date] = meeting_parts
-                print(f"[{self.language}] Registered WEEKEND meeting for {meeting_date}: {title_text} with {len(songs)} songs")
+                logger.info(f"Registered WEEKEND meeting for {meeting_date}: {title_text} with {len(songs)} songs")
             except Exception as e:
-                print(f"[{self.language}] Error extracting weekend from {content_file}: {e}")
+                logger.error(f"Error extracting weekend from {content_file}: {e}")
                 continue
         
         return meetings
@@ -1000,7 +1003,7 @@ class EPUBMeetingScraper:
         # Limit to only 2 songs maximum for weekend meetings
         if len(songs) > 2:
             songs = songs[:2]  # Take only first 2 songs found
-            print(f"[{self.language}] Limited weekend songs to 2: {songs}")
+            logger.debug(f"Limited weekend songs to 2: {songs}")
         
         # 1. Opening Song and Prayer (GENERIC - no specific number)
         meeting_parts.append({
@@ -1082,7 +1085,7 @@ class EPUBMeetingScraper:
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except Exception as e:
-                print(f"[{self.language}] Error loading cache: {e}")
+                logger.error(f"Error loading cache: {e}")
         
         return {}
     
@@ -1097,7 +1100,7 @@ class EPUBMeetingScraper:
                 if not parts_list or len(parts_list) < 3:
                     continue
                     
-                print(f"[{self.language}] Post-processing midweek meeting {meeting_date}")
+                logger.debug(f"Post-processing midweek meeting {meeting_date}")
                 
                 # Extract all song numbers using universal pattern
                 song_numbers = []
@@ -1106,10 +1109,10 @@ class EPUBMeetingScraper:
                     if song_num:
                         song_numbers.append(song_num)
                 
-                print(f"[{self.language}] Found songs: {song_numbers}")
+                logger.debug(f"Found songs: {song_numbers}")
                 
                 if len(song_numbers) < 2:
-                    print(f"[{self.language}]  Not enough songs found, skipping post-processing")
+                    logger.debug(f"Not enough songs found, skipping post-processing")
                     continue
                 
                 # Process based on POSITION and DURATION patterns
@@ -1125,7 +1128,7 @@ class EPUBMeetingScraper:
                         duration <= 3):  # Combined opening is usually 1 minutes
                         
                         opening_song = song_numbers[0]
-                        print(f"[{self.language}]  Splitting opening part by position/duration")
+                        logger.debug(f"Splitting opening part by position/duration")
                         
                         new_parts.extend([
                             {
@@ -1148,7 +1151,7 @@ class EPUBMeetingScraper:
                         duration <= 4):  # Combined closing is usually 4+ minutes
                         
                         closing_song = song_numbers[-1]
-                        print(f"[{self.language}] Splitting closing part by position/duration")
+                        logger.debug(f"Splitting closing part by position/duration")
                         
                         new_parts.extend([
                             {
@@ -1171,7 +1174,7 @@ class EPUBMeetingScraper:
                         i > 0 and i < len(parts_list) - 2):  # Not first or last
                         
                         song_num = self._extract_song_number(title)
-                        print(f"[{self.language}]  Processing middle song by position/duration")
+                        logger.debug(f"Processing middle song by position/duration")
                         
                         new_parts.append({
                             'title': f"MIDDLE_SONG|{song_num}",
@@ -1186,7 +1189,7 @@ class EPUBMeetingScraper:
                 
                 # Replace the original parts list
                 meetings_data['midweek'][issue][meeting_date] = new_parts
-                print(f"[{self.language}]  Post-processed {meeting_date}: {len(parts_list)} → {len(new_parts)} parts")
+                logger.debug(f"Post-processed {meeting_date}: {len(parts_list)} -> {len(new_parts)} parts")
     
     def _extract_song_number(self, text: str) -> Optional[int]:
         """Extract song number from text with improved precision"""
@@ -1215,13 +1218,13 @@ class EPUBMeetingScraper:
         
         try:
             # STAGE 1: Save original raw data first
-            print(f"[{self.language}] Saving raw cache data...")
+            logger.debug(f"Saving raw cache data...")
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(meetings_data, f, ensure_ascii=False, indent=2)
-            print(f"[{self.language}] Raw cache saved: {cache_file}")
+            logger.debug(f"Raw cache saved: {cache_file}")
             
             # STAGE 2: Read back, post-process, and save updated version
-            print(f"[{self.language}] Reading back for post-processing...")
+            logger.debug(f"Reading back for post-processing...")
             with open(cache_file, 'r', encoding='utf-8') as f:
                 loaded_data = json.load(f)
             
@@ -1229,25 +1232,25 @@ class EPUBMeetingScraper:
             self._post_process_midweek_meetings(loaded_data)
             
             # Save the processed version
-            print(f"[{self.language}] Saving processed cache data...")
+            logger.debug(f"Saving processed cache data...")
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(loaded_data, f, ensure_ascii=False, indent=2)
-            print(f"[{self.language}] Processed cache saved: {cache_file}")
+            logger.debug(f"Processed cache saved: {cache_file}")
 
         except Exception as e:
-            print(f"[{self.language}] Error in two-stage save process: {e}")
+            logger.error(f"Error in two-stage save process: {e}")
 
     
     def update_meetings_cache(self) -> bool:
         """Update the meetings cache with latest EPUB content"""
-        print(f"[{self.language}] Updating meetings cache...")
+        logger.info(f"Updating meetings cache...")
         today = datetime.now()
         
         # Get current issue dates
         mwb_issue, _ = self._get_current_issue_dates()
 
         # Download EPUBs, print the constructed download URL for debugging
-        print(f"[{self.language}] Attempting to download MWB EPUB for issue {mwb_issue}...")
+        logger.debug(f"Attempting to download MWB EPUB for issue {mwb_issue}...")
         mwb_epub = self._download_epub('mwb', mwb_issue)
 
         meetings_data = self._load_cached_meetings()
@@ -1256,7 +1259,7 @@ class EPUBMeetingScraper:
         if 'midweek' not in meetings_data:
             meetings_data['midweek'] = {}
         if mwb_epub:
-            print(f"[{self.language}] Parsing midweek meetings from {mwb_epub.name}...")
+            logger.info(f"Parsing midweek meetings from {mwb_epub.name}...")
             mwb_content = self._parse_epub_content(mwb_epub)
             midweek_meetings = self._extract_midweek_meetings(mwb_content)
             meetings_data['midweek'][mwb_issue] = midweek_meetings or {}
@@ -1268,7 +1271,7 @@ class EPUBMeetingScraper:
         w_epub = None
         w_issue_selected = None
         for w_candidate in w_issues:
-            print(f"[{self.language}] Attempting to download Watchtower EPUB for issue {w_candidate}...")
+            logger.debug(f"Attempting to download Watchtower EPUB for issue {w_candidate}...")
             temp_epub = self._download_epub('w', w_candidate)
             if temp_epub:
                 # Parse the content to check if it has studies for our target date
@@ -1276,28 +1279,28 @@ class EPUBMeetingScraper:
                 weekend_meetings = self._extract_weekend_meetings(w_content)
                 
                 # Check if this Watchtower contains studies for our target date
+                # _extract_heading_date returns the START of the study week
+                # (e.g., "2026-02-23" for heading "February 23 - March 1, 2026")
                 contains_current_studies = False
                 for meeting_date_str in weekend_meetings.keys():
-                    meeting_date = datetime.strptime(meeting_date_str, '%Y-%m-%d')
-                    study_week_start = meeting_date - timedelta(days=6)
-                    # Find the most recent past Saturday (or today if Saturday)
-                    last_saturday = today - timedelta(days=(today.weekday() + 2) % 7)
-                    if study_week_start <= last_saturday <= meeting_date:
+                    week_start = datetime.strptime(meeting_date_str, '%Y-%m-%d')
+                    week_end = week_start + timedelta(days=6)
+                    if week_start <= today <= week_end:
                         contains_current_studies = True
                         break
                 
                 if contains_current_studies:
-                    print(f"[{self.language}] Found relevant studies in {w_candidate}")
+                    logger.info(f"Found relevant studies in {w_candidate}")
                     w_epub = temp_epub
                     w_issue_selected = w_candidate
                     break
                 else:
-                    print(f"[{self.language}] No relevant studies in {w_candidate}, trying next...")
+                    logger.debug(f"No relevant studies in {w_candidate}, trying next...")
 
         if 'weekend' not in meetings_data:
             meetings_data['weekend'] = {}
         if w_epub:
-            print(f"[{self.language}] Parsing weekend meetings from {w_epub.name}...")
+            logger.info(f"Parsing weekend meetings from {w_epub.name}...")
             w_content = self._parse_epub_content(w_epub)
             weekend_meetings = self._extract_weekend_meetings(w_content)
             meetings_data['weekend'][w_issue_selected] = weekend_meetings or {}
@@ -1306,7 +1309,7 @@ class EPUBMeetingScraper:
 
         # Save updated cache
         self._save_cached_meetings(meetings_data)
-        print(f"[{self.language}] Cache file written: {self.CACHE_DIR / f'{self.language}_meetings_cache.json'}")
+        logger.info(f"Cache file written: {self.CACHE_DIR / f'{self.language}_meetings_cache.json'}")
 
         return bool(mwb_epub or w_epub)
     
@@ -1318,7 +1321,7 @@ class EPUBMeetingScraper:
         type_data = meetings_data.get(meeting_type_key, {})
         
         # Print number of issues loaded for this meeting type
-        print(f"[{self.language}] Loaded {len(type_data)} issues for {meeting_type.name}")
+        logger.debug(f"Loaded {len(type_data)} issues for {meeting_type.name}")
         
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d')
@@ -1341,10 +1344,10 @@ class EPUBMeetingScraper:
                     week_start = meeting_date  # Start of week
                     week_end = meeting_date + timedelta(days=6)  # End of week (Sunday)
                 
-                print(f"[{self.language}] Checking week from {week_start.date()} to {week_end.date()} against {target_date.date()}")
+                logger.debug(f"Checking week from {week_start.date()} to {week_end.date()} against {target_date.date()}")
                 
                 if week_start <= target_date <= week_end:
-                    print(f"[{self.language}] Match found in issue {issue} for meeting on {meeting_date_str}")
+                    logger.debug(f"Match found in issue {issue} for meeting on {meeting_date_str}")
                     return self._convert_to_meeting_object(meeting_parts_data, meeting_type, meeting_date_str)
         
         return None
@@ -1425,17 +1428,17 @@ class EPUBMeetingScraper:
     def get_meeting_for_current_week(self, meeting_type: MeetingType) -> Optional[Meeting]:
         """Get meeting for current week using intelligent date matching"""
         today = datetime.now()
-        print(f"[{self.language}] Today's date: {today}")
+        logger.debug(f"Today's date: {today}")
         # Always use today's date for both meeting types
         target_date = today
         current_date_str = target_date.strftime('%Y-%m-%d')
-        print(f"[{self.language}] Attempting to find meeting for type: {meeting_type.name}")
-        print(f"[{self.language}] Looking for {meeting_type.name} meeting for date: {current_date_str}")
+        logger.debug(f"Attempting to find meeting for type: {meeting_type.name}")
+        logger.debug(f"Looking for {meeting_type.name} meeting for date: {current_date_str}")
         meeting = self.get_meeting_by_date_range(current_date_str, meeting_type)
         if meeting:
-            print(f"[{self.language}] Found {meeting_type.name} meeting: {meeting.title}")
+            logger.info(f"Found {meeting_type.name} meeting: {meeting.title}")
         else:
-            print(f"[{self.language}] No {meeting_type.name} meeting found for current week.")
+            logger.warning(f"No {meeting_type.name} meeting found for current week.")
         return meeting
     
     def update_meetings(self) -> Dict[MeetingType, Meeting]:

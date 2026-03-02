@@ -2033,8 +2033,9 @@ class MainWindow(QMainWindow):
             create_action = menu.addAction(self.tr("Create New Meeting"))
             create_action.triggered.connect(self._create_new_meeting)
 
-            # Position menu below the update button
-            menu.exec(self.sender().mapToGlobal(self.sender().rect().bottomLeft()))
+            # Position menu at cursor – sender() is a QAction (no geometry)
+            from PyQt6.QtGui import QCursor
+            menu.exec(QCursor.pos())
             
     def _process_weekend_meeting_songs(self, meeting: Meeting):
         """Process weekend meeting to ensure songs are properly displayed"""
