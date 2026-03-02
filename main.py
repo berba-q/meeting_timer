@@ -217,21 +217,25 @@ def _run_startup_cleanup(controller, main_window):
     )
 
     def on_cleanup_finished(result):
-        if result.has_removals:
-            main_window._show_toast_notification(
-                main_window.tr("Data Cleanup"),
-                result.summary(),
-                icon="toast-shredder"
-            )
-        if result.errors:
-            main_window._show_toast_notification(
-                main_window.tr("Cleanup Errors"),
-                main_window.tr(f"{len(result.errors)} file(s) could not be removed"),
-                icon="toast-info"
-            )
+        # Defer UI updates to the next event-loop iteration so they never
+        # overlap with a Windows COM synchronous call (0x8001010d crash).
+        def _show():
+            if result.has_removals:
+                main_window._show_toast_notification(
+                    main_window.tr("Data Cleanup"),
+                    result.summary(),
+                    icon="toast-shredder"
+                )
+            if result.errors:
+                main_window._show_toast_notification(
+                    main_window.tr("Cleanup Errors"),
+                    main_window.tr(f"{len(result.errors)} file(s) could not be removed"),
+                    icon="toast-info"
+                )
+        QTimer.singleShot(0, _show)
         worker.deleteLater()
 
-    worker.finished.connect(on_cleanup_finished)
+    worker.finished.connect(on_cleanup_finished, Qt.ConnectionType.QueuedConnection)
     worker.start()
 
 
