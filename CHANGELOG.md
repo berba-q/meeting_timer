@@ -1,13 +1,16 @@
 # Changelog
 
-# [](https://github.com/berba-q/meeting_timer/compare/v1.0.8...v) (2026-02-26)
+# [](https://github.com/berba-q/meeting_timer/compare/v1.0.9...v) (2026-03-02)
+
+
+### Bug Fixes
+
+* Fix a rare issue that causes crashes if cursor position is not found ([3d4cc5b](https://github.com/berba-q/meeting_timer/commit/3d4cc5b9da1048e1af1b7c8cff9ca729d967e132))
 
 
 ### Features
 
 * Implement automatic data cleanup feature ([b406dc9](https://github.com/berba-q/meeting_timer/commit/b406dc9e53cc2bd585378977e1dc2a0006cd1a97))
-
-
 
 ## [1.0.7](https://github.com/berba-q/meeting_timer/compare/v1.0.6...v1.0.7) (2026-02-25)
 
@@ -21,8 +24,6 @@
 
 * Added persistence and resume of timer when app crashes ([9f4bfd5](https://github.com/berba-q/meeting_timer/commit/9f4bfd55bbb5ca4fd5b474b58c511496abb58adf))
 * Enhance meeting duration management including defining specific meeting end time which forces time redestribution from current part. ([440f266](https://github.com/berba-q/meeting_timer/commit/440f266ed1d6af0bfb591d0ea4080e3b73f64c26))
-
-
 
 ## [1.0.6](https://github.com/berba-q/meeting_timer/compare/v1.0.5...v1.0.6) (2026-01-27)
 
@@ -39,8 +40,6 @@
 
 * Add intellligent CO visit mode which adjust both midweek and weekend meetings with CO visit  meeting pattern ([190360b](https://github.com/berba-q/meeting_timer/commit/190360bc9f924857b61464d7994d43518db82f57))
 * Implemented toast notification messages instead of system notifications to improve user experience. ([eeb2d71](https://github.com/berba-q/meeting_timer/commit/eeb2d71c70a45b505981551550b5a179c5b82fc0))
-
-
 
 ## [1.0.5](https://github.com/berba-q/meeting_timer/compare/v1.0.4...v1.0.5) (2025-07-03)
 
@@ -125,8 +124,6 @@
 * update overtime color coding for timer display ([c07cfe9](https://github.com/berba-q/meeting_timer/commit/c07cfe902f7970c7e44c2666dc90fce3714b58d2))
 * version1.0 of scraper using api and scraping from epubs instead of wol.jw.org ([c394604](https://github.com/berba-q/meeting_timer/commit/c394604622f7345263f6b4ee252170683d3bc004))
 
-
-
 ## [1.0.2](https://github.com/berba-q/meeting_timer/compare/v1.0.1...v1.0.2) (2025-05-17)
 
 
@@ -193,8 +190,6 @@
 * **workflow:** enhance release notes generation and update CHANGELOG.md process ([644efd3](https://github.com/berba-q/meeting_timer/commit/644efd301eff0c63d6c9aa06633b6437868b6bb8))
 * **workflow:** update Node.js setup and improve release notes generation ([711786e](https://github.com/berba-q/meeting_timer/commit/711786e4f05d754384bafe28f839967d44c5255c))
 
-
-
 ## [1.0.1](https://github.com/berba-q/meeting_timer/compare/v1.0.0...v1.0.1) (2025-05-07)
 
 
@@ -214,9 +209,4 @@
 * Improve responsiveness of the main window and include docking tools ([75b0706](https://github.com/berba-q/meeting_timer/commit/75b0706255a155e1f4ba5682ca3fa6b94b025cae))
 * timer display dynamically adjusts with screen size ([bcb3463](https://github.com/berba-q/meeting_timer/commit/bcb346314d407280fe4a64ff41b7d2f021aa3b21))
 
-
-
 # 1.0.0 (2025-04-30)
-
-
-
