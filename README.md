@@ -63,18 +63,23 @@ device on your network — on Windows, macOS, and Linux.
 - **Automatic Update Checking**: Notifies you when a new version is available
 
 ### Keyboard Shortcuts
-| Shortcut | Action |
-|---|---|
-| Ctrl+N | New Meeting |
-| Ctrl+O | Open Meeting |
-| Ctrl+E | Edit Current Meeting |
-| Ctrl+Shift+S | Edit Weekend Songs |
-| F5 | Update Meetings from Web |
-| F9 | Toggle Digital/Analog Display |
-| F10 | Toggle Secondary Display |
-| Ctrl+, | Open Settings |
 
-## Screenshots
+<table>
+  <thead>
+    <tr><th>Shortcut</th><th>Action</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>New Meeting</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Open Meeting</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Edit Current Meeting</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Edit Weekend Songs</td></tr>
+    <tr><td><kbd>F5</kbd></td><td>Update Meetings from Web</td></tr>
+    <tr><td><kbd>F9</kbd></td><td>Toggle Digital/Analog Display</td></tr>
+    <tr><td><kbd>F10</kbd></td><td>Toggle Secondary Display</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Open Settings</td></tr>
+  </tbody>
+</table>
+
 
 ### Main Interface
 ![Main Interface](assets/main_interface.png)
