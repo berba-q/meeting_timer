@@ -2,7 +2,15 @@
 
 ![OnTime Meeting Timer Logo](assets/readme.png)
 
-A cross-platform timer application designed specifically for managing meeting schedules with robust timing, display options, and network sharing capabilities.
+**A free, open-source meeting timer built for Jehovah's Witnesses congregations.**
+OnTime automatically scrapes the current Watchtower and Midweek Meeting schedules
+from wol.jw.org, manages timing for all parts, and shares a live display to any
+device on your network — on Windows, macOS, and Linux.
+
+[![Latest Release](https://img.shields.io/github/v/release/berba-q/meeting_timer?label=Download&color=blue)](https://github.com/berba-q/meeting_timer/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
+[![Python](https://img.shields.io/badge/Python-3.11%2B-yellow?logo=python)]()
 
 ## Features
 
@@ -76,6 +84,17 @@ A cross-platform timer application designed specifically for managing meeting sc
 
 ### Mobile Network Display
 ![Network Display](assets/network_display.png)
+
+## Who is this for?
+
+OnTime is built for the **sound/media desk** (or any appointed brother)
+who manages timing at a Kingdom Hall or any Christian meeting. It handles:
+
+- **Midweek Meeting** (Life and Ministry): all parts, student items, and song/prayer timing
+- **Weekend Meeting**: Public Talk, Watchtower Study, and announcements
+- **Circuit Overseer visits**: activates a modified schedule automatically
+- **Custom Meetings (Conventions, Assemblies, Special Meetings, etc)**: Import and manage custom meetings
+Schedules are fetched from the public wol.jw.org pages.
 
 ## Getting Started
 

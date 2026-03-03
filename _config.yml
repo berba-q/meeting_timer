@@ -1,0 +1,12 @@
+title: "OnTime Meeting Timer"
+description: >-
+  Free, open-source meeting timer for Jehovah's Witnesses. Auto-scrapes Watchtower and Life & Ministry schedules from wol.jw.org. Multi-screen display, live network sharing, CO Visit mode. Windows, macOS, Linux.
+url: "https://berba-q.github.io"
+baseurl: "/meeting_timer"
+remote_theme: pages-themes/cayman@v0.2.0
+plugins:
+- jekyll-remote-theme
+- jekyll-seo-tag
+markdown: kramdown
+kramdown:
+  input: GFM
